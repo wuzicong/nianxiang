@@ -31,15 +31,20 @@
 
 ## 双部署模式
 
-同一套代码，用环境变量切换：
+同一套代码，用环境变量切换。两种模式都默认私有；分享必须主动发布，并可设密码、过期和撤销。
 
 | 变量 | 自托管（默认开发） | 云托管 |
 |------|-------------------|--------|
 | `DEPLOY_MODE` | `selfhost` | `cloud` |
-| `STORAGE_BACKEND` | `minio` | `s3` |
-| 对象存储 | Compose MinIO | 云厂商 S3 兼容桶 |
-| 数据库 | Compose Postgres | 托管 PostgreSQL + pgvector |
-| 密钥 | `.env` / Docker secrets | KMS / Secret Manager |
+| `STORAGE_BACKEND` | `minio`（也可改 `s3` 绑定自有云桶） | `s3` |
+| 对象存储 | Compose MinIO，桶匿名访问关闭 | 云厂商 S3 兼容桶，Block Public Access |
+| 数据库 | Compose Postgres + pgvector | 托管 PostgreSQL + pgvector |
+| 预签名 | 同样夹紧到 5–15 分钟 | 同样夹紧到 5–15 分钟 |
+| 加密 | 磁盘与备份由运维负责 | `AWS_KMS_KEY_ID` 可配，生产建议 SSE-KMS |
+| 密钥 | 本机 `.env` / Docker secrets，不进 Git | 云 KMS / Secret Manager，不进 Git、不进镜像 |
+| CDN | 不需要 | 只缓存衍生图，不缓存原图 |
+
+`S3_BUCKET` 必须是 `memora-${MEMORA_ENV}`（例如 `memora-local`、`memora-prod`）。
 
 详细清单：
 
@@ -52,53 +57,69 @@
 
 **共用**
 
-- 默认全私有；分享须主动发布；支持密码 / 过期 / 撤销
-- 传输 TLS；**密钥不进仓库**（本仓仅 `.env.example`）
+- 默认全私有；分享须主动发布；支持密码 / 过期 / 一键撤销
+- 传输 TLS；**密钥不进仓库**（本仓只有 `.env.example` 与 `env.cloud.example` 占位）
+- 原图只走预签名或鉴权代理；`PRESIGN_TTL_MINUTES` 由 API 夹紧到 **5–15 分钟**
 - 人脸 / 向量等敏感能力可关闭；删号级联清理
 - 分享可剥离 GPS；软删后 GC
 
 **云托管加严（硬门槛）**
 
 - 原图桶 **Block Public Access**；禁止匿名 list/get
-- 仅 API 运行时角色最小 IAM（限定 `users/*` 等前缀）
-- 原图访问：**预签名 5–15 分钟**（`PRESIGN_TTL_MINUTES`）
+- 仅 API 运行时角色最小 IAM（`users/*`、`albums/*` 等前缀，禁止 `*` 资源）
 - **SSE-KMS** 可配（`AWS_KMS_KEY_ID`）；密钥与应用角色分离
 - CDN **只托衍生图**，不缓存原图
 - 运维默认不可读原图；排障需审批 + 短时授权 + 审计
+- 备份加密
 
 **自托管**
 
-- Postgres / Redis / MinIO 仅绑定 `127.0.0.1`（见 `docker-compose.yml`）
-- 公网暴露请走反代 + HTTPS；附备份与加固清单（逐步补齐）
+- Postgres / Redis / MinIO / ML 只绑定 `127.0.0.1`（见 `docker-compose.yml`）
+- 公网只暴露反代后的 Web/API，并强制 HTTPS
+- 加固：防火墙只开 443、系统更新、磁盘告警、备份落到本机以外
+- 开发口令写在 `.env.example` 里，只为对齐 Compose；换到非本机前必须改掉
 
 ---
 
-## 快速开始
+## 最短路径
 
-### 1. 基础设施（Compose）
+命令都在仓库根目录执行。
+
+### 自托管
 
 ```bash
 cp .env.example .env
 docker compose up -d
-docker compose ps
+corepack enable && pnpm install
+pnpm dev:api    # http://127.0.0.1:3001/health
 ```
 
-预期服务：`postgres`、`redis`、`minio`、`minio-init`（建桶）、`ml`（`/health`）。
+`docker compose ps` 应看到 `postgres`、`redis`、`minio`、`minio-init`（退出码 0）、`ml`。MinIO 控制台：<http://127.0.0.1:9001>。
 
-MinIO 控制台：<http://127.0.0.1:9001>（凭据见 `.env`）。
+可选：`pnpm dev:web`（3000）、`pnpm dev:worker`（等 Redis 就绪）。
 
-### 2. 应用（本地开发）
+### 云托管
+
+不要把 Compose 里的 Postgres / MinIO 当生产。在密钥库设置（对照 `deploy/cloud/env.cloud.example`）：
 
 ```bash
-corepack enable
-pnpm install
-pnpm --filter @memora/shared build
-pnpm dev:api    # http://127.0.0.1:3001/health
-pnpm dev:web    # http://127.0.0.1:3000
-pnpm dev:worker # Redis 就绪后启动 BullMQ 桩
+DEPLOY_MODE=cloud
+MEMORA_ENV=prod
+STORAGE_BACKEND=s3
+DATABASE_URL=postgresql://...@HOST:5432/memora?sslmode=require
+REDIS_URL=rediss://...
+S3_BUCKET=memora-prod
+S3_REGION=ap-southeast-1
+S3_ENDPOINT=https://s3.ap-southeast-1.amazonaws.com
+S3_FORCE_PATH_STYLE=false
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+AWS_KMS_KEY_ID=...          # 可配，生产建议开启
+PRESIGN_TTL_MINUTES=10      # 超出 5–15 会被夹紧
+CDN_BASE_URL=https://cdn.example.com/memora-prod
 ```
 
-云模式：将 `deploy/cloud/env.cloud.example` 中的变量写入部署侧密钥库，**不要**提交真实凭据。
+然后用同一套 web / api / worker / ml 进程或镜像启动。桶策略示意见 `deploy/cloud/s3-bucket-policy.hcl.example`。
 
 ---
 
@@ -140,4 +161,4 @@ memora-{env}/
 
 ## 许可与协作
 
-私有项目，未经授权不得分发。功能开发请走 `main` 保护分支 + PR。
+私有项目，未经授权不得分发。功能开发请走 `main` 保护分支 + PR。推送后 CI 会跑 `pnpm typecheck`、Job/桶路径契约检查，并拒绝明显的私钥与云访问密钥。

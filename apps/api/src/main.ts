@@ -1,7 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { bucketName } from "@memora/shared";
-import { config, uploadPlaceholderResponse } from "./config.js";
+import { config, logDeployWarnings, uploadPlaceholderResponse } from "./config.js";
 
 const app = express();
 app.use(cors());
@@ -34,6 +34,9 @@ app.post("/api/v1/assets/upload-url", (req, res) => {
 });
 
 const port = config.port;
+logDeployWarnings();
 app.listen(port, () => {
-  console.log(`[memora-api] listening on :${port} (DEPLOY_MODE=${config.deployMode})`);
+  console.log(
+    `[memora-api] listening on :${port} (DEPLOY_MODE=${config.deployMode} STORAGE_BACKEND=${config.storageBackend} presign=${config.presignTtlMinutes}m)`,
+  );
 });

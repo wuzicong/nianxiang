@@ -38,6 +38,16 @@ export function templateAssetPrefix(packId: string): string {
   return `templates/${packId}/assets/`;
 }
 
-/** 云模式预签名 TTL 建议范围（分钟） */
+/** 云模式预签名 TTL 允许范围（分钟）。超出部分在 API 启动时夹紧。 */
 export const PRESIGN_TTL_MIN_MINUTES = 5;
 export const PRESIGN_TTL_MAX_MINUTES = 15;
+export const PRESIGN_TTL_DEFAULT_MINUTES = 10;
+
+/** 非数字或空值回落到默认 10 分钟，再夹紧到 5–15。 */
+export function clampPresignTtlMinutes(value: number): number {
+  const n = Number.isFinite(value) ? Math.trunc(value) : PRESIGN_TTL_DEFAULT_MINUTES;
+  return Math.min(
+    PRESIGN_TTL_MAX_MINUTES,
+    Math.max(PRESIGN_TTL_MIN_MINUTES, n),
+  );
+}

@@ -22,9 +22,22 @@ venv/
 !.env.example
 !**/.env.example
 !**/env.*.example
+env.cloud
+.envrc
 secrets/
+credentials.json
 *.pem
 *.key
+*.p12
+*.pfx
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Local compose overrides may contain secrets
+docker-compose.override.yml
+compose.override.yml
 
 # IDE & OS
 .idea/
@@ -35,8 +48,10 @@ Thumbs.db
 # Logs & temp
 logs/
 *.log
+pnpm-debug.log*
 tmp/
 .cache/
+.turbo/
 
 # Test & coverage
 coverage/

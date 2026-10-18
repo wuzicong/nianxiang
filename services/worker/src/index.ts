@@ -2,7 +2,18 @@ import { Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { ALL_JOB_NAMES, type JobName } from "@memora/shared";
 
-const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
+
+function redactRedisUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.username) parsed.username = "***";
+    if (parsed.password) parsed.password = "***";
+    return parsed.toString();
+  } catch {
+    return "redis://***";
+  }
+}
 
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 
@@ -13,7 +24,7 @@ function stubProcessor(jobName: JobName) {
   };
 }
 
-console.log(`[memora-worker] connecting redis=${redisUrl}`);
+console.log(`[memora-worker] connecting redis=${redactRedisUrl(redisUrl)}`);
 
 for (const name of ALL_JOB_NAMES) {
   // P0：每个 Job 名注册独立 Worker（后续合并为路由处理器）
@@ -24,7 +35,7 @@ for (const name of ALL_JOB_NAMES) {
 }
 
 console.log(
-  `[memora-worker] BullMQ stubs registered on queue pattern; jobs: ${ALL_JOB_NAMES.join(", ")}`,
+  `[memora-worker] BullMQ stubs registered; jobs: ${ALL_JOB_NAMES.join(", ")}`,
 );
 
 // 保持进程存活

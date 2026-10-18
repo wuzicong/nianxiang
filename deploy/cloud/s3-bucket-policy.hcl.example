@@ -1,12 +1,21 @@
-# 示意：原图桶默认拒绝一切公共访问；API 角色仅 rw 指定前缀
-# 实际请使用 Terraform aws_s3_bucket_public_access_block + IAM policy
+# 示意，不会被本仓库自动套用。
+# 落地时用 Terraform aws_s3_bucket_public_access_block + 桶策略 + IAM。
 
 block_public_acls       = true
 block_public_policy     = true
 ignore_public_acls      = true
 restrict_public_buckets = true
 
-# IAM 最小权限前缀示例：
-# arn:aws:s3:::memora-prod/users/*
-# arn:aws:s3:::memora-prod/albums/*
-# 禁止 s3:ListBucket 对匿名主体
+# 桶策略要点：
+# - Principal "*" 对 s3:GetObject / s3:ListBucket → Deny
+# - 强制 aws:SecureTransport = true
+# - 原图前缀 users/*/originals/* 不挂到 CDN
+#
+# API 角色只允许这些资源（不要 Resource "*"）：
+#   arn:aws:s3:::memora-prod
+#   arn:aws:s3:::memora-prod/users/*
+#   arn:aws:s3:::memora-prod/albums/*
+#   arn:aws:s3:::memora-prod/templates/*
+# 动作限于 s3:GetObject / PutObject / DeleteObject / ListBucket（List 带 prefix 条件）。
+# 服务端加密：PutObject 要求 s3:x-amz-server-side-encryption = aws:kms
+# 且 kms key id 等于 AWS_KMS_KEY_ID。KMS key policy 与应用角色分离。

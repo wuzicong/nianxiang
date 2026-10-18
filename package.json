@@ -8,7 +8,9 @@
     "dev:web": "pnpm --filter @memora/web dev",
     "dev:api": "pnpm --filter @memora/api dev",
     "dev:worker": "pnpm --filter @memora/worker dev",
+    "pretypecheck": "pnpm --filter @memora/shared build",
     "typecheck": "pnpm -r run typecheck",
+    "check:contracts": "node scripts/check-contracts.mjs",
     "lint": "pnpm -r run lint --if-present"
   },
   "engines": {

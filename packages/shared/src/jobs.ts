@@ -1,6 +1,7 @@
 /**
- * 异步 Job 名称（与服务器/Worker 契约冻结，勿随意改名）
- * @see 总册 §3.4
+ * 异步 Job 名称（与总册 §3.4 逐字冻结，共 8 个，勿改名）
+ * media.derivative, meta.exif, meta.geocode, ml.face, ml.clip,
+ * ml.scene, smart.album.refresh, album.render
  */
 export const JOB_NAMES = {
   MEDIA_DERIVATIVE: "media.derivative",

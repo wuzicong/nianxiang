@@ -1,35 +1,53 @@
 # 自托管部署（Compose）
 
-隐私优先：数据与 ML 默认留在本机。开发环境默认走此模式。
+隐私优先：数据和 ML 默认留在本机。开发环境走这条路径。也可以把 `STORAGE_BACKEND` 改成 `s3`，只挂你自己的云桶，应用仍跑在本机。
 
-## 快速开始
+## 最短路径
+
+在仓库根目录：
 
 ```bash
 cp .env.example .env
-# 编辑 .env：DEPLOY_MODE=selfhost、MinIO 凭据仅本地使用
-
 docker compose up -d
+docker compose ps
 ```
 
-## 服务清单（P0）
+`.env` 里保持：
 
-| 服务 | 端口（默认） | 说明 |
-|------|----------------|------|
-| postgres | 5432（仅内网） | pgvector 镜像 |
-| redis | 6379（仅内网） | BullMQ |
-| minio | 9000 API / 9001 控制台 | 对象存储 |
-| minio-init | — | 创建 `memora-{env}` 桶 |
+```bash
+DEPLOY_MODE=selfhost
+MEMORA_ENV=local
+STORAGE_BACKEND=minio
+S3_BUCKET=memora-local
+```
 
-应用进程（web / api / worker / ml）在 P0 以本地 `pnpm dev` 或后续 Compose profile 启动；**基础设施**由根目录 `docker-compose.yml` 拉起。
+`DATABASE_URL` 的口令要和 `POSTGRES_PASSWORD` 相同；`S3_SECRET_ACCESS_KEY` 要和 `MINIO_ROOT_PASSWORD` 相同。模板里的 `memora-dev-change-me` 只给本机用。
 
-## 安全基线（自托管）
+## 服务
 
-- Postgres / Redis / MinIO **不映射到公网**（仅 `127.0.0.1` 或 Docker 内网）
-- 生产请在前置反代（Caddy / Traefik）上强制 HTTPS
-- 密钥写在 `.env` 或 Docker secrets，**禁止提交进 Git**
-- 附：备份脚本占位见 `backup.sh`（P1 实现逻辑备份）
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| postgres | `127.0.0.1:5432` | pgvector |
+| redis | `127.0.0.1:6379` | BullMQ，AOF |
+| minio | `127.0.0.1:9000` / 控制台 `9001` | 对象存储 |
+| minio-init | 一次性 | 建桶并 `anonymous set none` |
+| ml | `127.0.0.1:8000/health` | 推理桩 |
+
+web / api / worker 在 P0 用 `pnpm dev:*` 起。不要把 5432、6379、9000、9001 改绑到 `0.0.0.0`。
+
+## 安全
+
+- 公网只经过 Caddy / Traefik，强制 HTTPS
+- 防火墙只开放 443（SSH 按你自己的跳板策略）
+- 密钥放 `.env` 或 Docker secrets，禁止提交
+- 做好系统更新、磁盘告警；单盘有坏盘和停电风险，备份请放到另一块盘或另一台机器
+- 备份脚本占位：`deploy/self-host/backup.sh`（P1 再接 `pg_dump`）
 
 ## 存储
 
-- `STORAGE_BACKEND=minio`（S3 兼容 API）
-- 桶名：`memora-{MEMORA_ENV}`，路径见根 README
+桶名 `memora-${MEMORA_ENV}`。对象键：
+
+```text
+users/{userId}/originals/{assetId}
+users/{userId}/derivatives/{assetId}/{thumb|preview|hero}.webp
+```

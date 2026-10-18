@@ -1,5 +1,6 @@
-# 念册 · Memora — P0 基础设施（自托管默认）
-# 应用服务：本地 pnpm dev 或后续 compose profile
+# 念册 · Memora — P0 自托管依赖
+# 开发口令仅用于本机，必须用 .env 覆盖后再暴露到非本机。
+# 数据端口全部绑定 127.0.0.1。云模式不要用本文件里的 Postgres / MinIO 当生产库。
 name: memora
 
 services:
@@ -8,7 +9,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-memora}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-memora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-memora-dev-change-me}
       POSTGRES_DB: ${POSTGRES_DB:-memora}
     ports:
       - "127.0.0.1:5432:5432"
@@ -40,14 +41,15 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-memora-dev-secret}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-memora-dev-change-me}
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
     volumes:
       - memora_minio_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9000/minio/health/live || exit 1"]
+      # 官方镜像自带 mc；curl 在该镜像里不一定存在
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -58,13 +60,13 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-memora} ${MINIO_ROOT_PASSWORD:-memora-dev-secret};
-      mc mb -p local/${S3_BUCKET:-memora-local} || true;
-      mc anonymous set none local/${S3_BUCKET:-memora-local} || true;
-      echo 'MinIO bucket ready (private)';
-      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-memora-dev-change-me}
+      S3_BUCKET: ${S3_BUCKET:-memora-local}
+    volumes:
+      - ./deploy/self-host/minio-init.sh:/minio-init.sh:ro
+    entrypoint: ["/bin/sh", "/minio-init.sh"]
     restart: "no"
 
   ml:
