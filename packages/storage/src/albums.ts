@@ -26,7 +26,21 @@ export interface ShareRecord {
   expiresAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  /** 只说明有没有设密码，绝不携带哈希。 */
+  passwordProtected: boolean;
 }
+
+/** 活跃分享的门闩。passwordHash 只给校验用，调用方不得记录或回显。 */
+export interface ActiveShareGate {
+  shareId: string;
+  passwordHash: string | null;
+}
+
+/**
+ * public：只读没有密码的分享。
+ * granted：调用方已经对上密码；仍会拒绝撤销和过期。
+ */
+export type ShareReadAccess = "public" | "granted";
 
 export interface PublicShareAsset {
   assetId: string;
@@ -71,6 +85,8 @@ export interface NewShare {
   userId: string;
   tokenHash: string;
   expiresAt: Date | null;
+  /** scrypt 编码。null 表示这个分享不设密码。不要传明文。 */
+  passwordHash: string | null;
 }
 
 export interface AlbumRepository {
@@ -83,7 +99,16 @@ export interface AlbumRepository {
   createShare(input: NewShare): Promise<CreateShareResult>;
   listShares(albumId: string, userId: string): Promise<ShareRecord[] | null>;
   revokeShare(shareId: string, userId: string): Promise<ShareRecord | null>;
-  findActiveShareByTokenHash(tokenHash: string): Promise<PublicShareView | null>;
+  /** 不含相册标题和素材。撤销、过期、不存在都是 null。 */
+  findActiveShareGate(tokenHash: string): Promise<ActiveShareGate | null>;
+  /**
+   * 读取仍有效的分享内容。
+   * access 为 public 时，设了密码的分享返回 null，避免未经校验就拿出素材。
+   */
+  findActiveShareByTokenHash(
+    tokenHash: string,
+    access?: ShareReadAccess,
+  ): Promise<PublicShareView | null>;
   close(): Promise<void>;
 }
 
@@ -101,6 +126,7 @@ interface ShareRow {
   id: string;
   album_id: string;
   user_id: string;
+  password_hash: string | null;
   expires_at: Date | string | null;
   revoked_at: Date | string | null;
   created_at: Date | string;
@@ -143,6 +169,7 @@ function mapShare(row: ShareRow): ShareRecord {
     expiresAt: isoOrNull(row.expires_at),
     revokedAt: isoOrNull(row.revoked_at),
     createdAt: iso(row.created_at),
+    passwordProtected: typeof row.password_hash === "string" && row.password_hash.length > 0,
   };
 }
 
@@ -361,12 +388,19 @@ export function createAlbumRepository(options: {
 
     async createShare(input) {
       const inserted = await query<ShareRow>(
-        `INSERT INTO shares (id, album_id, user_id, token_hash, expires_at)
-         SELECT $1, a.id, a.user_id, $3, $4
+        `INSERT INTO shares (id, album_id, user_id, token_hash, expires_at, password_hash)
+         SELECT $1, a.id, a.user_id, $3, $4, $5
          FROM albums a
-         WHERE a.id = $2 AND a.user_id = $5
-         RETURNING id, album_id, user_id, expires_at, revoked_at, created_at`,
-        [input.id, input.albumId, input.tokenHash, input.expiresAt, input.userId],
+         WHERE a.id = $2 AND a.user_id = $6
+         RETURNING id, album_id, user_id, password_hash, expires_at, revoked_at, created_at`,
+        [
+          input.id,
+          input.albumId,
+          input.tokenHash,
+          input.expiresAt,
+          input.passwordHash,
+          input.userId,
+        ],
       );
       const row = inserted.rows[0];
       if (!row) return { ok: false, reason: "album_not_found" };
@@ -380,7 +414,7 @@ export function createAlbumRepository(options: {
       );
       if (owned.rows.length === 0) return null;
       const result = await query<ShareRow>(
-        `SELECT id, album_id, user_id, expires_at, revoked_at, created_at
+        `SELECT id, album_id, user_id, password_hash, expires_at, revoked_at, created_at
          FROM shares
          WHERE album_id = $1 AND user_id = $2
          ORDER BY created_at DESC`,
@@ -394,14 +428,34 @@ export function createAlbumRepository(options: {
         `UPDATE shares
          SET revoked_at = COALESCE(revoked_at, now())
          WHERE id = $1 AND user_id = $2
-         RETURNING id, album_id, user_id, expires_at, revoked_at, created_at`,
+         RETURNING id, album_id, user_id, password_hash, expires_at, revoked_at, created_at`,
         [shareId, userId],
       );
       const row = result.rows[0];
       return row ? mapShare(row) : null;
     },
 
-    async findActiveShareByTokenHash(tokenHash) {
+    async findActiveShareGate(tokenHash) {
+      const result = await query<{ id: string; password_hash: string | null }>(
+        `SELECT s.id, s.password_hash
+         FROM shares s
+         JOIN albums a ON a.id = s.album_id AND a.user_id = s.user_id
+         WHERE s.token_hash = $1
+           AND s.revoked_at IS NULL
+           AND (s.expires_at IS NULL OR s.expires_at > now())`,
+        [tokenHash],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      return {
+        shareId: row.id,
+        passwordHash: typeof row.password_hash === "string" && row.password_hash.length > 0
+          ? row.password_hash
+          : null,
+      };
+    },
+
+    async findActiveShareByTokenHash(tokenHash, access = "public") {
       return withTransaction(async (client) => {
         const share = await client.query<{
           id: string;
@@ -415,8 +469,9 @@ export function createAlbumRepository(options: {
            JOIN albums a ON a.id = s.album_id AND a.user_id = s.user_id
            WHERE s.token_hash = $1
              AND s.revoked_at IS NULL
-             AND (s.expires_at IS NULL OR s.expires_at > now())`,
-          [tokenHash],
+             AND (s.expires_at IS NULL OR s.expires_at > now())
+             AND ($2::boolean OR s.password_hash IS NULL)`,
+          [tokenHash, access === "granted"],
         );
         const row = share.rows[0];
         if (!row) return null;
@@ -432,8 +487,9 @@ export function createAlbumRepository(options: {
           `SELECT id FROM shares
            WHERE id = $1
              AND revoked_at IS NULL
-             AND (expires_at IS NULL OR expires_at > now())`,
-          [row.id],
+             AND (expires_at IS NULL OR expires_at > now())
+             AND ($2::boolean OR password_hash IS NULL)`,
+          [row.id, access === "granted"],
         );
         if (stillActive.rows.length === 0) return null;
         return {

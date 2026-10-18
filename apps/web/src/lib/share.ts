@@ -22,6 +22,7 @@ export interface PublicSharePayload {
 export type ShareLoad =
   | { kind: "missing" }
   | { kind: "unavailable" }
+  | { kind: "locked" }
   | { kind: "ok"; share: PublicSharePayload };
 
 function httpUrl(value: unknown): string | null {
@@ -35,7 +36,7 @@ function httpUrl(value: unknown): string | null {
   }
 }
 
-function parsePayload(value: unknown): PublicSharePayload | null {
+export function parsePublicSharePayload(value: unknown): PublicSharePayload | null {
   if (!value || typeof value !== "object") return null;
   const album = (value as { album?: { title?: unknown; themeId?: unknown } }).album;
   const assets = (value as { assets?: unknown }).assets;
@@ -88,9 +89,18 @@ export async function loadPublicShare(token: string): Promise<ShareLoad> {
     return { kind: "unavailable" };
   }
   if (response.status >= 500) return { kind: "unavailable" };
+  if (response.status === 401) {
+    try {
+      const body = (await response.json()) as { error?: unknown };
+      if (body.error === "password_required") return { kind: "locked" };
+    } catch {
+      return { kind: "missing" };
+    }
+    return { kind: "missing" };
+  }
   if (!response.ok) return { kind: "missing" };
   try {
-    const share = parsePayload(await response.json());
+    const share = parsePublicSharePayload(await response.json());
     if (!share) return { kind: "unavailable" };
     return { kind: "ok", share };
   } catch {

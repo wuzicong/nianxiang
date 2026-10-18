@@ -24,6 +24,7 @@ import {
   type ObjectStore,
   type PresignPutInput,
   type PublicShareView,
+  type ShareReadAccess,
   type ShareRecord,
   type AssetJobEnqueuer,
 } from "@memora/storage";
@@ -167,7 +168,11 @@ export function memoryAuth(): AuthRepository & { users: Map<string, AuthUser> } 
 
 export function memoryAlbums(
   assets: Pick<AssetRepository, "get">,
-): AlbumRepository & { tokenHashes: Set<string>; expireShare(shareId: string): void } {
+): AlbumRepository & {
+  tokenHashes: Set<string>;
+  passwordHashes: Set<string>;
+  expireShare(shareId: string): void;
+} {
   interface StoredAlbum {
     id: string;
     userId: string;
@@ -183,12 +188,14 @@ export function memoryAlbums(
   }
   interface StoredShare extends ShareRecord {
     tokenHash: string;
+    passwordHash: string | null;
   }
 
   const albums = new Map<string, StoredAlbum>();
   const membership = new Map<string, Membership[]>();
   const shares = new Map<string, StoredShare>();
   const tokenHashes = new Set<string>();
+  const passwordHashes = new Set<string>();
   let clock = Date.parse("2026-04-01T00:00:00.000Z");
   const nowIso = () => {
     clock += 1000;
@@ -205,10 +212,18 @@ export function memoryAlbums(
     expiresAt: share.expiresAt,
     revokedAt: share.revokedAt,
     createdAt: share.createdAt,
+    passwordProtected: share.passwordHash !== null,
   });
+  const activeShare = (tokenHash: string): StoredShare | null => {
+    const share = [...shares.values()].find((item) => item.tokenHash === tokenHash);
+    if (!share || share.revokedAt) return null;
+    if (share.expiresAt && Date.parse(share.expiresAt) <= Date.now()) return null;
+    return share;
+  };
 
   return {
     tokenHashes,
+    passwordHashes,
     async ready() {},
     async createAlbum(input: NewAlbum): Promise<CreateAlbumResult> {
       const owned = [...albums.values()].filter((album) => album.userId === input.userId);
@@ -277,12 +292,15 @@ export function memoryAlbums(
         albumId: album.id,
         userId: album.userId,
         tokenHash: input.tokenHash,
+        passwordHash: input.passwordHash,
+        passwordProtected: input.passwordHash !== null,
         expiresAt: input.expiresAt ? input.expiresAt.toISOString() : null,
         revokedAt: null,
         createdAt: nowIso(),
       };
       shares.set(share.id, share);
       tokenHashes.add(input.tokenHash);
+      if (input.passwordHash) passwordHashes.add(input.passwordHash);
       return { ok: true, share: toShare(share) };
     },
     async listShares(albumId, userId) {
@@ -299,10 +317,18 @@ export function memoryAlbums(
       if (!share.revokedAt) share.revokedAt = new Date().toISOString();
       return toShare(share);
     },
-    async findActiveShareByTokenHash(tokenHash): Promise<PublicShareView | null> {
-      const share = [...shares.values()].find((item) => item.tokenHash === tokenHash);
-      if (!share || share.revokedAt) return null;
-      if (share.expiresAt && Date.parse(share.expiresAt) <= Date.now()) return null;
+    async findActiveShareGate(tokenHash) {
+      const share = activeShare(tokenHash);
+      if (!share) return null;
+      return { shareId: share.id, passwordHash: share.passwordHash };
+    },
+    async findActiveShareByTokenHash(
+      tokenHash,
+      access: ShareReadAccess = "public",
+    ): Promise<PublicShareView | null> {
+      const share = activeShare(tokenHash);
+      if (!share) return null;
+      if (access !== "granted" && share.passwordHash) return null;
       const album = albums.get(share.albumId);
       if (!album || album.userId !== share.userId) return null;
       const viewAssets: PublicShareView["assets"] = [];
@@ -437,6 +463,8 @@ export async function postJson(
     body: text ? (JSON.parse(text) as unknown) : null,
     setCookies: response.headers.getSetCookie(),
     cacheControl: response.headers.get("cache-control"),
+    robots: response.headers.get("x-robots-tag"),
+    referrerPolicy: response.headers.get("referrer-policy"),
   };
 }
 

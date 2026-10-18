@@ -48,6 +48,14 @@ test("redactSecrets masks share capability tokens in page and API paths", () => 
   assert.match(cleaned, /\/api\/v1\/public\/shares\/\*\*\*/);
 });
 
+test("redactSecrets masks scrypt password hashes", () => {
+  const encoded =
+    "scrypt$RojMItSksXMJbZuB6DEmDg$1gBxoMQt_-ovfCnLvYPvcJ5apMcnzY6IP5HyQzmAmMc";
+  const cleaned = redactSecrets(`stored ${encoded} ok`);
+  assert.equal(cleaned.includes(encoded), false);
+  assert.match(cleaned, /scrypt\$\*\*\*/);
+});
+
 test("safeErrorMessage keeps ordinary failures", () => {
   assert.equal(safeErrorMessage(new Error("asset_not_found")), "asset_not_found");
   assert.equal(safeErrorMessage("plain"), "plain");

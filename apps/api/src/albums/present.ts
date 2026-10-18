@@ -25,6 +25,7 @@ export function presentShare(share: ShareRecord) {
     expiresAt: share.expiresAt,
     revokedAt: share.revokedAt,
     createdAt: share.createdAt,
+    passwordProtected: share.passwordProtected,
   };
 }
 

@@ -9,6 +9,7 @@ test("local selfhost leaves the session cookie insecure and registration open", 
   assert.equal(config.registrationOpen, true);
   assert.equal(config.sessionTtlSeconds, 14 * 24 * 60 * 60);
   assert.equal(config.oidcConfigured, false);
+  assert.equal(config.sharePasswordRequired, false);
   assert.deepEqual(config.webOrigins, ["http://127.0.0.1:3000", "http://localhost:3000"]);
 });
 
@@ -46,4 +47,7 @@ test("session, registration, and oidc flags do not retain the client secret", ()
   assert.equal(config.oidcConfigured, true);
   assert.deepEqual(config.webOrigins, ["https://app.example"]);
   assert.equal(JSON.stringify(config).includes(secret), false);
+  assert.equal(createConfig({ ...ENV, SHARE_REQUIRE_PASSWORD: "true" }).sharePasswordRequired, true);
+  assert.equal(createConfig({ ...ENV, SHARE_REQUIRE_PASSWORD: "0" }).sharePasswordRequired, false);
+  assert.equal(createConfig({ ...ENV, SHARE_REQUIRE_PASSWORD: "yes" }).sharePasswordRequired, false);
 });

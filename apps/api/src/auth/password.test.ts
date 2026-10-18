@@ -5,7 +5,7 @@ import { hashPassword, isAcceptablePassword, verifyPassword } from "./password.j
 test("scrypt hash verifies the same password and rejects a different one", async () => {
   const password = "correct-horse";
   const encoded = await hashPassword(password);
-  assert.match(encoded, /^scrypt\$/);
+  assert.match(encoded, /^scrypt\$[A-Za-z0-9_-]{22}\$[A-Za-z0-9_-]{43}$/);
   assert.equal(encoded.includes(password), false);
   const again = await hashPassword(password);
   assert.notEqual(encoded, again);

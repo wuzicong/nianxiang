@@ -82,22 +82,25 @@ test("postgres albums and shares revoke, expire, and keep only the token hash", 
       userId: ownerId,
       tokenHash,
       expiresAt: new Date(Date.now() + 60_000),
+      passwordHash: null,
     });
     assert.equal(share.ok, true);
     if (!share.ok) return;
-    const stored = await pool.query<{ token_hash: string }>(
-      `SELECT token_hash FROM shares WHERE id = $1`,
+    assert.equal(share.share.passwordProtected, false);
+    const stored = await pool.query<{ token_hash: string; password_hash: string | null }>(
+      `SELECT token_hash, password_hash FROM shares WHERE id = $1`,
       [share.share.id],
     );
     assert.equal(stored.rows[0]?.token_hash, tokenHash);
     assert.notEqual(stored.rows[0]?.token_hash, token);
+    assert.equal(stored.rows[0]?.password_hash, null);
     const columns = await pool.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns WHERE table_name = 'shares'`,
     );
-    assert.equal(
-      columns.rows.some((row) => row.column_name === "token"),
-      false,
-    );
+    const columnNames = columns.rows.map((row) => row.column_name);
+    assert.equal(columnNames.includes("token"), false);
+    assert.equal(columnNames.includes("password"), false);
+    assert.equal(columnNames.includes("password_hash"), true);
     await assert.rejects(
       () =>
         pool.query(
@@ -113,12 +116,53 @@ test("postgres albums and shares revoke, expire, and keep only the token hash", 
     assert.equal(JSON.stringify(active).includes("/originals/"), false);
     assert.equal(active?.assets[0]?.derivatives.preview, preview);
 
+    const passwordPlain = "share-secret-1";
+    const passwordHash =
+      "scrypt$AAAAAAAAAAAAAAAAAAAAAA$BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    const protectedToken = randomBytes(32).toString("base64url");
+    const protectedHash = createHash("sha256").update(protectedToken).digest("hex");
+    const protectedShare = await albums.createShare({
+      id: randomUUID(),
+      albumId: created.album.id,
+      userId: ownerId,
+      tokenHash: protectedHash,
+      expiresAt: null,
+      passwordHash,
+    });
+    assert.equal(protectedShare.ok, true);
+    if (!protectedShare.ok) return;
+    assert.equal(protectedShare.share.passwordProtected, true);
+    assert.equal(JSON.stringify(protectedShare.share).includes(passwordPlain), false);
+    assert.equal(JSON.stringify(protectedShare.share).includes(passwordHash), false);
+    const gate = await albums.findActiveShareGate(protectedHash);
+    assert.equal(gate?.passwordHash, passwordHash);
+    assert.equal(await albums.findActiveShareByTokenHash(protectedHash, "public"), null);
+    const opened = await albums.findActiveShareByTokenHash(protectedHash, "granted");
+    assert.equal(opened?.title, "海港");
+    assert.equal(JSON.stringify(opened).includes(passwordHash), false);
+    await assert.rejects(
+      () =>
+        pool.query(
+          `INSERT INTO shares (id, album_id, user_id, token_hash, password_hash)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            randomUUID(),
+            created.album.id,
+            ownerId,
+            createHash("sha256").update("plaintext-password-row").digest("hex"),
+            passwordPlain,
+          ],
+        ),
+      (err: unknown) => (err as { code?: string }).code === "23514",
+    );
+
     const expired = await albums.createShare({
       id: randomUUID(),
       albumId: created.album.id,
       userId: ownerId,
       tokenHash: createHash("sha256").update("expired-share-token").digest("hex"),
       expiresAt: new Date(Date.now() - 60_000),
+      passwordHash: null,
     });
     assert.equal(expired.ok, true);
     if (!expired.ok) return;

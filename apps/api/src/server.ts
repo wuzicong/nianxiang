@@ -306,6 +306,7 @@ export function createApp(deps: AppDeps): Express {
     auth: deps.auth,
     albums: deps.albums,
     objects: deps.objects,
+    sharePasswordRequired: deps.config.sharePasswordRequired,
   });
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
