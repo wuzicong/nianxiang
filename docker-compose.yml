@@ -66,6 +66,7 @@ services:
       S3_BUCKET: ${S3_BUCKET:-memora-local}
     volumes:
       - ./deploy/self-host/minio-init.sh:/minio-init.sh:ro
+      - ./deploy/self-host/minio-cors.xml:/minio-cors.xml:ro
     entrypoint: ["/bin/sh", "/minio-init.sh"]
     restart: "no"
 

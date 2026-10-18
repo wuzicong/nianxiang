@@ -41,7 +41,7 @@ web / api / worker 在 P0 用 `pnpm dev:*` 起。不要把 5432、6379、9000、
 - 防火墙只开放 443（SSH 按你自己的跳板策略）
 - 密钥放 `.env` 或 Docker secrets，禁止提交
 - 做好系统更新、磁盘告警；单盘有坏盘和停电风险，备份请放到另一块盘或另一台机器
-- 备份脚本占位：`deploy/self-host/backup.sh`（P1 再接 `pg_dump`）
+- 备份：`deploy/self-host/backup.sh` 读取环境变量做 `pg_dump` 和 `mc mirror`，不把口令写进日志。需要本机有 `pg_dump` 和 `mc`。
 
 ## 存储
 
@@ -51,3 +51,9 @@ web / api / worker 在 P0 用 `pnpm dev:*` 起。不要把 5432、6379、9000、
 users/{userId}/originals/{assetId}
 users/{userId}/derivatives/{assetId}/{thumb|preview|hero}.webp
 ```
+
+`minio-init` 会 `mc anonymous set none`。匿名拒绝的策略意图写在 `bucket-policy.json`，init **不会**把这份 Deny 套到桶上，避免误伤根用户。同一组固定镜像里 `mc cors set` 可能打印未实现的警告；`curl` 上传不依赖 CORS。浏览器从 3000 跨域 PUT 时，要在反代上加 CORS，或换更新的 MinIO。
+
+素材表在 API 或 Worker 第一次连上 Postgres 时创建，SQL 见 `packages/storage/migrations/001_assets.sql`。
+
+上传验证见仓库根 README 的「本地验证上传」。

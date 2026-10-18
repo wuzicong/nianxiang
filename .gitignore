@@ -61,3 +61,6 @@ test-results/
 
 # Docker local volumes (if bind-mounted outside compose named volumes)
 data/
+backups/
+.terraform/
+.terraform.lock.hcl

@@ -1,42 +1,42 @@
-import cors from "cors";
-import express from "express";
-import { bucketName } from "@memora/shared";
-import { config, logDeployWarnings, uploadPlaceholderResponse } from "./config.js";
+import {
+  createAssetJobEnqueuer,
+  createAssetRepository,
+  createObjectStore,
+  objectStoreConfigFromRuntime,
+  safeErrorMessage,
+} from "@memora/storage";
+import { config, logDeployWarnings } from "./config.js";
+import { createApp } from "./server.js";
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.get("/health", (_req, res) => {
-  res.json({
-    ok: true,
-    service: "memora-api",
-    deployMode: config.deployMode,
-    memoraEnv: config.memoraEnv,
-    storage: {
-      backend: config.storageBackend,
-      bucket: config.s3.bucket,
-      expectedBucketPattern: bucketName(config.memoraEnv),
-    },
-  });
+const objects = createObjectStore(objectStoreConfigFromRuntime(config));
+const assets = createAssetRepository({
+  connectionString: config.databaseUrl,
+  applicationName: "memora-api",
 });
+const jobs = createAssetJobEnqueuer(config.redisUrl);
+const app = createApp({ config, objects, assets, jobs });
 
-/** v1 上传预签名占位 — POST /api/v1/assets/upload-url */
-app.post("/api/v1/assets/upload-url", (req, res) => {
-  const { filename, mime, size } = req.body ?? {};
-  if (!filename || !mime || typeof size !== "number") {
-    res.status(400).json({
-      error: "filename, mime, size required",
-    });
-    return;
-  }
-  res.status(501).json(uploadPlaceholderResponse(filename, mime, size));
-});
-
-const port = config.port;
-logDeployWarnings();
-app.listen(port, () => {
+const server = app.listen(config.port, () => {
+  logDeployWarnings();
   console.log(
-    `[memora-api] listening on :${port} (DEPLOY_MODE=${config.deployMode} STORAGE_BACKEND=${config.storageBackend} presign=${config.presignTtlMinutes}m)`,
+    `[memora-api] listening on :${config.port} (DEPLOY_MODE=${config.deployMode} STORAGE_BACKEND=${config.storageBackend} presign=${config.presignTtlMinutes}m bucket=${config.s3.bucket})`,
   );
+});
+
+async function shutdown(): Promise<void> {
+  server.close();
+  await jobs.close().catch((err) => {
+    console.error("[memora-api] queue close failed", safeErrorMessage(err));
+  });
+  await assets.close().catch((err) => {
+    console.error("[memora-api] db close failed", safeErrorMessage(err));
+  });
+  process.exit(0);
+}
+
+process.on("SIGINT", () => {
+  void shutdown();
+});
+process.on("SIGTERM", () => {
+  void shutdown();
 });
