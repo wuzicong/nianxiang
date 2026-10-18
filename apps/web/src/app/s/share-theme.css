@@ -66,11 +66,11 @@
 }
 
 .share-ticket {
-  width: 8.5rem;
-  right: 0.75rem;
-  bottom: 1.25rem;
+  width: 6.6rem;
+  right: 3.25rem;
+  bottom: 3rem;
   transform: rotate(-8deg);
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .share-stamp {
@@ -92,9 +92,7 @@
 }
 
 .share-shell[data-theme="cotton-candy"] .share-card {
-  border-color: transparent;
-  border-bottom: none;
-  border-radius: var(--share-radius-card) var(--share-radius-card) 1.1rem 1.35rem;
+  border-color: color-mix(in srgb, var(--share-brand) 55%, var(--share-border));
 }
 
 .share-shell[data-theme="kyoto-lantern"] .share-card {
@@ -120,8 +118,9 @@
   padding-top: 1.85rem;
 }
 
-.share-shell[data-theme="magazine-heirloom"] .share-card-body {
-  padding: 1.85rem 4.4rem 1.55rem 1.45rem;
+.share-shell[data-theme="magazine-heirloom"] .share-brand,
+.share-shell[data-theme="magazine-heirloom"] .share-kicker {
+  padding-right: 3.4rem;
 }
 
 .share-motif {
@@ -146,13 +145,11 @@
 }
 
 .share-washi-edge,
-.share-folio,
-.share-torn {
+.share-folio {
   pointer-events: none;
 }
 
-.share-washi-edge,
-.share-torn {
+.share-washi-edge {
   position: absolute;
   z-index: 2;
 }
@@ -164,9 +161,7 @@
   height: 0.7rem;
 }
 
-.share-washi-edge svg,
-.share-torn svg,
-.share-tape svg {
+.share-washi-edge svg {
   display: block;
   width: 100%;
   height: 100%;
@@ -179,14 +174,6 @@
   width: 3.6rem;
   z-index: 2;
   color: var(--share-text);
-}
-
-.share-torn {
-  left: 0.35rem;
-  right: 0.35rem;
-  bottom: -0.85rem;
-  height: 1.15rem;
-  color: var(--share-surface);
 }
 
 .share-brand {
@@ -239,8 +226,8 @@
 .share-shell[data-theme="magazine-heirloom"] .share-title {
   font-weight: 500;
   letter-spacing: 0.01em;
-  font-size: clamp(2.15rem, 5vw, 2.85rem);
-  line-height: 1.02;
+  font-size: clamp(1.9rem, 3.1vw, 2.45rem);
+  line-height: 1.12;
 }
 
 .share-rule {
@@ -249,6 +236,11 @@
   border: 0;
   background: var(--share-accent);
   width: 4.75rem;
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-rule {
+  background: var(--share-brand);
+  height: 2px;
 }
 
 .share-shell[data-theme="magazine-heirloom"] .share-rule {
@@ -358,10 +350,6 @@
   .share-ticket,
   .share-stamp {
     display: none;
-  }
-
-  .share-shell[data-theme="magazine-heirloom"] .share-card-body {
-    padding-right: 1.35rem;
   }
 
   .share-folio {

@@ -43,15 +43,6 @@ export function ShareCardDecor({ themeId }: { themeId: ThemeId }) {
   );
 }
 
-export function ShareCardFoot({ themeId }: { themeId: ThemeId }) {
-  if (themeId !== "cotton-candy") return null;
-  return (
-    <div className="share-torn" aria-hidden="true">
-      <TornEdge />
-    </div>
-  );
-}
-
 function SoftBlob({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 220 180" fill="none">
@@ -86,17 +77,6 @@ function WashiTape() {
     <svg className="share-tape-mark" viewBox="0 0 120 28" fill="none">
       <rect x="1" y="4" width="118" height="20" rx="2" fill="#C9B8E8" fillOpacity="0.72" />
       <path d="M1 8h118M1 20h118" stroke="#F5C6C6" strokeWidth="1" strokeDasharray="3 4" />
-    </svg>
-  );
-}
-
-function TornEdge() {
-  return (
-    <svg viewBox="0 0 360 28" preserveAspectRatio="none" fill="none">
-      <path
-        d="M0 8c14 7 22-8 38-5 16 3 20 12 38 9 18-3 22-13 40-8 16 4 22 11 38 7 18-5 24-13 42-7 16 6 26 9 42 3 16-6 22-11 40-5 18 7 22 12 40 7 16-4 20 1 42-1v20H0V8z"
-        fill="currentColor"
-      />
     </svg>
   );
 }

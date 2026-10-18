@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { ThemeSkin } from "../../lib/themes";
-import { ShareBackdrop, ShareCardDecor, ShareCardFoot } from "./share-ornaments";
+import { ShareBackdrop, ShareCardDecor } from "./share-ornaments";
 
 function buttonInk(brand: string, text: string, background: string): string {
   const hex = brand.trim().replace(/^#/, "");
@@ -52,7 +52,6 @@ export function ShareChrome({
       <article className="share-card">
         <ShareCardDecor themeId={theme.id} />
         <div className="share-card-body">{children}</div>
-        <ShareCardFoot themeId={theme.id} />
       </article>
     </main>
   );
