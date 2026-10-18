@@ -61,6 +61,20 @@ test("presignPut adds KMS headers only when a key is configured", async () => {
   assert.match(signedHeaders, /x-amz-server-side-encryption/);
 });
 
+test("presignGet signs a single derivative key for the same TTL", async () => {
+  const store = createObjectStore(baseConfig());
+  const signed = await store.presignGet({
+    key: "users/local/derivatives/asset-1/preview.webp",
+  });
+  const url = new URL(signed.url);
+  assert.equal(url.pathname, "/memora-local/users/local/derivatives/asset-1/preview.webp");
+  assert.equal(url.searchParams.get("X-Amz-Expires"), "600");
+  assert.equal(signed.url.includes(SECRET), false);
+  assert.equal(signed.url.includes("/originals/"), false);
+  const drift = Math.abs(signed.expiresAt.getTime() - (Date.now() + 600_000));
+  assert.ok(drift < 5_000);
+});
+
 test("presign TTL outside 5–15 minutes is rejected", () => {
   assert.throws(() => createObjectStore(baseConfig({ presignTtlSeconds: 60 })));
   assert.throws(() => createObjectStore(baseConfig({ presignTtlSeconds: 3_600 })));

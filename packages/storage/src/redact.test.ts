@@ -38,6 +38,16 @@ test("redactSecrets masks session cookies, bearer tokens, and json passwords", (
   assert.match(cleaned, /"password":"\*\*\*/);
 });
 
+test("redactSecrets masks share capability tokens in page and API paths", () => {
+  const token = `${"a".repeat(42)}-`;
+  const cleaned = redactSecrets(
+    `open /s/${token} and /api/v1/public/shares/${token}?x=1`,
+  );
+  assert.equal(cleaned.includes(token), false);
+  assert.match(cleaned, /\/s\/\*\*\*/);
+  assert.match(cleaned, /\/api\/v1\/public\/shares\/\*\*\*/);
+});
+
 test("safeErrorMessage keeps ordinary failures", () => {
   assert.equal(safeErrorMessage(new Error("asset_not_found")), "asset_not_found");
   assert.equal(safeErrorMessage("plain"), "plain");

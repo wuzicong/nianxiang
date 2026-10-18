@@ -1,4 +1,5 @@
 import {
+  createAlbumRepository,
   createAssetJobEnqueuer,
   createAssetRepository,
   createAuthRepository,
@@ -18,8 +19,12 @@ const auth = createAuthRepository({
   connectionString: config.databaseUrl,
   applicationName: "memora-api",
 });
+const albums = createAlbumRepository({
+  connectionString: config.databaseUrl,
+  applicationName: "memora-api",
+});
 const jobs = createAssetJobEnqueuer(config.redisUrl);
-const app = createApp({ config, objects, assets, jobs, auth });
+const app = createApp({ config, objects, assets, jobs, auth, albums });
 
 const server = app.listen(config.port, () => {
   logDeployWarnings();
@@ -38,6 +43,9 @@ async function shutdown(): Promise<void> {
   });
   await auth.close().catch((err) => {
     console.error("[memora-api] auth db close failed", safeErrorMessage(err));
+  });
+  await albums.close().catch((err) => {
+    console.error("[memora-api] album db close failed", safeErrorMessage(err));
   });
   process.exit(0);
 }

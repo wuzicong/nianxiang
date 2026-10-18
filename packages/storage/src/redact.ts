@@ -7,6 +7,9 @@ const JSON_SECRET =
   /("(?:password|passwordHash|password_hash|token|session|authorization)"\s*:\s*")[^"]*/gi;
 const ASSIGNED_SECRET =
   /((?:password|secret|token|authorization)\s*[=:]\s*)(?!\*\*\*|bearer\b)[^\s&]+/gi;
+/** 分享页和公开读取路径上的能力令牌。先写更长的 API 路径，避免被短路径截断。 */
+const SHARE_CAPABILITY =
+  /(\/(?:api\/v1\/public\/shares|s)\/)(?!\*\*\*)[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
 
 /** 日志用。去掉带密码的 URL、预签名 query、会话 Cookie 和常见密钥形状。 */
 export function redactSecrets(input: string): string {
@@ -17,7 +20,8 @@ export function redactSecrets(input: string): string {
     .replace(BEARER, "$1***")
     .replace(SESSION_COOKIE, "$1***")
     .replace(JSON_SECRET, "$1***")
-    .replace(ASSIGNED_SECRET, "$1***");
+    .replace(ASSIGNED_SECRET, "$1***")
+    .replace(SHARE_CAPABILITY, "$1***");
 }
 
 export function safeErrorMessage(err: unknown): string {

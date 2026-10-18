@@ -30,6 +30,7 @@ export {
   type HeadResult,
   type ObjectStore,
   type ObjectStoreConfig,
+  type PresignGetResult,
   type PresignPutInput,
   type PresignPutResult,
   type PutObjectInput,
@@ -42,4 +43,24 @@ export {
   runtimeWarnings,
   type RuntimeConfig,
 } from "./runtime-config.js";
-export { ASSET_SCHEMA_SQL, AUTH_SCHEMA_SQL, SCHEMA_ADVISORY_LOCK } from "./schema.js";
+export {
+  createAlbumRepository,
+  MAX_ALBUMS_PER_USER,
+  MAX_ASSETS_PER_ALBUM,
+  type AddAssetsResult,
+  type AlbumRepository,
+  type AlbumSummary,
+  type CreateAlbumResult,
+  type CreateShareResult,
+  type NewAlbum,
+  type NewShare,
+  type PublicShareAsset,
+  type PublicShareView,
+  type ShareRecord,
+} from "./albums.js";
+export {
+  ASSET_SCHEMA_SQL,
+  ALBUM_SCHEMA_SQL,
+  AUTH_SCHEMA_SQL,
+  SCHEMA_ADVISORY_LOCK,
+} from "./schema.js";

@@ -2,7 +2,7 @@
 
 智能照片库 + 主题成册：上传后按时间 / 地点 / 人物 / 场景组织素材，选片套用模板，生成可分享的故事站或翻页纪念册。
 
-> **登录**：上传和读取素材必须带会话 Cookie。邮箱密码登录，自托管和云模式共用。人脸、CLIP、地理编码和成册渲染仍是桩。
+> **W6**：相册和可撤销分享已经接上。分享链接只存令牌哈希，可设过期，撤销后立即失效。密码分享、人脸、CLIP、地理编码和成册排版仍未做。
 
 私有仓库：[wuzicong/nianxiang](https://github.com/wuzicong/nianxiang)
 
@@ -13,10 +13,10 @@
 ```
 ├── apps/
 │   ├── web/          # Next.js 15 前端壳
-│   └── api/          # Node API：会话、预签名上传、完成登记
+│   └── api/          # Node API：会话、上传、相册与分享
 ├── packages/
-│   ├── shared/       # Job 名、桶路径、上传限制
-│   └── storage/      # MinIO / S3、素材表、用户与会话
+│   ├── shared/       # Job 名、桶路径、上传限制、模板 id
+│   └── storage/      # MinIO / S3、素材、用户、相册与分享
 ├── services/
 │   ├── worker/       # BullMQ 消费桩
 │   └── ml/           # FastAPI /health 桩
@@ -32,7 +32,7 @@
 
 ## 双部署模式
 
-同一套代码，用环境变量切换。两种模式都默认私有；分享必须主动发布，并可设密码、过期和撤销。
+同一套代码，用环境变量切换。两种模式都默认私有；分享必须主动发布。过期和一键撤销已实现，密码分享还没做。
 
 | 变量 | 自托管（默认开发） | 云托管 |
 |------|-------------------|--------|
@@ -58,11 +58,12 @@
 
 **共用**
 
-- 默认全私有；分享须主动发布；支持密码 / 过期 / 一键撤销
+- 默认全私有；分享须主动发布；支持过期和一键撤销（密码分享未做）
 - 传输 TLS；**密钥不进仓库**（本仓只有 `.env.example` 与 `env.cloud.example` 占位）
 - 原图只走预签名或鉴权代理；`PRESIGN_TTL_MINUTES` 由 API 夹紧到 **5–15 分钟**
 - 上传 / 完成 / 读取素材只认会话里的用户；对象键是 `users/{已认证 userId}/...`
 - 人脸 / 向量等敏感能力可关闭；删号级联清理
+- 分享令牌只存哈希；公开页只签衍生图，不签原图；撤销和过期都是 404
 - 分享可剥离 GPS；软删后 GC
 
 **云托管加严（硬门槛）**
@@ -171,7 +172,42 @@ curl -s -b /tmp/memora.cookies -c /tmp/memora.cookies -X POST http://127.0.0.1:3
 
 注册默认开放（`AUTH_REGISTRATION=open`）。云上线前可以设成 `closed`。OIDC 的环境变量名已经留好，授权码流程还没接。
 
-`pnpm test` 覆盖预签名、登录、跨用户隔离和日志打码，不依赖 Compose。`pnpm typecheck` 与 `pnpm check:contracts` 是合入前要绿的两项。
+## 本地验证相册和分享
+
+Postgres 和 API 已经在跑。如果上一步已经登出，先重新登录，把 Cookie 留在 `/tmp/memora.cookies`。`token` 只在创建分享的响应里出现一次，数据库只存它的 sha256。不要把 token 写进日志、工单或截图。
+
+```bash
+curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/albums \
+  -H 'content-type: application/json' \
+  -d '{"title":"京都周末","themeId":"kyoto-lantern"}'
+curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/albums/<albumId>/assets \
+  -H 'content-type: application/json' \
+  -d '{"assetIds":["<assetId>"]}'
+# expiresAt 可省略，表示不过期；要设的话用一个未来的 ISO 时间，且不超过 366 天
+curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/albums/<albumId>/shares \
+  -H 'content-type: application/json' \
+  -d '{}'
+# 不带 Cookie。响应是衍生图的短时预签名，没有原图键，也没有 GPS。
+curl -s http://127.0.0.1:3001/api/v1/public/shares/<token>
+curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/shares/<shareId>/revoke
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/api/v1/public/shares/<token>
+```
+
+撤销后、过期后、以及乱写的 token，都是 **404**，正文都是 `分享不存在`。未登录不能建相册；别人的相册和分享同样是 404。
+
+页面：`pnpm dev:web`，打开 `http://127.0.0.1:3000/s/<token>`。肤色来自 `templates/<themeId>/theme.json`（棉花糖日记、京都纸灯、杂志 Heirloom）。撤销后刷新应看到「分享不存在」。
+
+合入前在仓库根目录跑，这三项不依赖 Compose：
+
+```bash
+pnpm typecheck
+pnpm check:contracts
+pnpm test
+```
+
+`pnpm test` 覆盖预签名、登录、相册、分享撤销、跨用户隔离和日志打码。`pnpm typecheck` 与 `pnpm check:contracts` 是合入前要绿的两项。
+
+还没做：分享密码、细粒度协作者权限、社交登录 / OIDC 授权码、相册改名和删除、拖拽排序、完整成册排版、把原图放进分享。
 
 ## 冻结契约（P0 已入库，P1 沿用）
 
@@ -207,9 +243,9 @@ memora-{env}/
 |------|------|
 | P0 | 骨架、Compose、契约、双模式文档 |
 | P1 | 预签名上传、derivative / exif worker、桶策略骨架 |
-| 登录 | 邮箱密码会话；上传和读取绑定已认证用户 ← **当前** |
-| 后续 | 人脸 / CLIP、地理编码、选片成册 |
-| W6 MVP | 选片 → 3 模板 → 可分享短链 |
+| 登录 | 邮箱密码会话；上传和读取绑定已认证用户 |
+| W6 MVP | 相册、链接分享、过期与撤销 ← **当前** |
+| 后续 | 分享密码、细粒度权限、人脸 / CLIP、地理编码、成册排版 |
 
 ---
 

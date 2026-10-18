@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { apiOrigin } from "@/lib/api-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,6 @@ const HOP_BY_HOP = new Set([
   "host",
   "content-length",
 ]);
-
-function apiOrigin(): string {
-  return (process.env.API_ORIGIN ?? "http://127.0.0.1:3001").replace(/\/$/, "");
-}
 
 async function proxy(request: NextRequest, path: string[]): Promise<NextResponse> {
   const target = `${apiOrigin()}/api/v1/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;

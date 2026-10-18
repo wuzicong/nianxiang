@@ -68,7 +68,7 @@ export interface AssetRepository {
   close(): Promise<void>;
 }
 
-interface AssetRow {
+export interface AssetRow {
   id: string;
   user_id: string;
   storage_key: string;
@@ -89,7 +89,7 @@ function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function mapRow(row: AssetRow): AssetRecord {
+export function mapAssetRow(row: AssetRow): AssetRecord {
   return {
     id: row.id,
     userId: row.user_id,
@@ -193,7 +193,7 @@ export function createAssetRepository(options: {
     async get(id) {
       const result = await query<AssetRow>(`SELECT * FROM assets WHERE id = $1`, [id]);
       const row = result.rows[0];
-      return row ? mapRow(row) : null;
+      return row ? mapAssetRow(row) : null;
     },
     async markUploaded(id) {
       const updated = await query<AssetRow>(
@@ -203,9 +203,9 @@ export function createAssetRepository(options: {
          RETURNING *`,
         [id],
       );
-      if (updated.rows[0]) return mapRow(updated.rows[0]);
+      if (updated.rows[0]) return mapAssetRow(updated.rows[0]);
       const current = await query<AssetRow>(`SELECT * FROM assets WHERE id = $1`, [id]);
-      return current.rows[0] ? mapRow(current.rows[0]) : null;
+      return current.rows[0] ? mapAssetRow(current.rows[0]) : null;
     },
     async markProcessing(id) {
       await query(
