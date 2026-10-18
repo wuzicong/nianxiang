@@ -8,9 +8,13 @@
     "dev:web": "pnpm --filter @memora/web dev",
     "dev:api": "pnpm --filter @memora/api dev",
     "dev:worker": "pnpm --filter @memora/worker dev",
-    "pretypecheck": "pnpm --filter @memora/shared build",
+    "postinstall": "pnpm --filter @memora/shared build && pnpm --filter @memora/storage build",
+    "pretypecheck": "pnpm --filter @memora/shared build && pnpm --filter @memora/storage build",
+    "pretest": "pnpm --filter @memora/shared build && pnpm --filter @memora/storage build",
     "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r --if-present run test",
     "check:contracts": "node scripts/check-contracts.mjs",
+    "verify:upload": "node scripts/verify-upload.mjs",
     "lint": "pnpm -r run lint --if-present"
   },
   "engines": {

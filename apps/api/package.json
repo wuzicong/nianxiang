@@ -7,10 +7,12 @@
     "build": "tsc",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@memora/shared": "workspace:*",
+    "@memora/storage": "workspace:*",
     "cors": "^2.8.5",
     "express": "^4.21.2"
   },
