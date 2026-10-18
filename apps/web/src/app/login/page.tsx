@@ -89,6 +89,9 @@ export default function LoginPage() {
             <br />
             <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}>{user.id}</span>
           </p>
+          <p style={{ marginTop: "0.75rem" }}>
+            <a href="/albums">管理相册与分享</a>
+          </p>
           <button type="button" onClick={() => void logout()}>
             退出
           </button>
