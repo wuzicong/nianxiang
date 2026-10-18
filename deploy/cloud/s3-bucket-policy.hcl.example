@@ -1,0 +1,12 @@
+# 示意：原图桶默认拒绝一切公共访问；API 角色仅 rw 指定前缀
+# 实际请使用 Terraform aws_s3_bucket_public_access_block + IAM policy
+
+block_public_acls       = true
+block_public_policy     = true
+ignore_public_acls      = true
+restrict_public_buckets = true
+
+# IAM 最小权限前缀示例：
+# arn:aws:s3:::memora-prod/users/*
+# arn:aws:s3:::memora-prod/albums/*
+# 禁止 s3:ListBucket 对匿名主体

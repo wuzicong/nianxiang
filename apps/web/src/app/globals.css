@@ -1,0 +1,16 @@
+:root {
+  --memora-cream: #f7ede2;
+  --memora-ink: #2c2a29;
+  --memora-moon: #fafaf7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", sans-serif;
+  background: var(--memora-moon);
+  color: var(--memora-ink);
+}

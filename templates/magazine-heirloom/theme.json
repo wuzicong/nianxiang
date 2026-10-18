@@ -1,0 +1,18 @@
+{
+  "$schema": "../theme.schema.placeholder.json",
+  "id": "magazine-heirloom",
+  "name": "杂志 Heirloom",
+  "nameEn": "Magazine Heirloom",
+  "track": "editorial",
+  "moodDefault": "editorial",
+  "version": "0.0.1-placeholder",
+  "colors": {
+    "background": "#FAFAF7",
+    "primary": "#1A1A1A",
+    "accent": "#C2A878",
+    "muted": "#E8E4DE",
+    "text": "#1A1A1A"
+  },
+  "radius": { "card": 8, "button": 8 },
+  "slots": ["hero", "spread-2", "quote", "timeline", "closing"]
+}

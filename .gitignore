@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+!**/.env.example
+!**/env.*.example
+secrets/
+*.pem
+*.key
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+logs/
+*.log
+tmp/
+.cache/
+
+# Test & coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Docker local volumes (if bind-mounted outside compose named volumes)
+data/
