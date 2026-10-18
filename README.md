@@ -20,7 +20,7 @@
 ├── services/
 │   ├── worker/       # BullMQ 消费桩
 │   └── ml/           # FastAPI /health 桩
-├── templates/        # MVP 三套 theme.json 占位
+├── templates/        # W6 三套主题（theme.json + assets/）
 ├── deploy/
 │   ├── self-host/    # Compose 说明与备份占位
 │   └── cloud/        # 云托管 env 与安全清单
@@ -191,7 +191,9 @@ memora-{env}/
   templates/{packId}/assets/...
 ```
 
-### MVP 模板占位
+### W6 主题
+
+可分享 MVP 使用这三套完整主题。装饰 SVG 在各自的 `assets/` 下，说明见 [templates/README.md](templates/README.md)。
 
 - `templates/cotton-candy/theme.json` — 棉花糖日记
 - `templates/kyoto-lantern/theme.json` — 京都纸灯

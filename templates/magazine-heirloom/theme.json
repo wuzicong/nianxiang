@@ -1,18 +1,101 @@
 {
-  "$schema": "../theme.schema.placeholder.json",
+  "$schema": "../theme.schema.json",
   "id": "magazine-heirloom",
-  "name": "杂志 Heirloom",
-  "nameEn": "Magazine Heirloom",
+  "name": {
+    "zh": "杂志 Heirloom",
+    "en": "Magazine Heirloom"
+  },
   "track": "editorial",
   "moodDefault": "editorial",
-  "version": "0.0.1-placeholder",
-  "colors": {
-    "background": "#FAFAF7",
-    "primary": "#1A1A1A",
-    "accent": "#C2A878",
-    "muted": "#E8E4DE",
-    "text": "#1A1A1A"
+  "version": "1.0.0",
+  "tokens": {
+    "colors": {
+      "bg": "#FAFAF7",
+      "surface": "#FFFFFF",
+      "primary": "#1A1A1A",
+      "secondary": "#E8E4DE",
+      "accent": "#C2A878",
+      "text": "#1A1A1A",
+      "muted": "#6F6A63",
+      "border": "#E0DBD3"
+    },
+    "radius": {
+      "sm": 2,
+      "md": 4,
+      "lg": 8,
+      "pill": 999
+    },
+    "shadow": "0 2px 12px rgba(26,26,26,0.06)",
+    "fonts": {
+      "title": "\"Cormorant Garamond\", \"思源宋体\", serif",
+      "body": "\"Inter\", system-ui, \"PingFang SC\", sans-serif",
+      "hand": "\"Cormorant Garamond\", serif"
+    },
+    "stickerTiltDeg": [
+      0
+    ],
+    "noise": 0.02,
+    "motion": {
+      "enter": "editorial-fade",
+      "hoverLift": 0,
+      "respectReducedMotion": true
+    }
   },
-  "radius": { "card": 8, "button": 8 },
-  "slots": ["hero", "spread-2", "quote", "timeline", "closing"]
+  "layouts": [
+    "story"
+  ],
+  "slots": [
+    {
+      "id": "cover",
+      "type": "hero",
+      "required": true,
+      "caption": true
+    },
+    {
+      "id": "toc",
+      "type": "quote",
+      "required": false,
+      "hint": "Issue / 目录感"
+    },
+    {
+      "id": "spread-a",
+      "type": "spread-2",
+      "required": true
+    },
+    {
+      "id": "full-bleed",
+      "type": "hero",
+      "required": true
+    },
+    {
+      "id": "pull-quote",
+      "type": "quote",
+      "required": false
+    },
+    {
+      "id": "grid",
+      "type": "polaroid-wall",
+      "min": 4,
+      "max": 6
+    },
+    {
+      "id": "closing",
+      "type": "closing",
+      "required": true
+    }
+  ],
+  "fillRules": {
+    "cover": "compositionScore desc, preferPortrait",
+    "full-bleed": "aspectNearest:landscape sharpness desc",
+    "dedupe": "phash"
+  },
+  "decorations": [
+    "thin-rule",
+    "page-number",
+    "gold-accent-line"
+  ],
+  "shareCopyDefaults": {
+    "title": "Heirloom",
+    "subtitle": "一本只关于你们的杂志"
+  }
 }

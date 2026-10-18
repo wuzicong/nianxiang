@@ -1,18 +1,123 @@
 {
-  "$schema": "../theme.schema.placeholder.json",
+  "$schema": "../theme.schema.json",
   "id": "kyoto-lantern",
-  "name": "京都纸灯",
-  "nameEn": "Kyoto Lantern",
+  "name": {
+    "zh": "京都纸灯",
+    "en": "Kyoto Lantern"
+  },
   "track": "travel",
   "moodDefault": "retro",
-  "version": "0.0.1-placeholder",
-  "colors": {
-    "background": "#1A1A1A",
-    "primary": "#C2A878",
-    "accent": "#E8E4DE",
-    "lantern": "#F5C6C6",
-    "text": "#FAFAF7"
+  "version": "1.0.0",
+  "tokens": {
+    "colors": {
+      "bg": "#1A1A1A",
+      "surface": "#242422",
+      "primary": "#C2A878",
+      "secondary": "#3A3530",
+      "accent": "#F5C6C6",
+      "text": "#FAFAF7",
+      "muted": "#A39E96",
+      "border": "#3F3A34"
+    },
+    "radius": {
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "pill": 999
+    },
+    "shadow": "0 12px 32px rgba(0,0,0,0.35)",
+    "fonts": {
+      "title": "\"Fraunces\", \"思源宋体\", serif",
+      "body": "system-ui, -apple-system, \"PingFang SC\", sans-serif",
+      "hand": "\"Caveat\", \"霞鹜文楷\", cursive"
+    },
+    "stickerTiltDeg": [
+      -2,
+      2,
+      4
+    ],
+    "noise": 0.05,
+    "motion": {
+      "enter": "fade-up",
+      "hoverLift": 3,
+      "respectReducedMotion": true
+    }
   },
-  "radius": { "card": 12, "button": 12 },
-  "slots": ["hero", "map-chapter", "timeline", "spread-2", "closing"]
+  "layouts": [
+    "story",
+    "flip"
+  ],
+  "slots": [
+    {
+      "id": "cover",
+      "type": "hero",
+      "required": true,
+      "caption": true
+    },
+    {
+      "id": "map",
+      "type": "map-chapter",
+      "required": false
+    },
+    {
+      "id": "spread-a",
+      "type": "spread-2",
+      "required": true
+    },
+    {
+      "id": "stamp-wall",
+      "type": "polaroid-wall",
+      "min": 4,
+      "max": 8
+    },
+    {
+      "id": "letter",
+      "type": "quote",
+      "required": false,
+      "hint": "纸灯下的信"
+    },
+    {
+      "id": "timeline",
+      "type": "timeline",
+      "required": true
+    },
+    {
+      "id": "closing",
+      "type": "closing",
+      "required": true
+    }
+  ],
+  "fillRules": {
+    "cover": "preferScene:night|street|temple sharpness desc",
+    "map": "useGpsCluster",
+    "dedupe": "phash"
+  },
+  "matchHints": {
+    "scenes": [
+      "night",
+      "street",
+      "temple",
+      "lantern",
+      "travel"
+    ],
+    "placeKeywords": [
+      "京",
+      "寺",
+      "巷",
+      "旅",
+      "夜",
+      "kyoto",
+      "temple"
+    ]
+  },
+  "decorations": [
+    "postage-stamp",
+    "lantern-glow",
+    "washi-edge",
+    "ticket-stub"
+  ],
+  "shareCopyDefaults": {
+    "title": "京都纸灯",
+    "subtitle": "夜色里一盏灯，把旅途收成信"
+  }
 }
