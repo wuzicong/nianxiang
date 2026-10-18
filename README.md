@@ -2,7 +2,7 @@
 
 智能照片库 + 主题成册：上传后按时间 / 地点 / 人物 / 场景组织素材，选片套用模板，生成可分享的故事站或翻页纪念册。
 
-> **P1**：预签名上传、衍生图 / EXIF worker、私有桶策略骨架已经接上。人脸、CLIP、地理编码和成册渲染仍是桩。
+> **登录**：上传和读取素材必须带会话 Cookie。邮箱密码登录，自托管和云模式共用。人脸、CLIP、地理编码和成册渲染仍是桩。
 
 私有仓库：[wuzicong/nianxiang](https://github.com/wuzicong/nianxiang)
 
@@ -13,10 +13,10 @@
 ```
 ├── apps/
 │   ├── web/          # Next.js 15 前端壳
-│   └── api/          # Node API：/health、预签名上传、完成登记
+│   └── api/          # Node API：会话、预签名上传、完成登记
 ├── packages/
 │   ├── shared/       # Job 名、桶路径、上传限制
-│   └── storage/      # MinIO / S3 客户端、素材表、任务入队
+│   └── storage/      # MinIO / S3、素材表、用户与会话
 ├── services/
 │   ├── worker/       # BullMQ 消费桩
 │   └── ml/           # FastAPI /health 桩
@@ -61,6 +61,7 @@
 - 默认全私有；分享须主动发布；支持密码 / 过期 / 一键撤销
 - 传输 TLS；**密钥不进仓库**（本仓只有 `.env.example` 与 `env.cloud.example` 占位）
 - 原图只走预签名或鉴权代理；`PRESIGN_TTL_MINUTES` 由 API 夹紧到 **5–15 分钟**
+- 上传 / 完成 / 读取素材只认会话里的用户；对象键是 `users/{已认证 userId}/...`
 - 人脸 / 向量等敏感能力可关闭；删号级联清理
 - 分享可剥离 GPS；软删后 GC
 
@@ -142,22 +143,35 @@ pnpm dev:worker
 pnpm verify:upload
 ```
 
-脚本会申请 `PUT` 预签名、把一张 1×1 PNG 传到 `memora-local`、调用完成接口，然后轮询到 `ready`。它只打印 asset id、对象键、过期时间和衍生图字节数，**不打印带签名的 URL**。
+脚本会先确认未登录是 401，再注册一个一次性用户、申请 `PUT` 预签名、把一张 1×1 PNG 传到 `memora-local`、调用完成接口，然后轮询到 `ready`。它只打印 asset id、对象键、过期时间和衍生图字节数，**不打印带签名的 URL，也不打印密码或会话令牌**。
 
-手工调用时字段是 `filename`、`mime`、`size`、`userId`。`userId` 目前由调用方传入（还没有登录），并且必须是安全路径片段。`mime` 只接受 jpeg / png / webp / gif，`size` 默认不超过 25 MiB。
+`mime` 只接受 jpeg / png / webp / gif，`size` 默认不超过 25 MiB。请求体里的 `userId` 会被忽略。完成接口确认对象大小和类型与申请一致后，入队 `media.derivative` 和 `meta.exif`。Worker 写出 `thumb.webp`、`preview.webp`、`hero.webp`，失败最多重试 3 次。读取接口不返回 GPS 坐标。
+
+## 本地验证登录
+
+API 和 Postgres 起来之后。下面的密码只是占位，换成你自己的，不要用真实口令，也不要把它写进仓库：
 
 ```bash
-curl -s -X POST http://127.0.0.1:3001/api/v1/assets/upload-url \
+curl -s -c /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/auth/register \
   -H 'content-type: application/json' \
-  -d '{"filename":"trip.jpg","mime":"image/jpeg","size":12345,"userId":"local"}'
+  -d '{"email":"you@example.com","password":"replace-with-8-plus-chars"}'
+curl -s -b /tmp/memora.cookies http://127.0.0.1:3001/api/v1/auth/me
+curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/assets/upload-url \
+  -H 'content-type: application/json' \
+  -d '{"filename":"trip.jpg","mime":"image/jpeg","size":12345}'
 # 用返回的 url 和 headers 做 PUT，再：
-curl -s -X POST http://127.0.0.1:3001/api/v1/assets/<assetId>/complete
-curl -s http://127.0.0.1:3001/api/v1/assets/<assetId>
+curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/assets/<assetId>/complete
+curl -s -b /tmp/memora.cookies http://127.0.0.1:3001/api/v1/assets/<assetId>
+curl -s -b /tmp/memora.cookies -c /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/auth/logout
 ```
 
-完成接口确认对象大小和类型与申请一致后，入队 `media.derivative` 和 `meta.exif`。Worker 写出 `thumb.webp`、`preview.webp`、`hero.webp`，失败最多重试 3 次。读取接口不返回 GPS 坐标。
+不带 Cookie 时，上传、完成和读取都是 401。别人的素材返回 404。登出会撤销当前会话。
 
-`pnpm test` 覆盖预签名、校验、衍生图和日志打码，不依赖 Compose。`pnpm typecheck` 与 `pnpm check:contracts` 是合入前要绿的两项。
+也可以开页面：`pnpm dev:web`，浏览器打开 <http://127.0.0.1:3000/login>。页面把 `/api/v1` 转到 `127.0.0.1:3001`，Cookie 落在 Web 源上。自托管开发不给 Cookie 加 Secure；`DEPLOY_MODE=cloud`、`MEMORA_ENV=staging|prod` 或 `NODE_ENV=production` 会加。
+
+注册默认开放（`AUTH_REGISTRATION=open`）。云上线前可以设成 `closed`。OIDC 的环境变量名已经留好，授权码流程还没接。
+
+`pnpm test` 覆盖预签名、登录、跨用户隔离和日志打码，不依赖 Compose。`pnpm typecheck` 与 `pnpm check:contracts` 是合入前要绿的两项。
 
 ## 冻结契约（P0 已入库，P1 沿用）
 
@@ -190,8 +204,9 @@ memora-{env}/
 | 阶段 | 目标 |
 |------|------|
 | P0 | 骨架、Compose、契约、双模式文档 |
-| P1 | 预签名上传、derivative / exif worker、桶策略骨架 ← **当前** |
-| 后续 | 登录、人脸 / CLIP、地理编码、选片成册 |
+| P1 | 预签名上传、derivative / exif worker、桶策略骨架 |
+| 登录 | 邮箱密码会话；上传和读取绑定已认证用户 ← **当前** |
+| 后续 | 人脸 / CLIP、地理编码、选片成册 |
 | W6 MVP | 选片 → 3 模板 → 可分享短链 |
 
 ---

@@ -1,4 +1,13 @@
 export {
+  createAuthRepository,
+  EmailTakenError,
+  type AuthRepository,
+  type AuthSession,
+  type AuthUser,
+  type NewAuthSession,
+  type NewAuthUser,
+} from "./auth.js";
+export {
   createAssetRepository,
   type AssetRecord,
   type AssetRepository,
@@ -33,4 +42,4 @@ export {
   runtimeWarnings,
   type RuntimeConfig,
 } from "./runtime-config.js";
-export { ASSET_SCHEMA_SQL } from "./schema.js";
+export { ASSET_SCHEMA_SQL, AUTH_SCHEMA_SQL, SCHEMA_ADVISORY_LOCK } from "./schema.js";

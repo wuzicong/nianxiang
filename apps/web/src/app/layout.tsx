@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "念册 · Memora",
-  description: "智能相册与主题成册（P0 骨架）",
+  description: "智能相册与主题成册",
 };
 
 export default function RootLayout({

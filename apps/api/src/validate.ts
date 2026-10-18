@@ -1,6 +1,5 @@
 import {
   isAllowedUploadContentType,
-  isSafeStorageId,
   normalizeContentType,
   sanitizeFilename,
   type AllowedUploadContentType,
@@ -8,30 +7,29 @@ import {
 import { HttpError } from "./http.js";
 
 export interface UploadRequest {
-  userId: string;
   filename: string;
   contentType: AllowedUploadContentType;
   sizeBytes: number;
 }
 
+export function asRecord(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+  return body as Record<string, unknown>;
+}
+
+/** userId 不从请求体读取。调用方传入的身份一律忽略。 */
 export function validateUploadRequest(input: {
   filename: unknown;
   mime: unknown;
   size: unknown;
-  userId: unknown;
   maxBytes: number;
 }): UploadRequest {
   if (
     typeof input.filename !== "string" ||
     typeof input.mime !== "string" ||
-    typeof input.userId !== "string" ||
     typeof input.size !== "number"
   ) {
-    throw new HttpError(
-      400,
-      "invalid_request",
-      "filename、mime、size、userId 必填，size 必须是数字",
-    );
+    throw new HttpError(400, "invalid_request", "filename、mime、size 必填，size 必须是数字");
   }
   if (!Number.isInteger(input.size) || input.size < 1) {
     throw new HttpError(400, "invalid_request", "size 必须是正整数");
@@ -43,13 +41,6 @@ export function validateUploadRequest(input: {
       `原图不能超过 ${input.maxBytes} 字节`,
     );
   }
-  if (!isSafeStorageId(input.userId)) {
-    throw new HttpError(
-      400,
-      "invalid_user",
-      "userId 只能包含字母、数字、下划线和连字符",
-    );
-  }
   const filename = sanitizeFilename(input.filename);
   if (!filename) {
     throw new HttpError(400, "invalid_filename", "文件名不能包含路径或控制字符");
@@ -58,7 +49,6 @@ export function validateUploadRequest(input: {
     throw new HttpError(400, "unsupported_media_type", "只接受 jpeg、png、webp、gif");
   }
   return {
-    userId: input.userId,
     filename,
     contentType: normalizeContentType(input.mime) as AllowedUploadContentType,
     sizeBytes: input.size,

@@ -27,6 +27,7 @@ REDIS_URL=rediss://...
 |----|------|
 | 原图桶 | Block Public Access；禁止匿名 list/get |
 | 预签名 | 5–15 分钟，只签单个对象 |
+| 登录 | 与自托管同一套邮箱密码会话；Cookie 在云模式带 Secure；OIDC 只留挂点 |
 | 加密 | SSE-KMS 可配；生产建议开启 |
 | CDN | 只缓存衍生图，不缓存原图 |
 | IAM | API 角色只读写 `users/*`、`albums/*`、`templates/*`，禁止 `*` |

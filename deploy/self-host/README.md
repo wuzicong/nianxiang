@@ -33,7 +33,9 @@ S3_BUCKET=memora-local
 | minio-init | 一次性 | 建桶并 `anonymous set none` |
 | ml | `127.0.0.1:8000/health` | 推理桩 |
 
-web / api / worker 在 P0 用 `pnpm dev:*` 起。不要把 5432、6379、9000、9001 改绑到 `0.0.0.0`。
+web / api / worker 用 `pnpm dev:*` 起。不要把 5432、6379、9000、9001 改绑到 `0.0.0.0`。
+
+API 第一次访问会建 `users` / `sessions` 表。登录是邮箱加密码，会话 Cookie 名为 `memora_session`（HttpOnly）。本机 HTTP 不加 Secure；放到公网 HTTPS 前把 `COOKIE_SECURE=true`。页面入口是 `http://127.0.0.1:3000/login`。
 
 ## 安全
 
