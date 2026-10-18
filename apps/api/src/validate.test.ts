@@ -10,7 +10,6 @@ function valid(overrides: Record<string, unknown> = {}) {
     filename: "trip.jpg",
     mime: "image/jpeg",
     size: 100,
-    userId: "local",
     maxBytes: MAX,
     ...overrides,
   });
@@ -20,7 +19,7 @@ test("accepts a normalized image upload", () => {
   const parsed = valid({ mime: "IMAGE/PNG; charset=binary", filename: "  a.png  " });
   assert.equal(parsed.contentType, "image/png");
   assert.equal(parsed.filename, "a.png");
-  assert.equal(parsed.userId, "local");
+  assert.equal("userId" in parsed, false);
 });
 
 test("rejects missing fields, svg, traversal, and oversized payloads", () => {
@@ -32,11 +31,6 @@ test("rejects missing fields, svg, traversal, and oversized payloads", () => {
   assert.throws(() => valid({ mime: "image/svg+xml" }), (err: unknown) => {
     assert.ok(err instanceof HttpError);
     assert.equal(err.code, "unsupported_media_type");
-    return true;
-  });
-  assert.throws(() => valid({ userId: "../admin" }), (err: unknown) => {
-    assert.ok(err instanceof HttpError);
-    assert.equal(err.code, "invalid_user");
     return true;
   });
   assert.throws(() => valid({ filename: "a/b.jpg" }), (err: unknown) => {

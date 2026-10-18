@@ -1,6 +1,7 @@
 import {
   createAssetJobEnqueuer,
   createAssetRepository,
+  createAuthRepository,
   createObjectStore,
   objectStoreConfigFromRuntime,
   safeErrorMessage,
@@ -13,8 +14,12 @@ const assets = createAssetRepository({
   connectionString: config.databaseUrl,
   applicationName: "memora-api",
 });
+const auth = createAuthRepository({
+  connectionString: config.databaseUrl,
+  applicationName: "memora-api",
+});
 const jobs = createAssetJobEnqueuer(config.redisUrl);
-const app = createApp({ config, objects, assets, jobs });
+const app = createApp({ config, objects, assets, jobs, auth });
 
 const server = app.listen(config.port, () => {
   logDeployWarnings();
@@ -30,6 +35,9 @@ async function shutdown(): Promise<void> {
   });
   await assets.close().catch((err) => {
     console.error("[memora-api] db close failed", safeErrorMessage(err));
+  });
+  await auth.close().catch((err) => {
+    console.error("[memora-api] auth db close failed", safeErrorMessage(err));
   });
   process.exit(0);
 }

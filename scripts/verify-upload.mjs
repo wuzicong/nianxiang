@@ -2,6 +2,7 @@
  * 本地验证：预签名 PUT → complete → 衍生图出现在私有桶。
  * 需要 API、Worker、Postgres、Redis、MinIO 已经起来。不打印预签名 URL。
  */
+import { randomBytes } from "node:crypto";
 import {
   createObjectStore,
   objectStoreConfigFromRuntime,
@@ -18,10 +19,24 @@ function redact(text) {
   return String(text).replace(/\?[^\s]*/g, "?***").slice(0, 300);
 }
 
-async function postJson(path, body) {
+function cookiePair(response) {
+  const lines =
+    typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
+  const line = lines.find((item) => item.startsWith("memora_session="));
+  const pair = line?.split(";")[0] ?? "";
+  if (!pair || pair === "memora_session=") {
+    console.error("[verify] register did not set a session cookie");
+    process.exit(1);
+  }
+  return pair;
+}
+
+async function postJson(path, body, cookie) {
+  const headers = { "content-type": "application/json" };
+  if (cookie) headers.cookie = cookie;
   const response = await fetch(`${api}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(10_000),
   });
@@ -32,7 +47,7 @@ async function postJson(path, body) {
   } catch {
     parsed = { raw: redact(text) };
   }
-  return { status: response.status, body: parsed };
+  return { status: response.status, body: parsed, response };
 }
 
 const health = await fetch(`${api}/health`, { signal: AbortSignal.timeout(5_000) }).catch((err) => {
@@ -44,12 +59,35 @@ if (!health.ok) {
   process.exit(1);
 }
 
-const created = await postJson("/api/v1/assets/upload-url", {
+const anonymous = await postJson("/api/v1/assets/upload-url", {
   filename: "pixel.png",
   mime: "image/png",
   size: png.length,
   userId: "local",
 });
+if (anonymous.status !== 401) {
+  console.error("[verify] expected 401 before login", anonymous.status, anonymous.body?.error);
+  process.exit(1);
+}
+
+const email = `verify-${randomBytes(6).toString("hex")}@memora.test`;
+const password = randomBytes(18).toString("base64url");
+const registered = await postJson("/api/v1/auth/register", { email, password });
+if (registered.status !== 201) {
+  console.error("[verify] register failed", registered.status, registered.body?.error);
+  process.exit(1);
+}
+const cookie = cookiePair(registered.response);
+
+const created = await postJson(
+  "/api/v1/assets/upload-url",
+  {
+    filename: "pixel.png",
+    mime: "image/png",
+    size: png.length,
+  },
+  cookie,
+);
 if (created.status !== 201) {
   console.error("[verify] upload-url failed", created.status, created.body);
   process.exit(1);
@@ -71,7 +109,7 @@ if (!put.ok) {
   process.exit(1);
 }
 
-const completed = await postJson(`/api/v1/assets/${upload.assetId}/complete`, {});
+const completed = await postJson(`/api/v1/assets/${upload.assetId}/complete`, {}, cookie);
 if (completed.status !== 200) {
   console.error("[verify] complete failed", completed.status, completed.body);
   process.exit(1);
@@ -80,6 +118,7 @@ if (completed.status !== 200) {
 let asset = null;
 for (let attempt = 0; attempt < 60; attempt += 1) {
   const response = await fetch(`${api}/api/v1/assets/${upload.assetId}`, {
+    headers: { cookie },
     signal: AbortSignal.timeout(5_000),
   });
   asset = await response.json();

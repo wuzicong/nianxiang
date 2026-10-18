@@ -1,11 +1,9 @@
 import pg from "pg";
 import type { DerivativeSize } from "@memora/shared";
 import { safeErrorMessage } from "./redact.js";
-import { ASSET_SCHEMA_SQL } from "./schema.js";
+import { ASSET_SCHEMA_SQL, SCHEMA_ADVISORY_LOCK } from "./schema.js";
 
 const { Pool } = pg;
-
-const SCHEMA_LOCK = "4815162342";
 
 export type AssetStatus =
   | "pending_upload"
@@ -142,11 +140,11 @@ export function createAssetRepository(options: {
   async function migrate(): Promise<void> {
     const client = await pool.connect();
     try {
-      await client.query("SELECT pg_advisory_lock($1::bigint)", [SCHEMA_LOCK]);
+      await client.query("SELECT pg_advisory_lock($1::bigint)", [SCHEMA_ADVISORY_LOCK]);
       await client.query(ASSET_SCHEMA_SQL);
     } finally {
       try {
-        await client.query("SELECT pg_advisory_unlock($1::bigint)", [SCHEMA_LOCK]);
+        await client.query("SELECT pg_advisory_unlock($1::bigint)", [SCHEMA_ADVISORY_LOCK]);
       } catch (err) {
         console.error("[memora-storage] schema unlock failed", safeErrorMessage(err));
       }

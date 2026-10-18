@@ -23,6 +23,21 @@ test("redactSecrets masks access key ids and assigned secrets", () => {
   assert.match(cleaned, /token: \*\*\*/);
 });
 
+test("redactSecrets masks session cookies, bearer tokens, and json passwords", () => {
+  const session = `memora_session=${"a".repeat(43)}`;
+  const bearer = "Authorization: Bearer eyJhbGciOiJub25lIn0.payload.sig";
+  const cleaned = redactSecrets(
+    `${session}; ${bearer} {"password":"secret-value","token":"raw-token"}`,
+  );
+  assert.equal(cleaned.includes("a".repeat(43)), false);
+  assert.equal(cleaned.includes("eyJhbGciOiJub25lIn0"), false);
+  assert.equal(cleaned.includes("secret-value"), false);
+  assert.equal(cleaned.includes("raw-token"), false);
+  assert.match(cleaned, /memora_session=\*\*\*/);
+  assert.match(cleaned, /Bearer \*\*\*/);
+  assert.match(cleaned, /"password":"\*\*\*/);
+});
+
 test("safeErrorMessage keeps ordinary failures", () => {
   assert.equal(safeErrorMessage(new Error("asset_not_found")), "asset_not_found");
   assert.equal(safeErrorMessage("plain"), "plain");
