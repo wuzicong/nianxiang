@@ -1,18 +1,106 @@
 {
-  "$schema": "../theme.schema.placeholder.json",
+  "$schema": "../theme.schema.json",
   "id": "cotton-candy",
-  "name": "棉花糖日记",
-  "nameEn": "Cotton Candy Diary",
-  "track": "cute",
-  "moodDefault": "sweet",
-  "version": "0.0.1-placeholder",
-  "colors": {
-    "background": "#F7EDE2",
-    "primary": "#F5C6C6",
-    "accent": "#C9B8E8",
-    "sage": "#B7C4A3",
-    "text": "#2C2A29"
+  "name": {
+    "zh": "棉花糖日记",
+    "en": "Cotton Candy Diary"
   },
-  "radius": { "card": 24, "button": 20 },
-  "slots": ["hero", "spread-2", "polaroid-wall", "quote", "closing"]
+  "track": "couple-cute",
+  "moodDefault": "cute",
+  "version": "1.0.0",
+  "tokens": {
+    "colors": {
+      "bg": "#F7EDE2",
+      "surface": "#FFF8F5",
+      "primary": "#F5C6C6",
+      "secondary": "#C9B8E8",
+      "accent": "#B7C4A3",
+      "text": "#2C2A29",
+      "muted": "#8A8279",
+      "border": "#F0E0D6"
+    },
+    "radius": {
+      "sm": 12,
+      "md": 20,
+      "lg": 28,
+      "pill": 999
+    },
+    "shadow": "0 8px 24px rgba(44,42,41,0.08)",
+    "fonts": {
+      "title": "\"霞鹜文楷\", \"LXGW WenKai\", \"Songti SC\", serif",
+      "body": "system-ui, -apple-system, \"PingFang SC\", sans-serif",
+      "hand": "\"Caveat\", \"霞鹜文楷\", cursive"
+    },
+    "stickerTiltDeg": [
+      -5,
+      -3,
+      3,
+      6
+    ],
+    "noise": 0.04,
+    "motion": {
+      "enter": "spring",
+      "hoverLift": 4,
+      "respectReducedMotion": true
+    }
+  },
+  "layouts": [
+    "story",
+    "flip"
+  ],
+  "slots": [
+    {
+      "id": "cover",
+      "type": "hero",
+      "required": true,
+      "caption": true
+    },
+    {
+      "id": "days",
+      "type": "quote",
+      "required": false,
+      "hint": "在一起 N 天"
+    },
+    {
+      "id": "spread-a",
+      "type": "spread-2",
+      "required": true
+    },
+    {
+      "id": "polaroid",
+      "type": "polaroid-wall",
+      "min": 3,
+      "max": 9
+    },
+    {
+      "id": "note",
+      "type": "quote",
+      "required": false
+    },
+    {
+      "id": "timeline",
+      "type": "timeline",
+      "required": false
+    },
+    {
+      "id": "closing",
+      "type": "closing",
+      "required": true
+    }
+  ],
+  "fillRules": {
+    "cover": "preferFaceScore>=0.6 && sharpness desc",
+    "polaroid": "chronological, diversifyFaces",
+    "dedupe": "phash"
+  },
+  "decorations": [
+    "washi-tape",
+    "heart-sticker",
+    "torn-edge",
+    "soft-blob"
+  ],
+  "shareCopyDefaults": {
+    "title": "我们的棉花糖日记",
+    "subtitle": "把每一次想你都收进柔软的相册"
+  }
 }
