@@ -13,4 +13,4 @@ W6 可分享 MVP 带这三套主题。目录 id 固定为 `cotton-candy`、`kyot
 - `theme.json`：完整设计（`tokens`、`slots`、`fillRules`、`decorations`、`shareCopyDefaults`）。`$schema` 指向 `../theme.schema.json`。
 - `assets/`：装饰 SVG。对象键前缀是 `templates/{id}/assets/`。
 
-`name` 是 `{ zh, en }`。色板在 `tokens.colors`，不在顶层 `colors`。Web / API 目前不读取这些文件；正式 schema 已允许双语名和 `tokens`。
+`name` 是 `{ zh, en }`。色板在 `tokens.colors`，不在顶层 `colors`。分享页只读 `name.zh`、`tokens.colors`（页面底用 `bg`，卡片用 `surface`）和 `tokens.radius`。API 不解析主题包。
