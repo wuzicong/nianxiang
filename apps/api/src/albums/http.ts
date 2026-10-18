@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { isSafeStorageId, isShareToken, sharePagePath } from "@memora/shared";
+import { isSafeStorageId, isShareToken, isThemeId, sharePagePath } from "@memora/shared";
 import type { AlbumRepository, AuthRepository, ObjectStore } from "@memora/storage";
 import { safeErrorMessage } from "@memora/storage";
 import type { Express, Request, Response } from "express";
@@ -39,8 +39,23 @@ async function requireUser(auth: AuthRepository, req: Request): Promise<PublicUs
 }
 
 const SHARE_MISSING = { error: "share_not_found", message: "分享不存在" };
-const SHARE_LOCKED = { error: "password_required", message: "需要密码", passwordRequired: true };
 const SHARE_UNAVAILABLE = { error: "share_unavailable", message: "无法打开分享" };
+
+/** 上锁挑战只多带模板 id，方便分享页上肤。不带标题、照片、哈希或令牌。 */
+function shareLockedBody(themeId: string): {
+  error: "password_required";
+  message: string;
+  passwordRequired: true;
+  themeId?: string;
+} {
+  const body = {
+    error: "password_required" as const,
+    message: "需要密码",
+    passwordRequired: true as const,
+  };
+  if (!isThemeId(themeId)) return body;
+  return { ...body, themeId };
+}
 
 function setPublicShareHeaders(res: Response): void {
   res.setHeader("Cache-Control", "private, no-store");
@@ -51,7 +66,7 @@ function setPublicShareHeaders(res: Response): void {
 function sendShareJson(
   res: Response,
   status: number,
-  body: { error: string; message: string; passwordRequired?: boolean },
+  body: { error: string; message: string; passwordRequired?: boolean; themeId?: string },
 ): void {
   setPublicShareHeaders(res);
   res.status(status).json(body);
@@ -207,9 +222,9 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
 
   /**
    * 令牌是 256 bit，不能靠猜测枚举分享是否存在。
-   * GET：无密码且有效则直接给内容；有密码只返回「需要密码」，不给相册。
+   * GET：无密码且有效则直接给内容；有密码只返回「需要密码」和模板 id，不给相册标题或照片。
    * 撤销、过期、无效仍是 404「分享不存在」。
-   * POST unlock：密码不对、分享不存在、已撤销、已过期都是同一句 401，不写明原因。
+   * POST unlock：密码不对、分享不存在、已撤销、已过期都是同一句 401，不写明原因，也不带回模板。
    * 密码只读 JSON 正文，不读 query，避免进访问日志。
    */
   async function sendShareContent(
@@ -256,7 +271,7 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
         return;
       }
       if (gate.passwordHash) {
-        sendShareJson(res, 401, SHARE_LOCKED);
+        sendShareJson(res, 401, shareLockedBody(gate.themeId));
         return;
       }
       await sendShareContent(res, tokenHash, "public");
