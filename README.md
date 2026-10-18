@@ -2,7 +2,7 @@
 
 智能照片库 + 主题成册：上传后按时间 / 地点 / 人物 / 场景组织素材，选片套用模板，生成可分享的故事站或翻页纪念册。
 
-> **P0 地基**：可运行 monorepo 骨架、Compose 基础设施、双模式配置与安全基线文档。业务 API / 上传 / Worker 管线在 P1+ 迭代。
+> **P1**：预签名上传、衍生图 / EXIF worker、私有桶策略骨架已经接上。人脸、CLIP、地理编码和成册渲染仍是桩。
 
 私有仓库：[wuzicong/nianxiang](https://github.com/wuzicong/nianxiang)
 
@@ -13,9 +13,10 @@
 ```
 ├── apps/
 │   ├── web/          # Next.js 15 前端壳
-│   └── api/          # Node API：/health、上传预签名占位
+│   └── api/          # Node API：/health、预签名上传、完成登记
 ├── packages/
-│   └── shared/       # Job 名、桶路径、共享类型
+│   ├── shared/       # Job 名、桶路径、上传限制
+│   └── storage/      # MinIO / S3 客户端、素材表、任务入队
 ├── services/
 │   ├── worker/       # BullMQ 消费桩
 │   └── ml/           # FastAPI /health 桩
@@ -96,7 +97,7 @@ pnpm dev:api    # http://127.0.0.1:3001/health
 
 `docker compose ps` 应看到 `postgres`、`redis`、`minio`、`minio-init`（退出码 0）、`ml`。MinIO 控制台：<http://127.0.0.1:9001>。
 
-可选：`pnpm dev:web`（3000）、`pnpm dev:worker`（等 Redis 就绪）。
+可选：`pnpm dev:web`（3000）、`pnpm dev:worker`（等 Redis 就绪）。上传链路需要 API 和 Worker 同时在跑，步骤见下方「本地验证上传」。
 
 ### 云托管
 
@@ -119,11 +120,46 @@ PRESIGN_TTL_MINUTES=10      # 超出 5–15 会被夹紧
 CDN_BASE_URL=https://cdn.example.com/memora-prod
 ```
 
-然后用同一套 web / api / worker / ml 进程或镜像启动。桶策略示意见 `deploy/cloud/s3-bucket-policy.hcl.example`。
+然后用同一套 web / api / worker / ml 进程或镜像启动。可执行的桶骨架在 [`deploy/cloud/terraform`](deploy/cloud/terraform/README.md)，阅读用摘要仍是 `deploy/cloud/s3-bucket-policy.hcl.example`。两处都没有生产凭证。
 
 ---
 
-## 冻结契约（P0 已入库）
+## 本地验证上传
+
+Postgres、Redis、MinIO 用 Compose 起。API 和 Worker 在宿主机跑，这样改代码不用重建镜像。
+
+```bash
+cp .env.example .env
+docker compose up -d
+corepack enable && pnpm install
+pnpm dev:api
+pnpm dev:worker
+```
+
+另开一个终端：
+
+```bash
+pnpm verify:upload
+```
+
+脚本会申请 `PUT` 预签名、把一张 1×1 PNG 传到 `memora-local`、调用完成接口，然后轮询到 `ready`。它只打印 asset id、对象键、过期时间和衍生图字节数，**不打印带签名的 URL**。
+
+手工调用时字段是 `filename`、`mime`、`size`、`userId`。`userId` 目前由调用方传入（还没有登录），并且必须是安全路径片段。`mime` 只接受 jpeg / png / webp / gif，`size` 默认不超过 25 MiB。
+
+```bash
+curl -s -X POST http://127.0.0.1:3001/api/v1/assets/upload-url \
+  -H 'content-type: application/json' \
+  -d '{"filename":"trip.jpg","mime":"image/jpeg","size":12345,"userId":"local"}'
+# 用返回的 url 和 headers 做 PUT，再：
+curl -s -X POST http://127.0.0.1:3001/api/v1/assets/<assetId>/complete
+curl -s http://127.0.0.1:3001/api/v1/assets/<assetId>
+```
+
+完成接口确认对象大小和类型与申请一致后，入队 `media.derivative` 和 `meta.exif`。Worker 写出 `thumb.webp`、`preview.webp`、`hero.webp`，失败最多重试 3 次。读取接口不返回 GPS 坐标。
+
+`pnpm test` 覆盖预签名、校验、衍生图和日志打码，不依赖 Compose。`pnpm typecheck` 与 `pnpm check:contracts` 是合入前要绿的两项。
+
+## 冻结契约（P0 已入库，P1 沿用）
 
 ### Job 名
 
@@ -153,8 +189,9 @@ memora-{env}/
 
 | 阶段 | 目标 |
 |------|------|
-| P0 | 骨架、Compose、契约、双模式文档 ← **当前** |
-| P1 | 预签名上传、derivative worker、桶策略 |
+| P0 | 骨架、Compose、契约、双模式文档 |
+| P1 | 预签名上传、derivative / exif worker、桶策略骨架 ← **当前** |
+| 后续 | 登录、人脸 / CLIP、地理编码、选片成册 |
 | W6 MVP | 选片 → 3 模板 → 可分享短链 |
 
 ---

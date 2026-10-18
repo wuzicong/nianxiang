@@ -7,8 +7,7 @@ export default function Home() {
         念册 · Memora
       </h1>
       <p style={{ lineHeight: 1.6, color: "#555" }}>
-        P0 前端壳：上传、智能标签与成册能力将在后续里程碑接入。当前仓库已对齐 Job
-        契约与双模式部署变量。
+        前端仍是壳。预签名上传和衍生图在 API / Worker；选片、智能标签与成册还没接到这个页面。
       </p>
       <section style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "1rem" }}>冻结 Job 名（节选）</h2>

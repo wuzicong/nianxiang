@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyAnonymousRead",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::memora-local",
+        "arn:aws:s3:::memora-local/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalType": "Anonymous"
+        }
+      }
+    }
+  ]
+}

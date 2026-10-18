@@ -37,4 +37,8 @@ REDIS_URL=rediss://...
 
 策略示意（不会被本仓库自动套用）：[`s3-bucket-policy.hcl.example`](s3-bucket-policy.hcl.example)。
 
-生产编排（K8s 或单机）从 P1 再补。
+可计划、但默认不应用的 Terraform 骨架：[`terraform/README.md`](terraform/README.md)。里面没有后端状态，也没有访问密钥。
+
+素材表由应用启动后的第一次数据库访问创建（`packages/storage/migrations/001_assets.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。
+
+`DATABASE_URL` 里的 `sslmode=require` 会走 TLS，但不校验服务器证书。要校验 CA 时用 `sslmode=verify-full`。

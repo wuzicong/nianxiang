@@ -1,5 +1,5 @@
 # 示意，不会被本仓库自动套用。
-# 落地时用 Terraform aws_s3_bucket_public_access_block + 桶策略 + IAM。
+# 可执行骨架见 deploy/cloud/terraform/。本文件只留阅读用摘要。
 
 block_public_acls       = true
 block_public_policy     = true
