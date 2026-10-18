@@ -1,0 +1,5 @@
+{
+  "$comment": "P0 占位 schema；设计冻结后替换为正式 JSON Schema",
+  "type": "object",
+  "required": ["id", "name", "colors", "slots"]
+}

@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+!**/.env.example
+!**/env.*.example
+env.cloud
+.envrc
+secrets/
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Local compose overrides may contain secrets
+docker-compose.override.yml
+compose.override.yml
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+logs/
+*.log
+pnpm-debug.log*
+tmp/
+.cache/
+.turbo/
+
+# Test & coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Docker local volumes (if bind-mounted outside compose named volumes)
+data/

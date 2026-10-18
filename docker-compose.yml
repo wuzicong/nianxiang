@@ -1,0 +1,87 @@
+# 念册 · Memora — P0 自托管依赖
+# 开发口令仅用于本机，必须用 .env 覆盖后再暴露到非本机。
+# 数据端口全部绑定 127.0.0.1。云模式不要用本文件里的 Postgres / MinIO 当生产库。
+name: memora
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-memora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-memora-dev-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-memora}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - memora_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-memora} -d ${POSTGRES_DB:-memora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - memora_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-memora-dev-change-me}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - memora_minio_data:/data
+    healthcheck:
+      # 官方镜像自带 mc；curl 在该镜像里不一定存在
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-12-18T13-15-44Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-memora-dev-change-me}
+      S3_BUCKET: ${S3_BUCKET:-memora-local}
+    volumes:
+      - ./deploy/self-host/minio-init.sh:/minio-init.sh:ro
+    entrypoint: ["/bin/sh", "/minio-init.sh"]
+    restart: "no"
+
+  ml:
+    build: ./services/ml
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  memora_pg_data:
+  memora_redis_data:
+  memora_minio_data:

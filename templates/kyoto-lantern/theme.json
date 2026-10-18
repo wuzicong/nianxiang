@@ -1,0 +1,18 @@
+{
+  "$schema": "../theme.schema.placeholder.json",
+  "id": "kyoto-lantern",
+  "name": "京都纸灯",
+  "nameEn": "Kyoto Lantern",
+  "track": "travel",
+  "moodDefault": "retro",
+  "version": "0.0.1-placeholder",
+  "colors": {
+    "background": "#1A1A1A",
+    "primary": "#C2A878",
+    "accent": "#E8E4DE",
+    "lantern": "#F5C6C6",
+    "text": "#FAFAF7"
+  },
+  "radius": { "card": 12, "button": 12 },
+  "slots": ["hero", "map-chapter", "timeline", "spread-2", "closing"]
+}

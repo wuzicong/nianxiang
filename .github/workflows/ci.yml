@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm check:contracts
+
+  secrets:
+    name: no committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: reject private keys and cloud access key ids
+        run: |
+          set -eu
+          if grep -RInE \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=dist \
+            --exclude-dir=.next \
+            'AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY' .; then
+            echo "refusing: possible secret in tree"
+            exit 1
+          fi
