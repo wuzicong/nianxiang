@@ -1,4 +1,4 @@
-import { isShareToken } from "@memora/shared";
+import { isShareToken, isThemeId } from "@memora/shared";
 import { apiOrigin } from "./api-origin";
 
 export interface PublicDerivative {
@@ -22,7 +22,7 @@ export interface PublicSharePayload {
 export type ShareLoad =
   | { kind: "missing" }
   | { kind: "unavailable" }
-  | { kind: "locked" }
+  | { kind: "locked"; themeId: string | null }
   | { kind: "ok"; share: PublicSharePayload };
 
 function httpUrl(value: unknown): string | null {
@@ -91,8 +91,11 @@ export async function loadPublicShare(token: string): Promise<ShareLoad> {
   if (response.status >= 500) return { kind: "unavailable" };
   if (response.status === 401) {
     try {
-      const body = (await response.json()) as { error?: unknown };
-      if (body.error === "password_required") return { kind: "locked" };
+      const body = (await response.json()) as { error?: unknown; themeId?: unknown };
+      if (body.error === "password_required") {
+        const themeId = typeof body.themeId === "string" && isThemeId(body.themeId) ? body.themeId : null;
+        return { kind: "locked", themeId };
+      }
     } catch {
       return { kind: "missing" };
     }

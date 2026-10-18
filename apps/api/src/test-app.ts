@@ -320,7 +320,9 @@ export function memoryAlbums(
     async findActiveShareGate(tokenHash) {
       const share = activeShare(tokenHash);
       if (!share) return null;
-      return { shareId: share.id, passwordHash: share.passwordHash };
+      const album = albums.get(share.albumId);
+      if (!album || album.userId !== share.userId) return null;
+      return { shareId: share.id, passwordHash: share.passwordHash, themeId: album.themeId };
     },
     async findActiveShareByTokenHash(
       tokenHash,

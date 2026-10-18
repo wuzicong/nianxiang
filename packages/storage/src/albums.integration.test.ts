@@ -136,6 +136,8 @@ test("postgres albums and shares revoke, expire, and keep only the token hash", 
     assert.equal(JSON.stringify(protectedShare.share).includes(passwordHash), false);
     const gate = await albums.findActiveShareGate(protectedHash);
     assert.equal(gate?.passwordHash, passwordHash);
+    assert.equal(gate?.themeId, "kyoto-lantern");
+    assert.equal(JSON.stringify(gate).includes("海港"), false);
     assert.equal(await albums.findActiveShareByTokenHash(protectedHash, "public"), null);
     const opened = await albums.findActiveShareByTokenHash(protectedHash, "granted");
     assert.equal(opened?.title, "海港");

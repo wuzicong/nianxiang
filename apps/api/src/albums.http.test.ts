@@ -358,7 +358,12 @@ test("optional share password is hashed, challenged, and not echoed", async () =
           derivatives: { preview, hero: originalObjectKey(owner.user.id, assetId) },
         }),
       );
-      const album = await postJson(base, "/api/v1/albums", { title: "上锁的海港" }, owner.cookie);
+      const album = await postJson(
+        base,
+        "/api/v1/albums",
+        { title: "上锁的海港", themeId: "kyoto-lantern" },
+        owner.cookie,
+      );
       const albumId = (album.body as { album: { albumId: string } }).album.albumId;
       await postJson(base, `/api/v1/albums/${albumId}/assets`, { assetIds: [assetId] }, owner.cookie);
 
@@ -407,6 +412,7 @@ test("optional share password is hashed, challenged, and not echoed", async () =
         error: "password_required",
         message: "需要密码",
         passwordRequired: true,
+        themeId: "kyoto-lantern",
       });
       assert.equal(challenged.cacheControl, "private, no-store");
       assert.equal(challenged.robots, "noindex");
@@ -503,6 +509,31 @@ test("optional share password is hashed, challenged, and not echoed", async () =
       assert.equal(expiredPost.status, 401);
       assert.deepEqual(expiredPost.body, unavailable);
 
+      const weird = await albums.createAlbum({
+        id: "weird-theme-album",
+        userId: owner.user.id,
+        title: "不该出现的标题",
+        themeId: "not-a-theme",
+      });
+      assert.equal(weird.ok, true);
+      const weirdShare = await postJson(
+        base,
+        "/api/v1/albums/weird-theme-album/shares",
+        { password: secret },
+        owner.cookie,
+      );
+      assert.equal(weirdShare.status, 201);
+      const weirdToken = (weirdShare.body as { share: { token: string } }).share.token;
+      const weirdChallenge = await getJson(base, `/api/v1/public/shares/${weirdToken}`);
+      assert.equal(weirdChallenge.status, 401);
+      assert.deepEqual(weirdChallenge.body, {
+        error: "password_required",
+        message: "需要密码",
+        passwordRequired: true,
+      });
+      assert.equal(JSON.stringify(weirdChallenge.body).includes("不该出现的标题"), false);
+      assert.equal(JSON.stringify(weirdChallenge.body).includes("not-a-theme"), false);
+
       const text = logs.lines.join("\n");
       assert.equal(text.includes(secret), false);
       assert.equal(text.includes(share.token), false);
@@ -544,7 +575,12 @@ test("SHARE_REQUIRE_PASSWORD forces a password on new shares only", async () => 
       const token = (created.body as { share: { token: string } }).share.token;
       const challenged = await getJson(base, `/api/v1/public/shares/${token}`);
       assert.equal(challenged.status, 401);
-      assert.equal((challenged.body as { error: string }).error, "password_required");
+      assert.deepEqual(challenged.body, {
+        error: "password_required",
+        message: "需要密码",
+        passwordRequired: true,
+        themeId: "cotton-candy",
+      });
       assert.equal(logs.lines.join("\n").includes(secret), false);
     });
   } finally {

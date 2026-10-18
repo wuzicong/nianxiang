@@ -1,0 +1,360 @@
+.share-shell {
+  --share-ink: var(--share-text);
+  min-height: 100vh;
+  margin: 0;
+  background: var(--share-bg);
+  color: var(--share-text);
+  font-family: var(--share-font-body);
+  display: grid;
+  place-items: center;
+  padding: clamp(1.5rem, 4vw, 3.5rem) 1.15rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.share-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.share-shell[data-theme="cotton-candy"] .share-backdrop {
+  background:
+    radial-gradient(circle at 108% -6%, color-mix(in srgb, var(--share-brand) 78%, transparent), transparent 46%),
+    radial-gradient(circle at -12% 108%, color-mix(in srgb, var(--share-secondary) 70%, transparent), transparent 40%);
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-backdrop {
+  background:
+    radial-gradient(ellipse at 50% -12%, color-mix(in srgb, var(--share-brand) 42%, transparent), transparent 52%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--share-accent) 16%, transparent), transparent 36%);
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-backdrop {
+  background: linear-gradient(var(--share-accent), var(--share-accent)) center top / 100% 3px no-repeat;
+}
+
+.share-blob,
+.share-lantern,
+.share-ticket,
+.share-stamp {
+  position: absolute;
+  pointer-events: none;
+}
+
+.share-blob-a {
+  width: min(46vw, 280px);
+  top: -2.5rem;
+  right: -2rem;
+  opacity: 0.9;
+}
+
+.share-blob-b {
+  width: min(38vw, 220px);
+  left: -2.5rem;
+  bottom: -1.5rem;
+  opacity: 0.75;
+  transform: rotate(18deg);
+}
+
+.share-lantern {
+  width: 4.25rem;
+  top: 1.25rem;
+  left: 1.25rem;
+  opacity: 0.95;
+}
+
+.share-ticket {
+  width: 6.6rem;
+  right: 3.25rem;
+  bottom: 3rem;
+  transform: rotate(-8deg);
+  opacity: 0.92;
+}
+
+.share-stamp {
+  width: 4.5rem;
+  right: 6%;
+  top: 8%;
+  opacity: 0.85;
+}
+
+.share-card {
+  position: relative;
+  z-index: 1;
+  width: min(28.5rem, 100%);
+  background: var(--share-surface);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-card);
+  box-shadow: var(--share-shadow);
+}
+
+.share-shell[data-theme="cotton-candy"] .share-card {
+  border-color: color-mix(in srgb, var(--share-brand) 55%, var(--share-border));
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-card {
+  border-color: color-mix(in srgb, var(--share-brand) 62%, var(--share-border));
+  overflow: hidden;
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-card {
+  border-color: var(--share-text);
+  box-shadow: none;
+  border-radius: var(--share-radius-card);
+}
+
+.share-card-body {
+  padding: 1.7rem 1.4rem 1.45rem;
+}
+
+.share-shell[data-theme="cotton-candy"] .share-card-body {
+  padding-top: 1.15rem;
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-card-body {
+  padding-top: 1.85rem;
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-brand,
+.share-shell[data-theme="magazine-heirloom"] .share-kicker {
+  padding-right: 3.4rem;
+}
+
+.share-motif {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.95rem 1.2rem 0;
+}
+
+.share-tape-mark {
+  width: 7.2rem;
+  height: auto;
+  transform: rotate(-6deg);
+  transform-origin: left center;
+}
+
+.share-heart-mark {
+  width: 2.35rem;
+  height: 2.35rem;
+  transform: rotate(8deg);
+}
+
+.share-washi-edge,
+.share-folio {
+  pointer-events: none;
+}
+
+.share-washi-edge {
+  position: absolute;
+  z-index: 2;
+}
+
+.share-washi-edge {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0.7rem;
+}
+
+.share-washi-edge svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.share-folio {
+  position: absolute;
+  top: 1.15rem;
+  right: 1.05rem;
+  width: 3.6rem;
+  z-index: 2;
+  color: var(--share-text);
+}
+
+.share-brand {
+  margin: 0;
+}
+
+.share-brand a {
+  color: var(--share-text);
+  text-decoration-color: var(--share-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+
+.share-kicker {
+  margin: 0.85rem 0 0;
+  color: var(--share-muted);
+  letter-spacing: 0.16em;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.share-shell[data-theme="cotton-candy"] .share-kicker {
+  font-family: var(--share-font-title);
+  text-transform: none;
+  letter-spacing: 0.08em;
+  font-size: 1rem;
+  color: color-mix(in srgb, var(--share-brand) 38%, var(--share-text));
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-kicker {
+  font-family: var(--share-font-title);
+  letter-spacing: 0.22em;
+  color: var(--share-brand);
+}
+
+.share-title {
+  margin: 0.35rem 0 0;
+  font-family: var(--share-font-title);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.85rem, 4.4vw, 2.4rem);
+  line-height: 1.15;
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-title {
+  font-weight: 520;
+  letter-spacing: 0.03em;
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-title {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-size: clamp(1.9rem, 3.1vw, 2.45rem);
+  line-height: 1.12;
+}
+
+.share-rule {
+  height: 1px;
+  margin: 0.95rem 0 0;
+  border: 0;
+  background: var(--share-accent);
+  width: 4.75rem;
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-rule {
+  background: var(--share-brand);
+  height: 2px;
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-rule {
+  width: 100%;
+  height: 2px;
+}
+
+.share-copy,
+.share-note {
+  line-height: 1.65;
+  color: var(--share-muted);
+}
+
+.share-copy {
+  margin: 0.9rem 0 0;
+}
+
+.share-form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.35rem;
+}
+
+.share-form label {
+  font-size: 0.92rem;
+}
+
+.share-form input,
+.share-form button {
+  width: 100%;
+  font: inherit;
+  border-radius: var(--share-radius-button);
+}
+
+.share-form input {
+  padding: 0.75rem 0.9rem;
+  color: var(--share-text);
+  background: color-mix(in srgb, var(--share-bg) 55%, var(--share-surface));
+  border: 1px solid var(--share-border);
+}
+
+.share-shell[data-theme="cotton-candy"] .share-form input,
+.share-shell[data-theme="cotton-candy"] .share-form button,
+.share-shell[data-theme="cotton-candy"] .share-note[data-share-feedback="error"] {
+  border-radius: var(--share-radius-pill);
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-form input,
+.share-shell[data-theme="magazine-heirloom"] .share-form button,
+.share-shell[data-theme="magazine-heirloom"] .share-note[data-share-feedback="error"] {
+  border-radius: var(--share-radius-button);
+}
+
+.share-form button {
+  padding: 0.78rem 0.9rem;
+  font-weight: 650;
+  color: var(--share-ink);
+  background: var(--share-brand);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-form button {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 560;
+}
+
+.share-shell[data-theme="kyoto-lantern"] .share-form button {
+  letter-spacing: 0.12em;
+}
+
+.share-form button:disabled {
+  cursor: progress;
+  opacity: 0.58;
+}
+
+.share-form input:focus-visible,
+.share-form button:focus-visible,
+.share-brand a:focus-visible {
+  outline: 2px solid var(--share-accent);
+  outline-offset: 3px;
+}
+
+.share-note {
+  margin: 1rem 0 0;
+}
+
+.share-note[data-share-feedback="error"] {
+  color: var(--share-text);
+  border: 1.5px solid var(--share-accent);
+  border-radius: var(--share-radius-button);
+  padding: 0.8rem 0.95rem 0.8rem 1rem;
+  background: color-mix(in srgb, var(--share-accent) 18%, var(--share-surface));
+  box-shadow: inset 3px 0 0 var(--share-accent);
+}
+
+.share-noscript {
+  margin: 0.85rem 0 0;
+  color: var(--share-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .share-lantern,
+  .share-ticket,
+  .share-stamp {
+    display: none;
+  }
+
+  .share-folio {
+    position: static;
+    width: 3.2rem;
+    margin: 0 0 0.35rem auto;
+  }
+}

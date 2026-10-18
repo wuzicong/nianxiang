@@ -30,10 +30,15 @@ export interface ShareRecord {
   passwordProtected: boolean;
 }
 
-/** 活跃分享的门闩。passwordHash 只给校验用，调用方不得记录或回显。 */
+/**
+ * 活跃分享的门闩。
+ * passwordHash 只给校验用，调用方不得记录或回显。
+ * themeId 只有模板 id，不含标题、照片或令牌。
+ */
 export interface ActiveShareGate {
   shareId: string;
   passwordHash: string | null;
+  themeId: string;
 }
 
 /**
@@ -99,7 +104,7 @@ export interface AlbumRepository {
   createShare(input: NewShare): Promise<CreateShareResult>;
   listShares(albumId: string, userId: string): Promise<ShareRecord[] | null>;
   revokeShare(shareId: string, userId: string): Promise<ShareRecord | null>;
-  /** 不含相册标题和素材。撤销、过期、不存在都是 null。 */
+  /** 不含相册标题和素材。可带模板 id。撤销、过期、不存在都是 null。 */
   findActiveShareGate(tokenHash: string): Promise<ActiveShareGate | null>;
   /**
    * 读取仍有效的分享内容。
@@ -436,8 +441,8 @@ export function createAlbumRepository(options: {
     },
 
     async findActiveShareGate(tokenHash) {
-      const result = await query<{ id: string; password_hash: string | null }>(
-        `SELECT s.id, s.password_hash
+      const result = await query<{ id: string; password_hash: string | null; theme_id: string }>(
+        `SELECT s.id, s.password_hash, a.theme_id
          FROM shares s
          JOIN albums a ON a.id = s.album_id AND a.user_id = s.user_id
          WHERE s.token_hash = $1
@@ -452,6 +457,7 @@ export function createAlbumRepository(options: {
         passwordHash: typeof row.password_hash === "string" && row.password_hash.length > 0
           ? row.password_hash
           : null,
+        themeId: row.theme_id,
       };
     },
 

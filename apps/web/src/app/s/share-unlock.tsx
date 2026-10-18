@@ -2,14 +2,22 @@
 
 import { useState } from "react";
 import { parsePublicSharePayload, type PublicSharePayload } from "../../lib/share";
-import { themeSkin } from "../../lib/themes";
+import { themeSkin, type ThemeSkin } from "../../lib/themes";
 import { ShareGallery } from "./share-gallery";
+import { ShareChrome } from "./share-chrome";
 
 const FAILED = "无法打开分享。请确认密码；链接撤销或过期时也是这句话。";
+const HINT = "输入密码后才能查看照片。";
 
-export function ShareUnlock({ token }: { token: string }) {
+function feedbackFor(message: string): "hint" | "pending" | "error" {
+  if (message === HINT) return "hint";
+  if (message === "正在打开…") return "pending";
+  return "error";
+}
+
+export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin }) {
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("输入密码后才能查看照片。");
+  const [message, setMessage] = useState(HINT);
   const [pending, setPending] = useState(false);
   const [share, setShare] = useState<PublicSharePayload | null>(null);
 
@@ -59,23 +67,26 @@ export function ShareUnlock({ token }: { token: string }) {
     );
   }
 
+  const feedback = feedbackFor(message);
+
   return (
-    <main data-share-state="locked" style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1.5rem" }}>
-      <p style={{ marginBottom: "0.5rem" }}>
+    <ShareChrome theme={theme} state="locked">
+      <p className="share-brand">
         <a href="/">念册 · Memora</a>
       </p>
-      <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>这本相册需要密码</h1>
-      <p style={{ lineHeight: 1.6, color: "#555" }}>
-        密码不会出现在链接里。打开之后只在这一页里看图，刷新需要再输入一次。
-      </p>
+      <p className="share-kicker">{theme.name}</p>
+      <h1 className="share-title">这本相册需要密码</h1>
+      {theme.id === "cotton-candy" ? null : <hr className="share-rule" />}
+      <p className="share-copy">密码不会出现在链接里。打开之后只在这一页里看图，刷新需要再输入一次。</p>
       <form
+        className="share-form"
         method="post"
         action={`/api/v1/public/shares/${encodeURIComponent(token)}/unlock`}
+        aria-busy={pending}
         onSubmit={(event) => {
           event.preventDefault();
           void unlock();
         }}
-        style={{ display: "grid", gap: "0.75rem", maxWidth: 360 }}
       >
         <label htmlFor="share-password">密码</label>
         <input
@@ -89,15 +100,17 @@ export function ShareUnlock({ token }: { token: string }) {
           maxLength={128}
           required
           value={password}
+          aria-describedby="share-feedback"
           onChange={(event) => setPassword(event.target.value)}
-          style={{ padding: "0.6rem 0.7rem", font: "inherit" }}
         />
-        <button type="submit" disabled={pending} style={{ padding: "0.6rem 0.8rem", font: "inherit" }}>
+        <button type="submit" disabled={pending}>
           {pending ? "正在打开…" : "打开"}
         </button>
       </form>
-      <p style={{ lineHeight: 1.6, color: "#555" }}>{message}</p>
-      <noscript>需要启用 JavaScript 才能提交密码。</noscript>
-    </main>
+      <p id="share-feedback" className="share-note" role="status" data-share-feedback={feedback}>
+        {message}
+      </p>
+      <noscript className="share-noscript">需要启用 JavaScript 才能提交密码。</noscript>
+    </ShareChrome>
   );
 }

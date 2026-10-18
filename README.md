@@ -203,7 +203,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/api/v1/public/sha
 curl -s -b /tmp/memora.cookies -X POST http://127.0.0.1:3001/api/v1/albums/<albumId>/shares \
   -H 'content-type: application/json' \
   -d '{"password":"replace-with-8-plus-chars"}'
-# 有密码时这一步是 401，正文是「需要密码」，没有相册标题，也没有预签名
+# 有密码时这一步是 401，正文是「需要密码」，只额外带模板 id（themeId）。没有相册标题，也没有预签名
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/api/v1/public/shares/<token>
 # 密码放 JSON 正文，不要放 query。
 # 格式正确时：密码不对、链接不存在、已撤销或已过期，都是 401「无法打开分享」。
@@ -221,7 +221,7 @@ SHARE_REQUIRE_PASSWORD=true
 
 只接受 `true` / `1` 打开，`false` / `0` 或留空保持可选。设成别的值会告警并继续可选。这个开关不追溯已经创建的分享。
 
-页面：`pnpm dev:web`，打开 `http://127.0.0.1:3000/s/<token>`。肤色来自 `templates/<themeId>/theme.json`（棉花糖日记、京都纸灯、杂志 Heirloom）。无密码分享直接看图；有密码的先看到输入框，提交后才加载衍生图。撤销后刷新应看到「分享不存在」。刷新密码分享需要再输入一次，应用不发解锁 Cookie。
+页面：`pnpm dev:web`，打开 `http://127.0.0.1:3000/s/<token>`。肤色来自 `templates/<themeId>/theme.json`（棉花糖日记、京都纸灯、杂志 Heirloom）。无密码分享直接看图；有密码的先看到对应主题的输入框。模板优先用 401 里的 `themeId`，没有时才认链接上允许的 `?t=`（三套 id 之一），否则挑战态用棉花糖。解锁失败仍是同一句提示，页面沿用挑战态的皮肤，不会从失败响应里再要一次模板。提交后才加载衍生图。撤销后刷新应看到「分享不存在」。刷新密码分享需要再输入一次，应用不发解锁 Cookie。
 
 公开接口的取舍：令牌是 32 字节随机数，不能靠试 token 来枚举分享。持有链接的人需要知道要不要输密码，所以 **GET** 在「有效且设了密码」时用 **401「需要密码」**，和其他 404 分开。**POST /unlock** 则把密码错误、不存在、撤销、过期合成同一句 **401「无法打开分享」**，这个接口本身不能用来区分原因。密码错误时仍做一次 scrypt；分享不存在时对哑哈希做一次，避免只靠快慢判断链接是否还在。应用内不做按 IP 计数。公网请在反代上限制 `POST /api/v1/public/shares/`，本次不附 Nginx。反代访问日志仍要打码 `/s/` 和 `/api/v1/public/shares/`，并且不要记录这个 POST 的正文。
 

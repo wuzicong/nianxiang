@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./share-theme.css";
 
 export const metadata: Metadata = {
   title: "分享 · 念册",
