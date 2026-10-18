@@ -15,25 +15,49 @@ export interface ThemeSkin {
   radius: { card: number; button: number };
 }
 
-function skin(file: {
+interface ThemeFile {
   id: string;
-  name: string;
-  colors: { background: string; primary: string; accent: string; text: string };
-  radius: { card: number; button: number };
-}): ThemeSkin {
+  name: string | { zh?: string; en?: string };
+  tokens?: {
+    colors?: {
+      bg?: string;
+      surface?: string;
+      primary?: string;
+      accent?: string;
+      text?: string;
+    };
+    radius?: { md?: number; lg?: number };
+  };
+}
+
+function displayName(name: ThemeFile["name"]): string {
+  if (typeof name === "string" && name.trim().length > 0) return name.trim();
+  if (name && typeof name === "object" && typeof name.zh === "string" && name.zh.trim().length > 0) {
+    return name.zh.trim();
+  }
+  return "念册";
+}
+
+/** 卡片用 surface。tokens.colors.primary 在杂志主题里是深色品牌色，直接当底会和正文糊在一起。 */
+function skin(file: ThemeFile): ThemeSkin {
   if (!isThemeId(file.id)) {
     throw new Error("theme_id_mismatch");
   }
+  const colors = file.tokens?.colors ?? {};
+  const radius = file.tokens?.radius ?? {};
   return {
     id: file.id,
-    name: file.name,
+    name: displayName(file.name),
     colors: {
-      background: file.colors.background,
-      primary: file.colors.primary,
-      accent: file.colors.accent,
-      text: file.colors.text,
+      background: colors.bg ?? "#f6f3ee",
+      primary: colors.surface ?? colors.primary ?? "#ffffff",
+      accent: colors.accent ?? "#8a5a44",
+      text: colors.text ?? "#1c1917",
     },
-    radius: { card: file.radius.card, button: file.radius.button },
+    radius: {
+      card: radius.lg ?? radius.md ?? 16,
+      button: radius.md ?? 12,
+    },
   };
 }
 
@@ -43,7 +67,7 @@ const SKINS: Record<ThemeId, ThemeSkin> = {
   "magazine-heirloom": skin(magazineHeirloom),
 };
 
-/** 用 theme.json 的名字和颜色给分享页上肤。未知 id 回落到默认模板。 */
+/** 用 theme.json 的中文名和色板给分享页上肤。未知 id 回落到默认模板。 */
 export function themeSkin(themeId: string): ThemeSkin {
   if (!isThemeId(themeId)) return SKINS[DEFAULT_THEME_ID];
   return SKINS[themeId];

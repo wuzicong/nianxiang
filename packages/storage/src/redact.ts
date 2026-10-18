@@ -10,6 +10,8 @@ const ASSIGNED_SECRET =
 /** 分享页和公开读取路径上的能力令牌。先写更长的 API 路径，避免被短路径截断。 */
 const SHARE_CAPABILITY =
   /(\/(?:api\/v1\/public\/shares|s)\/)(?!\*\*\*)[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+/** 分享密码和登录密码的 scrypt 编码。日志里只留算法名。 */
+const SCRYPT_HASH = /\bscrypt\$[A-Za-z0-9_-]+\$[A-Za-z0-9_-]+/g;
 
 /** 日志用。去掉带密码的 URL、预签名 query、会话 Cookie 和常见密钥形状。 */
 export function redactSecrets(input: string): string {
@@ -21,7 +23,8 @@ export function redactSecrets(input: string): string {
     .replace(SESSION_COOKIE, "$1***")
     .replace(JSON_SECRET, "$1***")
     .replace(ASSIGNED_SECRET, "$1***")
-    .replace(SHARE_CAPABILITY, "$1***");
+    .replace(SHARE_CAPABILITY, "$1***")
+    .replace(SCRYPT_HASH, "scrypt$***");
 }
 
 export function safeErrorMessage(err: unknown): string {

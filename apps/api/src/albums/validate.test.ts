@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { HttpError } from "../http.js";
-import { parseAlbumTitle, parseAssetIds, parseExpiresAt, parseThemeId } from "./validate.js";
+import {
+  parseAlbumTitle,
+  parseAssetIds,
+  parseExpiresAt,
+  parseSharePassword,
+  parseThemeId,
+} from "./validate.js";
 
 const NOW = Date.parse("2026-10-18T00:00:00.000Z");
 
@@ -30,4 +36,22 @@ test("album validators reject empty titles, unknown themes, and bad expiry", () 
   );
   assert.throws(() => parseExpiresAt("2028-01-01T00:00:00.000Z", NOW), HttpError);
   assert.throws(() => parseExpiresAt(123, NOW), HttpError);
+});
+
+test("share password is optional unless the deployment requires one", () => {
+  assert.equal(parseSharePassword(undefined, false), null);
+  assert.equal(parseSharePassword(null, false), null);
+  assert.equal(parseSharePassword("  12345678", false), "  12345678");
+  assert.equal(parseSharePassword("share-secret-1", true), "share-secret-1");
+  assert.throws(
+    () => parseSharePassword(undefined, true),
+    (err) => err instanceof HttpError && err.code === "password_required",
+  );
+  assert.throws(
+    () => parseSharePassword("", false),
+    (err) => err instanceof HttpError && err.code === "weak_password",
+  );
+  assert.throws(() => parseSharePassword("short", false), HttpError);
+  assert.throws(() => parseSharePassword(`secret\npassword`, false), HttpError);
+  assert.throws(() => parseSharePassword("x".repeat(129), false), HttpError);
 });

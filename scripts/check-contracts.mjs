@@ -97,11 +97,18 @@ if (DEFAULT_THEME_ID !== "cotton-candy" || !isThemeId(DEFAULT_THEME_ID)) fail("d
 for (const id of THEME_IDS) {
   const theme = JSON.parse(readFileSync(join(templateRoot, id, "theme.json"), "utf8"));
   if (theme.id !== id) fail(`theme id ${id}`);
-  if (typeof theme.name !== "string" || theme.name.length < 1) fail(`theme name ${id}`);
-  for (const key of ["background", "primary", "text", "accent"]) {
-    if (typeof theme.colors?.[key] !== "string") fail(`theme color ${id}.${key}`);
+  const name =
+    typeof theme.name === "string"
+      ? theme.name
+      : typeof theme.name?.zh === "string"
+        ? theme.name.zh
+        : "";
+  if (name.length < 1) fail(`theme name ${id}`);
+  for (const key of ["bg", "surface", "primary", "text", "accent"]) {
+    if (typeof theme.tokens?.colors?.[key] !== "string") fail(`theme color ${id}.${key}`);
   }
-  if (typeof theme.radius?.card !== "number") fail(`theme radius ${id}`);
+  if (typeof theme.tokens?.radius?.md !== "number") fail(`theme radius ${id}.md`);
+  if (typeof theme.tokens?.radius?.lg !== "number") fail(`theme radius ${id}.lg`);
 }
 
 console.log("contracts ok");

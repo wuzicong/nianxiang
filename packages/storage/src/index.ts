@@ -47,6 +47,7 @@ export {
   createAlbumRepository,
   MAX_ALBUMS_PER_USER,
   MAX_ASSETS_PER_ALBUM,
+  type ActiveShareGate,
   type AddAssetsResult,
   type AlbumRepository,
   type AlbumSummary,
@@ -56,6 +57,7 @@ export {
   type NewShare,
   type PublicShareAsset,
   type PublicShareView,
+  type ShareReadAccess,
   type ShareRecord,
 } from "./albums.js";
 export {

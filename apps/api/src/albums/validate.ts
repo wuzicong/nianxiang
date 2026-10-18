@@ -1,4 +1,5 @@
 import { isSafeStorageId, isThemeId, DEFAULT_THEME_ID, type ThemeId } from "@memora/shared";
+import { isAcceptablePassword } from "../auth/password.js";
 import { HttpError } from "../http.js";
 
 export const MAX_ASSET_IDS_PER_REQUEST = 50;
@@ -44,6 +45,22 @@ export function parseExpiresAt(value: unknown, now = Date.now()): Date | null {
     throw new HttpError(400, "invalid_request", "过期时间不能超过 366 天");
   }
   return parsed;
+}
+
+/**
+ * 省略或 null：不设密码（除非部署要求必须带密码）。
+ * 空字符串和其他非法值都拒绝，避免调用方以为设了密码、实际却公开。
+ * 不 trim，首尾空格算进密码。
+ */
+export function parseSharePassword(value: unknown, required: boolean): string | null {
+  if (value === undefined || value === null) {
+    if (required) throw new HttpError(400, "password_required", "分享需要密码");
+    return null;
+  }
+  if (typeof value !== "string" || !isAcceptablePassword(value) || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new HttpError(400, "weak_password", "分享密码需要 8 到 128 个字符，且不能包含控制字符");
+  }
+  return value;
 }
 
 export function parseAssetIds(value: unknown): string[] {

@@ -10,6 +10,11 @@ export interface AppConfig extends RuntimeConfig {
   webOrigins: string[];
   cookieSecure: boolean;
   registrationOpen: boolean;
+  /**
+   * 为真时，新建分享必须带密码。默认否：密码可选，省略则沿用无密码分享。
+   * 已存在的分享不受这个开关影响。
+   */
+  sharePasswordRequired: boolean;
   /** 为真时只说明环境里出现了 OIDC 变量。本阶段不读取 client secret，也不走授权码。 */
   oidcConfigured: boolean;
 }
@@ -55,6 +60,16 @@ function cookieSecure(
   return env.NODE_ENV === "production";
 }
 
+function sharePasswordRequired(raw: string | undefined): boolean {
+  if (raw === undefined || raw.trim() === "") return false;
+  const flag = envFlag(raw.trim());
+  if (flag === undefined) {
+    console.warn("[memora-api] SHARE_REQUIRE_PASSWORD 无效，回落可选密码");
+    return false;
+  }
+  return flag;
+}
+
 function registrationOpen(raw: string | undefined): boolean {
   const value = (raw ?? "open").trim().toLowerCase();
   if (value === "open") return true;
@@ -76,6 +91,7 @@ export function createConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigins: webOrigins(env.WEB_ORIGINS),
     cookieSecure: cookieSecure(env, runtime.deployMode, runtime.memoraEnv),
     registrationOpen: registrationOpen(env.AUTH_REGISTRATION),
+    sharePasswordRequired: sharePasswordRequired(env.SHARE_REQUIRE_PASSWORD),
     oidcConfigured: Boolean(issuer || clientId || clientSecretSet),
   };
 }

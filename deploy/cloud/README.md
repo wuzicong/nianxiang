@@ -31,7 +31,7 @@ REDIS_URL=rediss://...
 | 加密 | SSE-KMS 可配；生产建议开启 |
 | CDN | 只缓存衍生图，不缓存原图 |
 | IAM | API 角色只读写 `users/*`、`albums/*`、`templates/*`，禁止 `*` |
-| 分享 | 链接令牌只存哈希；可设过期、可立即撤销。密码分享还没做 |
+| 分享 | 链接令牌只存哈希；可设过期、可立即撤销。密码可选，只存 scrypt，不回显 |
 | 运维 | 默认不能读原图；排障要审批、短时授权和审计 |
 | 备份 | 加密备份 |
 | 密钥 | Secret Manager / KMS；不进仓库、不进镜像 |
@@ -40,6 +40,6 @@ REDIS_URL=rediss://...
 
 可计划、但默认不应用的 Terraform 骨架：[`terraform/README.md`](terraform/README.md)。里面没有后端状态，也没有访问密钥。
 
-素材、登录和相册表由应用第一次访问数据库时创建（`packages/storage/migrations/001_assets.sql`、`002_auth.sql`、`003_albums.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。分享令牌只存哈希；撤销后公开读取立即 404。反代访问日志要打码 `/s/` 和 `/api/v1/public/shares/`，应用自己的日志不会打印明文 token。
+素材、登录和相册表由应用第一次访问数据库时创建（`packages/storage/migrations/001_assets.sql`、`002_auth.sql`、`003_albums.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。分享令牌只存哈希；可选密码只存 scrypt。撤销后公开读取立即 404。`SHARE_REQUIRE_PASSWORD=true` 时，之后新建的分享必须带密码。反代访问日志要打码 `/s/` 和 `/api/v1/public/shares/`，也不要记录 `POST .../unlock` 的正文。应用自己的日志不会打印明文 token 或密码。本次不附 Nginx 片段。限流放在反代上，对 `POST /api/v1/public/shares/` 按来源地址计数即可。
 
 `DATABASE_URL` 里的 `sslmode=require` 会走 TLS，但不校验服务器证书。要校验 CA 时用 `sslmode=verify-full`。

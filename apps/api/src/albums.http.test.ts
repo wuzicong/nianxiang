@@ -5,6 +5,7 @@ import { derivativeObjectKey, originalObjectKey } from "@memora/shared";
 import { MAX_ALBUMS_PER_USER, MAX_ASSETS_PER_ALBUM } from "@memora/storage";
 import { hashShareToken } from "./shares/token.js";
 import {
+  ENV,
   createTestApp,
   fakeObjects,
   getJson,
@@ -189,10 +190,18 @@ test("share token is returned once, stored hashed, and dies on revoke or expiry"
       assert.equal(created.cacheControl, "private, no-store");
       const share = (
         created.body as {
-          share: { shareId: string; token: string; path: string; expiresAt: string; revokedAt: null };
+          share: {
+            shareId: string;
+            token: string;
+            path: string;
+            expiresAt: string;
+            revokedAt: null;
+            passwordProtected: boolean;
+          };
         }
       ).share;
       assert.equal(share.revokedAt, null);
+      assert.equal(share.passwordProtected, false);
       assert.equal(share.path, `/s/${share.token}`);
       assert.equal(albums.tokenHashes.has(share.token), false);
       assert.equal(albums.tokenHashes.has(hashShareToken(share.token)), true);
@@ -320,6 +329,223 @@ test("share presign failures do not log the capability token", async () => {
       assert.equal(text.includes(token), false);
       assert.equal(text.includes(leaked), false);
       assert.equal(text.includes("supersecret"), false);
+    });
+  } finally {
+    logs.restore();
+  }
+});
+
+test("optional share password is hashed, challenged, and not echoed", async () => {
+  const secret = "share-secret-1";
+  const assets = memoryAssets();
+  const albums = memoryAlbums(assets);
+  const objects = fakeObjects();
+  const logs = captureLogs();
+  const unavailable = { error: "share_unavailable", message: "无法打开分享" };
+  try {
+    const { app } = createTestApp({ assets, albums, objects });
+    await withServer(app, async (base) => {
+      const owner = await registerSession(base, "pw-share@memora.test");
+      const assetId = "photo-locked";
+      const preview = derivativeObjectKey(owner.user.id, assetId, "preview");
+      assets.rows.set(
+        assetId,
+        record({
+          id: assetId,
+          userId: owner.user.id,
+          status: "ready",
+          filename: "harbor.jpg",
+          derivatives: { preview, hero: originalObjectKey(owner.user.id, assetId) },
+        }),
+      );
+      const album = await postJson(base, "/api/v1/albums", { title: "上锁的海港" }, owner.cookie);
+      const albumId = (album.body as { album: { albumId: string } }).album.albumId;
+      await postJson(base, `/api/v1/albums/${albumId}/assets`, { assetIds: [assetId] }, owner.cookie);
+
+      const weak = await postJson(
+        base,
+        `/api/v1/albums/${albumId}/shares`,
+        { password: "short" },
+        owner.cookie,
+      );
+      assert.equal(weak.status, 400);
+      assert.equal((weak.body as { error: string }).error, "weak_password");
+      assert.equal(albums.passwordHashes.size, 0);
+      assert.equal(albums.tokenHashes.size, 0);
+
+      const created = await postJson(
+        base,
+        `/api/v1/albums/${albumId}/shares`,
+        { password: secret, ignored: secret },
+        owner.cookie,
+      );
+      assert.equal(created.status, 201);
+      const share = (
+        created.body as {
+          share: { shareId: string; token: string; path: string; passwordProtected: boolean };
+        }
+      ).share;
+      assert.equal(share.passwordProtected, true);
+      assert.equal(share.path, `/s/${share.token}`);
+      const createdJson = JSON.stringify(created.body);
+      assert.equal(createdJson.includes(secret), false);
+      assert.equal(createdJson.includes("scrypt$"), false);
+      assert.equal([...albums.passwordHashes].some((item) => item.includes(secret)), false);
+      assert.match([...albums.passwordHashes][0] ?? "", /^scrypt\$[A-Za-z0-9_-]+\$[A-Za-z0-9_-]+$/);
+
+      const listed = await getJson(base, `/api/v1/albums/${albumId}/shares`, owner.cookie);
+      assert.equal(JSON.stringify(listed.body).includes(secret), false);
+      assert.equal(JSON.stringify(listed.body).includes("scrypt$"), false);
+      assert.equal(
+        (listed.body as { shares: { passwordProtected: boolean }[] }).shares[0]?.passwordProtected,
+        true,
+      );
+
+      const challenged = await getJson(base, `/api/v1/public/shares/${share.token}`);
+      assert.equal(challenged.status, 401);
+      assert.deepEqual(challenged.body, {
+        error: "password_required",
+        message: "需要密码",
+        passwordRequired: true,
+      });
+      assert.equal(challenged.cacheControl, "private, no-store");
+      assert.equal(challenged.robots, "noindex");
+      assert.equal(challenged.referrerPolicy, "no-referrer");
+      assert.equal(JSON.stringify(challenged.body).includes("上锁的海港"), false);
+      assert.equal(objects.presignGets.length, 0);
+
+      const viaQuery = await getJson(
+        base,
+        `/api/v1/public/shares/${share.token}?password=${encodeURIComponent(secret)}`,
+      );
+      assert.equal(viaQuery.status, 401);
+      assert.equal((viaQuery.body as { passwordRequired?: boolean }).passwordRequired, true);
+      assert.equal(objects.presignGets.length, 0);
+
+      const wrong = await postJson(base, `/api/v1/public/shares/${share.token}/unlock`, {
+        password: "not-the-share-password",
+      });
+      const unknown = await postJson(base, `/api/v1/public/shares/${"d".repeat(43)}/unlock`, {
+        password: "not-the-share-password",
+      });
+      const empty = await postJson(base, `/api/v1/public/shares/${share.token}/unlock`, {});
+      for (const response of [wrong, unknown, empty]) {
+        assert.equal(response.status, 401);
+        assert.deepEqual(response.body, unavailable);
+        assert.equal(response.cacheControl, "private, no-store");
+        assert.equal(response.robots, "noindex");
+        assert.equal(JSON.stringify(response.body).includes(secret), false);
+        assert.equal(JSON.stringify(response.body).includes("密码错"), false);
+      }
+      assert.equal(objects.presignGets.length, 0);
+
+      const malformed = await postJson(base, "/api/v1/public/shares/not-a-token/unlock", {
+        password: secret,
+      });
+      assert.equal(malformed.status, 404);
+      assert.deepEqual(malformed.body, MISSING_SHARE);
+
+      const opened = await postJson(base, `/api/v1/public/shares/${share.token}/unlock`, {
+        password: secret,
+      });
+      assert.equal(opened.status, 200);
+      assert.equal(opened.setCookies.length, 0);
+      const openedBody = opened.body as {
+        album: { title: string };
+        assets: { derivatives: { preview?: { url: string }; hero?: { url: string } } }[];
+      };
+      assert.equal(openedBody.album.title, "上锁的海港");
+      assert.match(openedBody.assets[0]?.derivatives.preview?.url ?? "", /derivatives/);
+      assert.equal(openedBody.assets[0]?.derivatives.hero, undefined);
+      assert.equal(JSON.stringify(openedBody).includes(secret), false);
+      assert.equal(JSON.stringify(openedBody).includes(share.token), false);
+      assert.deepEqual(objects.presignGets, [preview]);
+
+      const openShare = await postJson(base, `/api/v1/albums/${albumId}/shares`, {}, owner.cookie);
+      const openToken = (openShare.body as { share: { token: string } }).share.token;
+      const stillOpen = await getJson(base, `/api/v1/public/shares/${openToken}`);
+      assert.equal(stillOpen.status, 200);
+      const ignoredPassword = await postJson(base, `/api/v1/public/shares/${openToken}/unlock`, {
+        password: "ignored-password",
+      });
+      assert.equal(ignoredPassword.status, 200);
+
+      const revoked = await postJson(base, `/api/v1/shares/${share.shareId}/revoke`, {}, owner.cookie);
+      assert.equal(revoked.status, 200);
+      const deadGet = await getJson(base, `/api/v1/public/shares/${share.token}`);
+      assert.equal(deadGet.status, 404);
+      assert.deepEqual(deadGet.body, MISSING_SHARE);
+      const deadPost = await postJson(base, `/api/v1/public/shares/${share.token}/unlock`, {
+        password: secret,
+      });
+      assert.equal(deadPost.status, 401);
+      assert.deepEqual(deadPost.body, unavailable);
+      assert.deepEqual(deadPost.body, unknown.body);
+
+      const expiring = await postJson(
+        base,
+        `/api/v1/albums/${albumId}/shares`,
+        { password: secret },
+        owner.cookie,
+      );
+      const expiringShare = (
+        expiring.body as { share: { shareId: string; token: string } }
+      ).share;
+      albums.expireShare(expiringShare.shareId);
+      const expiredGet = await getJson(base, `/api/v1/public/shares/${expiringShare.token}`);
+      const expiredPost = await postJson(
+        base,
+        `/api/v1/public/shares/${expiringShare.token}/unlock`,
+        { password: secret },
+      );
+      assert.equal(expiredGet.status, 404);
+      assert.deepEqual(expiredGet.body, MISSING_SHARE);
+      assert.equal(expiredPost.status, 401);
+      assert.deepEqual(expiredPost.body, unavailable);
+
+      const text = logs.lines.join("\n");
+      assert.equal(text.includes(secret), false);
+      assert.equal(text.includes(share.token), false);
+      assert.equal(text.includes("scrypt$"), false);
+    });
+  } finally {
+    logs.restore();
+  }
+});
+
+test("SHARE_REQUIRE_PASSWORD forces a password on new shares only", async () => {
+  const secret = "required-share-pw";
+  const assets = memoryAssets();
+  const albums = memoryAlbums(assets);
+  const logs = captureLogs();
+  try {
+    const { app } = createTestApp({
+      assets,
+      albums,
+      objects: fakeObjects(),
+      env: { ...ENV, SHARE_REQUIRE_PASSWORD: "true" },
+    });
+    await withServer(app, async (base) => {
+      const owner = await registerSession(base, "require-pw@memora.test");
+      const album = await postJson(base, "/api/v1/albums", { title: "必须有密码" }, owner.cookie);
+      const albumId = (album.body as { album: { albumId: string } }).album.albumId;
+      const missing = await postJson(base, `/api/v1/albums/${albumId}/shares`, {}, owner.cookie);
+      assert.equal(missing.status, 400);
+      assert.equal((missing.body as { error: string }).error, "password_required");
+      assert.equal(albums.tokenHashes.size, 0);
+      const created = await postJson(
+        base,
+        `/api/v1/albums/${albumId}/shares`,
+        { password: secret },
+        owner.cookie,
+      );
+      assert.equal(created.status, 201);
+      assert.equal(JSON.stringify(created.body).includes(secret), false);
+      const token = (created.body as { share: { token: string } }).share.token;
+      const challenged = await getJson(base, `/api/v1/public/shares/${token}`);
+      assert.equal(challenged.status, 401);
+      assert.equal((challenged.body as { error: string }).error, "password_required");
+      assert.equal(logs.lines.join("\n").includes(secret), false);
     });
   } finally {
     logs.restore();
