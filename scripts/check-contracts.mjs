@@ -1,16 +1,24 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   ABSOLUTE_MAX_UPLOAD_BYTES,
   ALL_JOB_NAMES,
   DEFAULT_MAX_UPLOAD_BYTES,
+  DEFAULT_THEME_ID,
   JOB_NAMES,
+  THEME_IDS,
   albumExportKey,
   bucketName,
   clampPresignTtlMinutes,
   derivativeObjectKey,
   isAllowedUploadContentType,
   isSafeStorageId,
+  isShareToken,
+  isThemeId,
   originalObjectKey,
   resolveMaxUploadBytes,
+  sharePagePath,
   templateAssetPrefix,
 } from "../packages/shared/dist/index.js";
 
@@ -69,5 +77,31 @@ if (resolveMaxUploadBytes(String(ABSOLUTE_MAX_UPLOAD_BYTES + 1)) !== ABSOLUTE_MA
 if (!isSafeStorageId("user_1")) fail("safe id");
 if (isSafeStorageId("../etc")) fail("reject traversal id");
 if (isSafeStorageId("")) fail("reject empty id");
+
+if (!isShareToken("A".repeat(43))) fail("share token shape");
+if (isShareToken("short")) fail("share token short");
+if (isShareToken(`${"A".repeat(42)}/`)) fail("share token slash");
+if (isShareToken("A".repeat(44))) fail("share token long");
+if (!sharePagePath("A".repeat(43)).startsWith("/s/")) fail("share path");
+
+const templateRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "templates");
+const themeDirs = readdirSync(templateRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+const expectedThemes = [...THEME_IDS].sort();
+if (themeDirs.join() !== expectedThemes.join()) {
+  fail(`theme dirs ${themeDirs.join()} != ${expectedThemes.join()}`);
+}
+if (DEFAULT_THEME_ID !== "cotton-candy" || !isThemeId(DEFAULT_THEME_ID)) fail("default theme");
+for (const id of THEME_IDS) {
+  const theme = JSON.parse(readFileSync(join(templateRoot, id, "theme.json"), "utf8"));
+  if (theme.id !== id) fail(`theme id ${id}`);
+  if (typeof theme.name !== "string" || theme.name.length < 1) fail(`theme name ${id}`);
+  for (const key of ["background", "primary", "text", "accent"]) {
+    if (typeof theme.colors?.[key] !== "string") fail(`theme color ${id}.${key}`);
+  }
+  if (typeof theme.radius?.card !== "number") fail(`theme radius ${id}`);
+}
 
 console.log("contracts ok");

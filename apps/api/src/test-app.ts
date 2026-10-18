@@ -4,16 +4,27 @@ import type { AddressInfo } from "node:net";
 import { originalObjectKey } from "@memora/shared";
 import {
   EmailTakenError,
+  MAX_ALBUMS_PER_USER,
+  MAX_ASSETS_PER_ALBUM,
+  type AddAssetsResult,
+  type AlbumRepository,
+  type AlbumSummary,
   type AssetRecord,
   type AssetRepository,
   type AuthRepository,
   type AuthUser,
+  type CreateAlbumResult,
+  type CreateShareResult,
   type HeadResult,
+  type NewAlbum,
   type NewAsset,
   type NewAuthSession,
   type NewAuthUser,
+  type NewShare,
   type ObjectStore,
   type PresignPutInput,
+  type PublicShareView,
+  type ShareRecord,
   type AssetJobEnqueuer,
 } from "@memora/storage";
 import type { Express } from "express";
@@ -154,12 +165,184 @@ export function memoryAuth(): AuthRepository & { users: Map<string, AuthUser> } 
   };
 }
 
+export function memoryAlbums(
+  assets: Pick<AssetRepository, "get">,
+): AlbumRepository & { tokenHashes: Set<string>; expireShare(shareId: string): void } {
+  interface StoredAlbum {
+    id: string;
+    userId: string;
+    title: string;
+    themeId: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+  interface Membership {
+    assetId: string;
+    position: number;
+    createdAt: string;
+  }
+  interface StoredShare extends ShareRecord {
+    tokenHash: string;
+  }
+
+  const albums = new Map<string, StoredAlbum>();
+  const membership = new Map<string, Membership[]>();
+  const shares = new Map<string, StoredShare>();
+  const tokenHashes = new Set<string>();
+  let clock = Date.parse("2026-04-01T00:00:00.000Z");
+  const nowIso = () => {
+    clock += 1000;
+    return new Date(clock).toISOString();
+  };
+  const summary = (album: StoredAlbum): AlbumSummary => ({
+    ...album,
+    assetCount: membership.get(album.id)?.length ?? 0,
+  });
+  const toShare = (share: StoredShare): ShareRecord => ({
+    id: share.id,
+    albumId: share.albumId,
+    userId: share.userId,
+    expiresAt: share.expiresAt,
+    revokedAt: share.revokedAt,
+    createdAt: share.createdAt,
+  });
+
+  return {
+    tokenHashes,
+    async ready() {},
+    async createAlbum(input: NewAlbum): Promise<CreateAlbumResult> {
+      const owned = [...albums.values()].filter((album) => album.userId === input.userId);
+      if (owned.length >= MAX_ALBUMS_PER_USER) return { ok: false, reason: "album_limit" };
+      const stamp = nowIso();
+      const album: StoredAlbum = {
+        id: input.id,
+        userId: input.userId,
+        title: input.title,
+        themeId: input.themeId,
+        createdAt: stamp,
+        updatedAt: stamp,
+      };
+      albums.set(album.id, album);
+      membership.set(album.id, []);
+      return { ok: true, album: summary(album) };
+    },
+    async listAlbums(userId) {
+      return [...albums.values()]
+        .filter((album) => album.userId === userId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .map((album) => summary(album));
+    },
+    async getOwnedAlbum(id, userId) {
+      const album = albums.get(id);
+      if (!album || album.userId !== userId) return null;
+      return summary(album);
+    },
+    async listOwnedAssets(albumId, userId) {
+      const album = albums.get(albumId);
+      if (!album || album.userId !== userId) return null;
+      const rows: AssetRecord[] = [];
+      for (const item of membership.get(albumId) ?? []) {
+        const asset = await assets.get(item.assetId);
+        if (asset && asset.userId === userId) rows.push(asset);
+      }
+      return rows;
+    },
+    async addAssets(albumId, userId, assetIds): Promise<AddAssetsResult> {
+      const album = albums.get(albumId);
+      if (!album || album.userId !== userId) return { ok: false, reason: "album_not_found" };
+      for (const assetId of assetIds) {
+        const asset = await assets.get(assetId);
+        if (!asset || asset.userId !== userId) return { ok: false, reason: "asset_not_found" };
+      }
+      const rows = membership.get(albumId) ?? [];
+      const have = new Set(rows.map((item) => item.assetId));
+      const fresh = [...new Set(assetIds)].filter((id) => !have.has(id));
+      if (rows.length + fresh.length > MAX_ASSETS_PER_ALBUM) {
+        return { ok: false, reason: "too_many" };
+      }
+      let position = rows.reduce((max, item) => Math.max(max, item.position), 0);
+      for (const assetId of fresh) {
+        position += 1;
+        rows.push({ assetId, position, createdAt: nowIso() });
+      }
+      membership.set(albumId, rows);
+      if (fresh.length > 0) album.updatedAt = nowIso();
+      return { ok: true, assetIds: rows.map((item) => item.assetId) };
+    },
+    async createShare(input: NewShare): Promise<CreateShareResult> {
+      const album = albums.get(input.albumId);
+      if (!album || album.userId !== input.userId) return { ok: false, reason: "album_not_found" };
+      const share: StoredShare = {
+        id: input.id,
+        albumId: album.id,
+        userId: album.userId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt ? input.expiresAt.toISOString() : null,
+        revokedAt: null,
+        createdAt: nowIso(),
+      };
+      shares.set(share.id, share);
+      tokenHashes.add(input.tokenHash);
+      return { ok: true, share: toShare(share) };
+    },
+    async listShares(albumId, userId) {
+      const album = albums.get(albumId);
+      if (!album || album.userId !== userId) return null;
+      return [...shares.values()]
+        .filter((share) => share.albumId === albumId && share.userId === userId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .map((share) => toShare(share));
+    },
+    async revokeShare(shareId, userId) {
+      const share = shares.get(shareId);
+      if (!share || share.userId !== userId) return null;
+      if (!share.revokedAt) share.revokedAt = new Date().toISOString();
+      return toShare(share);
+    },
+    async findActiveShareByTokenHash(tokenHash): Promise<PublicShareView | null> {
+      const share = [...shares.values()].find((item) => item.tokenHash === tokenHash);
+      if (!share || share.revokedAt) return null;
+      if (share.expiresAt && Date.parse(share.expiresAt) <= Date.now()) return null;
+      const album = albums.get(share.albumId);
+      if (!album || album.userId !== share.userId) return null;
+      const viewAssets: PublicShareView["assets"] = [];
+      for (const item of membership.get(album.id) ?? []) {
+        const asset = await assets.get(item.assetId);
+        if (!asset || asset.userId !== album.userId) continue;
+        viewAssets.push({
+          assetId: asset.id,
+          filename: asset.filename,
+          width: asset.width,
+          height: asset.height,
+          derivatives: asset.derivatives,
+        });
+      }
+      return {
+        shareId: share.id,
+        albumId: album.id,
+        userId: album.userId,
+        title: album.title,
+        themeId: album.themeId,
+        assets: viewAssets,
+      };
+    },
+    async close() {},
+    expireShare(shareId: string) {
+      const share = shares.get(shareId);
+      if (!share) throw new Error("missing share");
+      share.expiresAt = new Date(Date.now() - 60_000).toISOString();
+    },
+  };
+}
+
 export function fakeObjects(options?: {
   head?: HeadResult | null;
   presignError?: Error;
-}): ObjectStore & { presigns: PresignPutInput[]; heads: string[] } {
+  presignGetError?: Error;
+}): ObjectStore & { presigns: PresignPutInput[]; presignGets: string[]; heads: string[] } {
   return {
     presigns: [],
+    presignGets: [],
     heads: [],
     async presignPut(input) {
       this.presigns.push(input);
@@ -171,6 +354,14 @@ export function fakeObjects(options?: {
           "Content-Type": input.contentType,
           "Content-Length": String(input.contentLength),
         },
+      };
+    },
+    async presignGet(input) {
+      this.presignGets.push(input.key);
+      if (options?.presignGetError) throw options.presignGetError;
+      return {
+        url: `http://127.0.0.1:9000/memora-local/${input.key}?X-Amz-Signature=supersecret`,
+        expiresAt: new Date("2026-01-01T00:10:00.000Z"),
       };
     },
     async head(key) {
@@ -202,14 +393,16 @@ export function createTestApp(options?: {
   objects?: ReturnType<typeof fakeObjects>;
   jobs?: ReturnType<typeof fakeJobs>;
   auth?: ReturnType<typeof memoryAuth>;
+  albums?: ReturnType<typeof memoryAlbums>;
 }) {
   const assets = options?.assets ?? memoryAssets();
   const objects = options?.objects ?? fakeObjects();
   const jobs = options?.jobs ?? fakeJobs();
   const auth = options?.auth ?? memoryAuth();
+  const albums = options?.albums ?? memoryAlbums(assets);
   const config = createConfig(options?.env ?? ENV);
-  const app = createApp({ config, assets, objects, jobs, auth });
-  return { app, config, assets, objects, jobs, auth };
+  const app = createApp({ config, assets, objects, jobs, auth, albums });
+  return { app, config, assets, objects, jobs, auth, albums };
 }
 
 export async function withServer(app: Express, fn: (base: string) => Promise<void>) {
@@ -243,6 +436,7 @@ export async function postJson(
     status: response.status,
     body: text ? (JSON.parse(text) as unknown) : null,
     setCookies: response.headers.getSetCookie(),
+    cacheControl: response.headers.get("cache-control"),
   };
 }
 
@@ -255,6 +449,9 @@ export async function getJson(base: string, path: string, cookie?: string) {
     status: response.status,
     body: text ? (JSON.parse(text) as unknown) : null,
     setCookies: response.headers.getSetCookie(),
+    cacheControl: response.headers.get("cache-control"),
+    robots: response.headers.get("x-robots-tag"),
+    referrerPolicy: response.headers.get("referrer-policy"),
   };
 }
 

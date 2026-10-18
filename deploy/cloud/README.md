@@ -31,7 +31,7 @@ REDIS_URL=rediss://...
 | 加密 | SSE-KMS 可配；生产建议开启 |
 | CDN | 只缓存衍生图，不缓存原图 |
 | IAM | API 角色只读写 `users/*`、`albums/*`、`templates/*`，禁止 `*` |
-| 分享 | 默认私有；密码、过期、一键撤销 |
+| 分享 | 链接令牌只存哈希；可设过期、可立即撤销。密码分享还没做 |
 | 运维 | 默认不能读原图；排障要审批、短时授权和审计 |
 | 备份 | 加密备份 |
 | 密钥 | Secret Manager / KMS；不进仓库、不进镜像 |
@@ -40,6 +40,6 @@ REDIS_URL=rediss://...
 
 可计划、但默认不应用的 Terraform 骨架：[`terraform/README.md`](terraform/README.md)。里面没有后端状态，也没有访问密钥。
 
-素材表由应用启动后的第一次数据库访问创建（`packages/storage/migrations/001_assets.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。
+素材、登录和相册表由应用第一次访问数据库时创建（`packages/storage/migrations/001_assets.sql`、`002_auth.sql`、`003_albums.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。分享令牌只存哈希；撤销后公开读取立即 404。反代访问日志要打码 `/s/` 和 `/api/v1/public/shares/`，应用自己的日志不会打印明文 token。
 
 `DATABASE_URL` 里的 `sslmode=require` 会走 TLS，但不校验服务器证书。要校验 CA 时用 `sslmode=verify-full`。

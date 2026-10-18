@@ -7,11 +7,11 @@ import {
   originalObjectKey,
 } from "@memora/shared";
 import type {
+  AlbumRepository,
   AssetJobEnqueuer,
   AssetRecord,
   AssetRepository,
   AuthRepository,
-  ExifSummary,
   ObjectStore,
 } from "@memora/storage";
 import { safeErrorMessage } from "@memora/storage";
@@ -29,8 +29,10 @@ import {
   revokePresentedSession,
   type PublicUser,
 } from "./auth/service.js";
+import { registerAlbumRoutes } from "./albums/http.js";
 import type { AppConfig } from "./config.js";
 import { HttpError, asyncRoute } from "./http.js";
+import { toPublicAsset } from "./present.js";
 import { asRecord, readTraceId, validateUploadRequest } from "./validate.js";
 
 export interface AppDeps {
@@ -39,35 +41,11 @@ export interface AppDeps {
   assets: AssetRepository;
   jobs: AssetJobEnqueuer;
   auth: AuthRepository;
-}
-
-function publicExif(exif: ExifSummary | null): Omit<ExifSummary, "lat" | "lng"> | null {
-  if (!exif) return null;
-  const { lat: _lat, lng: _lng, ...rest } = exif;
-  return rest;
+  albums: AlbumRepository;
 }
 
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-}
-
-export function toPublicAsset(asset: AssetRecord) {
-  return {
-    assetId: asset.id,
-    userId: asset.userId,
-    key: asset.storageKey,
-    filename: asset.filename,
-    contentType: asset.contentType,
-    size: asset.sizeBytes,
-    status: asset.status,
-    width: asset.width,
-    height: asset.height,
-    derivatives: asset.derivatives,
-    exif: publicExif(asset.exif),
-    error: asset.error,
-    createdAt: asset.createdAt,
-    updatedAt: asset.updatedAt,
-  };
 }
 
 async function headUploaded(objects: ObjectStore, key: string) {
@@ -323,6 +301,12 @@ export function createApp(deps: AppDeps): Express {
       res.json(toPublicAsset(asset));
     }),
   );
+
+  registerAlbumRoutes(app, {
+    auth: deps.auth,
+    albums: deps.albums,
+    objects: deps.objects,
+  });
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
     if (err instanceof HttpError) {

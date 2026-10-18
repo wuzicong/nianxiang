@@ -33,6 +33,11 @@ export interface PresignPutResult {
   headers: Record<string, string>;
 }
 
+export interface PresignGetResult {
+  url: string;
+  expiresAt: Date;
+}
+
 export interface HeadResult {
   contentLength: number;
   contentType?: string;
@@ -47,6 +52,7 @@ export interface PutObjectInput {
 
 export interface ObjectStore {
   presignPut(input: PresignPutInput): Promise<PresignPutResult>;
+  presignGet(input: { key: string }): Promise<PresignGetResult>;
   head(key: string): Promise<HeadResult | null>;
   getBuffer(key: string): Promise<Buffer>;
   putObject(input: PutObjectInput): Promise<void>;
@@ -145,6 +151,20 @@ export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
         url,
         expiresAt: new Date(Date.now() + cfg.presignTtlSeconds * 1000),
         headers,
+      };
+    },
+
+    async presignGet(input) {
+      const command = new GetObjectCommand({
+        Bucket: cfg.bucket,
+        Key: input.key,
+      });
+      const url = await getSignedUrl(client, command, {
+        expiresIn: cfg.presignTtlSeconds,
+      });
+      return {
+        url,
+        expiresAt: new Date(Date.now() + cfg.presignTtlSeconds * 1000),
       };
     },
 
