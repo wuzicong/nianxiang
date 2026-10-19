@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 type PublicUser = { id: string; email: string };
@@ -21,6 +22,7 @@ async function postAuth(path: string, body: { email: string; password: string })
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState<PublicUser | null>(null);
@@ -50,6 +52,7 @@ export default function LoginPage() {
         setUser(result.body.user);
         setPassword("");
         setMessage(path.endsWith("register") ? "注册成功" : "登录成功");
+        router.push("/library");
         return;
       }
       setMessage(result.body.message ?? "请求失败");
@@ -90,6 +93,8 @@ export default function LoginPage() {
             <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}>{user.id}</span>
           </p>
           <p style={{ marginTop: "0.75rem" }}>
+            <a href="/library">进入照片库</a>
+            {" · "}
             <a href="/albums">管理相册与分享</a>
           </p>
           <button type="button" onClick={() => void logout()}>

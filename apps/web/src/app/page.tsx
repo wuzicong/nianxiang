@@ -7,7 +7,8 @@ export default function Home() {
         念册 · Memora
       </h1>
       <p style={{ lineHeight: 1.6, color: "#555" }}>
-        登录在 <a href="/login">/login</a>
+        登录后的照片库在 <a href="/library">/library</a>
+        ，登录在 <a href="/login">/login</a>
         ，相册、上传和分享在 <a href="/albums">/albums</a>
         。打开某本相册可以按主题看故事或翻页，用的是预览图。三套模板的示例样张在{" "}
         <a href="/preview">/preview</a>

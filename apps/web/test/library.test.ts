@@ -1,0 +1,273 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createThemedAlbum } from "../src/lib/library-api";
+import {
+  applyPhotoSelection,
+  chronologicalAssetIds,
+  flattenGroupIds,
+  gridNeighbor,
+  groupPhotosByTime,
+  justifyPhotoRows,
+  LIBRARY_SELECTION_LIMIT,
+  libraryRefreshDelay,
+  normalizeCapturedAt,
+  parseLibraryPayload,
+  photoCalendar,
+  suggestedAlbumTitle,
+  type LibraryPhoto,
+} from "../src/lib/library";
+
+const signedThumb =
+  "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/thumb.webp?X-Amz-Signature=supersecret";
+
+function photo(partial: Partial<LibraryPhoto> & Pick<LibraryPhoto, "assetId">): LibraryPhoto {
+  return {
+    filename: `${partial.assetId}.jpg`,
+    status: "ready",
+    width: 400,
+    height: 300,
+    error: null,
+    capturedAt: null,
+    createdAt: "2024-01-02T00:00:00.000Z",
+    previews: {},
+    ...partial,
+  };
+}
+
+test("library payload keeps derivative previews and drops originals, GPS, and junk dates", () => {
+  const parsed = parseLibraryPayload({
+    hasMore: true,
+    assets: [
+      {
+        assetId: "asset1",
+        filename: "harbor.jpg",
+        status: "ready",
+        width: 640,
+        height: 480,
+        key: "users/owner/originals/asset1",
+        userId: "owner",
+        exif: { lat: 12.3456, lng: 99.9, hasGps: true, capturedAt: "2020-01-02T03:04:05" },
+        capturedAt: "2020-01-02T03:04:05",
+        createdAt: "2024-03-02T00:00:00.000Z",
+        previews: {
+          thumb: { url: signedThumb, expiresAt: "2026-01-01T00:10:00.000Z" },
+          preview: {
+            url: "http://127.0.0.1:9000/memora-local/users/owner/originals/asset1?X-Amz-Signature=supersecret",
+            expiresAt: "2026-01-01T00:10:00.000Z",
+          },
+        },
+      },
+      {
+        assetId: "asset2",
+        filename: "bad.jpg",
+        status: "ready",
+        capturedAt: "12.3456,99.9",
+        createdAt: "not-a-date",
+        previews: {},
+      },
+    ],
+  });
+  assert.equal(parsed.hasMore, true);
+  assert.equal(parsed.photos.length, 2);
+  assert.equal(parsed.photos[0]?.capturedAt, "2020-01-02T03:04:05");
+  assert.equal(parsed.photos[0]?.previews.thumb?.url, signedThumb);
+  assert.equal(parsed.photos[0]?.previews.preview, undefined);
+  assert.equal(parsed.photos[1]?.capturedAt, null);
+  assert.equal(parsed.photos[1]?.createdAt, "");
+  const json = JSON.stringify(parsed);
+  assert.equal(json.includes("/originals/"), false);
+  assert.equal(json.includes("12.3456"), false);
+  assert.equal(json.includes("hasGps"), false);
+  assert.equal(normalizeCapturedAt("2020:01:02 03:04:05"), null);
+});
+
+test("time groups prefer capture day and fall back to upload day", () => {
+  const groups = groupPhotosByTime(
+    [
+      photo({
+        assetId: "capture",
+        capturedAt: "2020-01-02T03:04:05",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      }),
+      photo({
+        assetId: "later",
+        capturedAt: "2020-01-02T18:00:00",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      }),
+      photo({
+        assetId: "zoned",
+        createdAt: "2024-01-01T16:30:00.000Z",
+      }),
+      photo({ assetId: "unknown", capturedAt: null, createdAt: "" }),
+    ],
+    "UTC",
+  );
+  assert.equal(groups.undated.map((item) => item.assetId).join(), "unknown");
+  assert.deepEqual(
+    groups.years.map((year) => year.year),
+    [2024, 2020],
+  );
+  const capturedDay = groups.years[1]?.months[0]?.days[0];
+  assert.equal(capturedDay?.key, "2020-01-02");
+  assert.equal(capturedDay?.uploadFallback, false);
+  assert.deepEqual(
+    capturedDay?.photos.map((item) => item.assetId),
+    ["later", "capture"],
+  );
+  assert.match(capturedDay?.weekday ?? "", /周/);
+  const uploadDay = groups.years[0]?.months[0]?.days[0];
+  assert.equal(uploadDay?.uploadFallback, true);
+  assert.equal(uploadDay?.key, "2024-01-01");
+
+  const shanghai = photoCalendar(
+    photo({ assetId: "zoned", createdAt: "2024-01-01T16:30:00.000Z" }),
+    "Asia/Shanghai",
+  );
+  assert.equal(shanghai?.day, 2);
+  assert.equal(shanghai?.source, "upload");
+  const literal = photoCalendar(
+    photo({ assetId: "capture", capturedAt: "2020-01-02T03:04:05", createdAt: "2026-08-01T00:00:00.000Z" }),
+    "Asia/Shanghai",
+  );
+  assert.equal(literal?.day, 2);
+  assert.equal(literal?.month, 1);
+  assert.equal(literal?.year, 2020);
+  assert.equal(literal?.source, "capture");
+});
+
+test("selection toggles, shift-adds a range, and stops at 200", () => {
+  const orderedIds = ["a", "b", "c", "d"];
+  const first = applyPhotoSelection({ selected: [], orderedIds, id: "a", shift: false, anchor: null });
+  assert.deepEqual(first.selected, ["a"]);
+  const range = applyPhotoSelection({
+    selected: first.selected,
+    orderedIds,
+    id: "c",
+    shift: true,
+    anchor: first.anchor,
+  });
+  assert.deepEqual(range.selected, ["a", "b", "c"]);
+  assert.equal(range.anchor, "a");
+  const off = applyPhotoSelection({
+    selected: range.selected,
+    orderedIds,
+    id: "b",
+    shift: false,
+    anchor: range.anchor,
+  });
+  assert.deepEqual(off.selected, ["a", "c"]);
+  const added = applyPhotoSelection({
+    selected: off.selected,
+    orderedIds,
+    id: "b",
+    shift: false,
+    anchor: off.anchor,
+    gesture: "add",
+  });
+  assert.deepEqual(added.selected, ["a", "c", "b"]);
+
+  const many = Array.from({ length: LIBRARY_SELECTION_LIMIT + 5 }, (_, index) => `p${index}`);
+  const capped = applyPhotoSelection({
+    selected: [],
+    orderedIds: many,
+    id: many[many.length - 1] ?? "p0",
+    shift: true,
+    anchor: many[0] ?? null,
+  });
+  assert.equal(capped.selected.length, LIBRARY_SELECTION_LIMIT);
+  assert.equal(capped.capped, true);
+});
+
+test("justified rows fill the width and leave a short last row at the target height", () => {
+  const squares = [
+    { id: "a", aspect: 1 },
+    { id: "b", aspect: 1 },
+    { id: "c", aspect: 1 },
+    { id: "d", aspect: 1 },
+  ];
+  const rows = justifyPhotoRows(squares, 640, { targetHeight: 180, gap: 10 });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]?.length, 3);
+  const fullWidth = (rows[0] ?? []).reduce((total, tile) => total + tile.width, 0) + 20;
+  assert.equal(fullWidth, 640);
+  assert.equal(rows[1]?.[0]?.width, 180);
+  assert.equal(rows[1]?.[0]?.height, 180);
+
+  const pair = justifyPhotoRows(squares.slice(0, 2), 640, { targetHeight: 180, gap: 10 });
+  assert.equal(pair.length, 1);
+  assert.equal(pair[0]?.[0]?.height, 180);
+  assert.equal((pair[0] ?? []).reduce((total, tile) => total + tile.width, 0) + 10 < 640, true);
+  assert.deepEqual(justifyPhotoRows([], 640), []);
+  assert.deepEqual(justifyPhotoRows(squares, 20), []);
+});
+
+test("arrow keys move through justified rows", () => {
+  const rows = [
+    [{ id: "a" }, { id: "b" }],
+    [{ id: "c" }],
+  ];
+  assert.equal(gridNeighbor(rows, "a", "ArrowRight"), "b");
+  assert.equal(gridNeighbor(rows, "b", "ArrowDown"), "c");
+  assert.equal(gridNeighbor(rows, "c", "ArrowUp"), "a");
+  assert.equal(gridNeighbor(rows, "c", "End"), "c");
+  assert.equal(gridNeighbor(rows, null, "Home"), "a");
+});
+
+test("album title and asset order follow the calendar", () => {
+  const photos = [
+    photo({ assetId: "new", capturedAt: "2024-05-02T12:00:00" }),
+    photo({ assetId: "old", capturedAt: "2024-05-01T09:00:00" }),
+  ];
+  assert.equal(suggestedAlbumTitle(photos, "UTC"), "2024年5月1日 – 2024年5月2日");
+  assert.deepEqual(chronologicalAssetIds(photos, ["new", "old"], "UTC"), ["old", "new"]);
+  assert.equal(suggestedAlbumTitle([photos[1]!], "UTC"), "2024年5月1日");
+  const groups = groupPhotosByTime(photos, "UTC");
+  assert.deepEqual(flattenGroupIds(groups), ["new", "old"]);
+});
+
+test("create themed album reuses the album APIs and chunks asset ids", async () => {
+  const calls: { url: string; body: string }[] = [];
+  const ids = Array.from({ length: 60 }, (_, index) => `p${index}`);
+  const fetchImpl = async (url: string, init?: RequestInit) => {
+    calls.push({ url, body: String(init?.body ?? "") });
+    if (url === "/api/v1/albums") {
+      return Response.json({ album: { albumId: "album-1", title: "2024年5月1日", themeId: "kyoto-lantern" } }, { status: 201 });
+    }
+    if (url === "/api/v1/albums/album-1/assets") {
+      return Response.json({ albumId: "album-1", assetIds: [] });
+    }
+    return Response.json({ message: "http://127.0.0.1/originals/x?X-Amz-Signature=supersecret" }, { status: 500 });
+  };
+  const created = await createThemedAlbum(
+    { title: " 2024年5月1日 ", themeId: "kyoto-lantern", assetIds: ids },
+    { fetchImpl },
+  );
+  assert.deepEqual(created, { ok: true, albumId: "album-1" });
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0]?.url, "/api/v1/albums");
+  assert.equal(calls[0]?.body.includes("userId"), false);
+  assert.deepEqual(JSON.parse(calls[0]?.body ?? "{}"), {
+    title: "2024年5月1日",
+    themeId: "kyoto-lantern",
+  });
+  assert.equal(JSON.parse(calls[1]?.body ?? "{}").assetIds.length, 50);
+  assert.equal(JSON.parse(calls[2]?.body ?? "{}").assetIds.length, 10);
+
+  const retryCalls: string[] = [];
+  const failed = await createThemedAlbum(
+    { title: "再试", themeId: "cotton-candy", assetIds: ["p0"], albumId: "album-1" },
+    {
+      fetchImpl: async (url: string) => {
+        retryCalls.push(url);
+        return Response.json({ message: "http://signed.example/?X-Amz-Signature=supersecret" }, { status: 404 });
+      },
+    },
+  );
+  assert.equal(failed.ok, false);
+  if (!failed.ok) {
+    assert.equal(failed.albumId, "album-1");
+    assert.equal(failed.message.includes("supersecret"), false);
+  }
+  assert.deepEqual(retryCalls, ["/api/v1/albums/album-1/assets"]);
+  assert.equal(libraryRefreshDelay([photo({ assetId: "p0", status: "processing" })]), 2000);
+});
