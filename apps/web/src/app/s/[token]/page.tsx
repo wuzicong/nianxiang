@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DEFAULT_THEME_ID } from "@memora/shared";
-import { loadPublicShare, SHARE_RATE_LIMIT_BODY, SHARE_RATE_LIMIT_TITLE } from "../../../lib/share";
-import { forcedPublicShareStatus } from "../../../lib/share-status-hook";
+import { SHARE_RATE_LIMIT_BODY, SHARE_RATE_LIMIT_TITLE } from "../../../lib/share";
+import { loadSharePage } from "../../../lib/share-request";
 import { resolveLockedThemeId, themeIdFromHint, themeSkin } from "../../../lib/themes";
 import { ShareGallery } from "../share-gallery";
 import { ShareStatus } from "../share-status";
@@ -12,14 +12,23 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ t?: string | string[]; smokeRateLimit?: string | string[] }>;
 }): Promise<Metadata> {
   const { token } = await params;
-  const loaded = await loadPublicShare(token);
+  const query = await searchParams;
+  const loaded = await loadSharePage(token, query.smokeRateLimit);
   if (loaded.kind === "locked") {
     return {
       title: "念册 · 需要密码",
+      robots: { index: false, follow: false },
+    };
+  }
+  if (loaded.kind === "limited") {
+    return {
+      title: `念册 · ${SHARE_RATE_LIMIT_TITLE}`,
       robots: { index: false, follow: false },
     };
   }
@@ -35,7 +44,7 @@ export default async function SharePage({
 }) {
   const { token } = await params;
   const query = await searchParams;
-  const loaded = await loadPublicShare(token, forcedPublicShareStatus(query.smokeRateLimit));
+  const loaded = await loadSharePage(token, query.smokeRateLimit);
   if (loaded.kind === "limited") {
     return (
       <ShareStatus

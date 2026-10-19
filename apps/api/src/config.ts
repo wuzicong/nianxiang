@@ -17,8 +17,16 @@ export interface AppConfig extends RuntimeConfig {
   sharePasswordRequired: boolean;
   /** 为真时只说明环境里出现了 OIDC 变量。本阶段不读取 client secret，也不走授权码。 */
   oidcConfigured: boolean;
+  /** 公开分享 GET 的固定窗口额度。和反代的公开前缀同一量级。 */
+  shareReadLimit: number;
+  /** 解锁 POST 的固定窗口额度。第 limit+1 次返回 429。 */
+  shareUnlockLimit: number;
+  shareRateWindowMs: number;
 }
 
+const DEFAULT_SHARE_READ_LIMIT = 60;
+const DEFAULT_SHARE_UNLOCK_LIMIT = 6;
+const DEFAULT_SHARE_RATE_WINDOW_SECONDS = 60;
 const DEFAULT_SESSION_TTL_HOURS = 14 * 24;
 const MAX_SESSION_TTL_HOURS = 90 * 24;
 const DEFAULT_WEB_ORIGINS = "http://127.0.0.1:3000,http://localhost:3000";
@@ -70,6 +78,13 @@ function sharePasswordRequired(raw: string | undefined): boolean {
   return flag;
 }
 
+function boundedInt(raw: string | undefined, fallback: number, max: number): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) return fallback;
+  const value = Number(raw.trim());
+  if (!Number.isSafeInteger(value) || value < 1) return fallback;
+  return Math.min(value, max);
+}
+
 function registrationOpen(raw: string | undefined): boolean {
   const value = (raw ?? "open").trim().toLowerCase();
   if (value === "open") return true;
@@ -93,6 +108,10 @@ export function createConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     registrationOpen: registrationOpen(env.AUTH_REGISTRATION),
     sharePasswordRequired: sharePasswordRequired(env.SHARE_REQUIRE_PASSWORD),
     oidcConfigured: Boolean(issuer || clientId || clientSecretSet),
+    shareReadLimit: boundedInt(env.SHARE_READ_LIMIT, DEFAULT_SHARE_READ_LIMIT, 10_000),
+    shareUnlockLimit: boundedInt(env.SHARE_UNLOCK_LIMIT, DEFAULT_SHARE_UNLOCK_LIMIT, 1_000),
+    shareRateWindowMs:
+      boundedInt(env.SHARE_RATE_WINDOW_SECONDS, DEFAULT_SHARE_RATE_WINDOW_SECONDS, 3_600) * 1_000,
   };
 }
 

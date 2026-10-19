@@ -13,8 +13,23 @@ export {
 } from "./share-load";
 export type { PublicDerivative, PublicShareAsset, PublicSharePayload, ShareLoad } from "./share-load";
 
+const FORWARDED_FOR = /^[0-9a-fA-F:., \t]+$/;
+
 /** 服务端拉取公开分享。不转发 Cookie，失败时也不把 token 写进日志。 */
-export async function loadPublicShare(token: string, forceStatus?: number) {
+export async function loadPublicShare(
+  token: string,
+  forceStatus?: number,
+  forwardedFor?: string,
+) {
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (
+    forwardedFor &&
+    forwardedFor.length <= 512 &&
+    !/[\r\n]/.test(forwardedFor) &&
+    FORWARDED_FOR.test(forwardedFor)
+  ) {
+    headers["x-forwarded-for"] = forwardedFor;
+  }
   return loadPublicShareFrom({
     tokenOk: isShareToken(token),
     forceStatus,
@@ -22,7 +37,7 @@ export async function loadPublicShare(token: string, forceStatus?: number) {
     fetchShare: () =>
       fetch(`${apiOrigin()}/api/v1/public/shares/${encodeURIComponent(token)}`, {
         cache: "no-store",
-        headers: { accept: "application/json" },
+        headers,
         signal: AbortSignal.timeout(8_000),
       }),
   });

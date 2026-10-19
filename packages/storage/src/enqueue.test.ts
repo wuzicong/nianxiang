@@ -3,6 +3,7 @@ import test from "node:test";
 import { JOB_NAMES } from "@memora/shared";
 import {
   ASSET_JOB_ATTEMPTS,
+  ASSET_JOB_BACKOFF_MS,
   assetJobOptions,
   bullJobId,
   isDuplicateJobError,
@@ -24,6 +25,8 @@ test("asset jobs retry with backoff", () => {
   const options = assetJobOptions("asset-1__media.derivative");
   assert.equal(options.attempts, ASSET_JOB_ATTEMPTS);
   assert.equal(options.backoff.type, "exponential");
+  assert.equal(options.backoff.delay, ASSET_JOB_BACKOFF_MS);
+  assert.equal(ASSET_JOB_BACKOFF_MS, 2_000);
   assert.equal(options.jobId.includes(":"), false);
 });
 
