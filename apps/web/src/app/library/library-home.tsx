@@ -22,6 +22,7 @@ import {
   libraryRefreshDelay,
   type LibraryPhoto,
 } from "../../lib/library";
+import { generateMockLibraryPhotos } from "../../lib/library-mock";
 import { LibraryDecor } from "../../lib/library-decor";
 import { themeSkin } from "../../lib/themes";
 import { UploadPhotos } from "../albums/upload-photos";
@@ -98,6 +99,17 @@ export function LibraryHome({
 
   const load = useCallback(async (mode: "initial" | "silent") => {
     if (mode === "initial") setPhase("loading");
+    const mockFromQuery =
+      typeof window !== "undefined"
+        ? Number(new URLSearchParams(window.location.search).get("libraryMock") || "0")
+        : 0;
+    const mockCount = mockFromQuery || Number(process.env.NEXT_PUBLIC_LIBRARY_MOCK_COUNT || "0");
+    if (mockCount > 0) {
+      setPhotos(generateMockLibraryPhotos(mockCount));
+      setHasMore(false);
+      setPhase("ready");
+      return;
+    }
     try {
       const [meResponse, listed] = await Promise.all([
         fetch("/api/v1/auth/me", { credentials: "include", cache: "no-store" }),
