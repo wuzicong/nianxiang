@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DEFAULT_THEME_ID } from "@memora/shared";
 import { loadPublicShare, SHARE_RATE_LIMIT_BODY, SHARE_RATE_LIMIT_TITLE } from "../../../lib/share";
@@ -8,6 +9,22 @@ import { ShareStatus } from "../share-status";
 import { ShareUnlock } from "../share-unlock";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  const loaded = await loadPublicShare(token);
+  if (loaded.kind === "locked") {
+    return {
+      title: "念册 · 需要密码",
+      robots: { index: false, follow: false },
+    };
+  }
+  return {};
+}
 
 export default async function SharePage({
   params,

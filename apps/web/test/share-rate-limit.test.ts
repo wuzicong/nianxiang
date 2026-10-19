@@ -7,6 +7,7 @@ import {
   UNLOCK_RATE_LIMIT,
   classifyPublicShare,
   loadPublicShareFrom,
+  parseRetryAfterSeconds,
 } from "../src/lib/share-load";
 import { forcedPublicShareStatus } from "../src/lib/share-status-hook";
 
@@ -22,6 +23,12 @@ function jsonResponse(status: number, body: unknown): Response {
     headers: { "content-type": "application/json" },
   });
 }
+
+test("parseRetryAfterSeconds 解析 Retry-After", () => {
+  assert.equal(parseRetryAfterSeconds(null), 60);
+  assert.equal(parseRetryAfterSeconds("45"), 45);
+  assert.equal(parseRetryAfterSeconds("500"), 120);
+});
 
 test("公开分享 429 是限流，不是不存在", async () => {
   const loaded = await classifyPublicShare(

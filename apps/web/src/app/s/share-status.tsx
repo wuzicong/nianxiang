@@ -23,6 +23,9 @@ export function ShareStatus({
       <h1 className="share-title">{title}</h1>
       {skin.id === "cotton-candy" ? null : <hr className="share-rule" />}
       <p className="share-copy">{body}</p>
+      <p className="share-status-actions">
+        <a className="share-secondary-button" href="/">回到念册</a>
+      </p>
     </ShareChrome>
   );
 }

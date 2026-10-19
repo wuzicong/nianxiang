@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import type { ThemeSkin } from "../../lib/themes";
 import type { PublicShareAsset, PublicSharePayload } from "../../lib/share";
 
@@ -14,11 +17,19 @@ export function ShareGallery({
   share,
   theme,
   refreshHint,
+  focusTitleOnMount,
 }: {
   share: PublicSharePayload;
   theme: ThemeSkin;
   refreshHint?: string;
+  focusTitleOnMount?: boolean;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (focusTitleOnMount) titleRef.current?.focus();
+  }, [focusTitleOnMount]);
+
   return (
     <main
       data-share-state="open"
@@ -39,7 +50,11 @@ export function ShareGallery({
         <p style={{ margin: "1.5rem 0 0", letterSpacing: "0.08em", color: theme.colors.accent }}>
           {theme.name}
         </p>
-        <h1 style={{ margin: "0.35rem 0 0", fontWeight: 600, letterSpacing: "-0.03em", fontSize: "2.25rem" }}>
+        <h1
+          ref={titleRef}
+          tabIndex={-1}
+          style={{ margin: "0.35rem 0 0", fontWeight: 600, letterSpacing: "-0.03em", fontSize: "2.25rem" }}
+        >
           {share.album.title}
         </h1>
         <p style={{ lineHeight: 1.6, maxWidth: 460 }}>

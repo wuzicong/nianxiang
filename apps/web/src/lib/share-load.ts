@@ -31,6 +31,14 @@ export const SHARE_RATE_LIMIT_BODY = "请稍后再试。这不是链接失效，
 export const UNLOCK_RATE_LIMIT =
   "请求太频繁，请稍后再试。解锁大约每分钟 6 次，先等一会儿，不要连续点击。";
 
+/** 解锁 POST 429 的 Retry-After（秒），缺省 60，上限 120。 */
+export function parseRetryAfterSeconds(header: string | null): number {
+  if (!header) return 60;
+  const parsed = Number.parseInt(header.trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 60;
+  return Math.min(parsed, 120);
+}
+
 function httpUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length < 8 || value.length > 4096) return null;
   try {

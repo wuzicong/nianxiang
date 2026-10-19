@@ -35,10 +35,12 @@ export function shareThemeStyle(theme: ThemeSkin): CSSProperties {
 export function ShareChrome({
   theme,
   state,
+  shake,
   children,
 }: {
   theme: ThemeSkin;
   state: "locked" | "status" | "limited";
+  shake?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -49,7 +51,7 @@ export function ShareChrome({
       style={shareThemeStyle(theme)}
     >
       <ShareBackdrop themeId={theme.id} />
-      <article className="share-card">
+      <article className="share-card" data-share-shake={shake ? "" : undefined}>
         <ShareCardDecor themeId={theme.id} />
         <div className="share-card-body">{children}</div>
       </article>
