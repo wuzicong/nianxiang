@@ -1,4 +1,3 @@
-# CPU only. This image has no CUDA / GPU runtime.
 FROM python:3.12-slim
 
 WORKDIR /app

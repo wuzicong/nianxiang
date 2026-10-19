@@ -4,29 +4,13 @@
 
 ## 最短路径
 
-在仓库根目录。
-
-只起数据库、Redis、MinIO 和 ML，方便本机 `pnpm dev:*`：
+在仓库根目录：
 
 ```bash
 cp .env.example .env
 docker compose up -d
 docker compose ps
 ```
-
-一键起整套（web、api、worker、ML CPU、Postgres、Redis、MinIO）。适合干净机器和发布前冒烟：
-
-```bash
-cp .env.example .env
-docker compose --profile app up -d --build
-docker compose --profile app ps
-```
-
-`ps` 里 postgres、redis、minio、ml、api、web、worker 应为 running / healthy，`minio-init` 退出码 0。然后按仓库根 README 的「本地冒烟」执行 `pnpm smoke`。
-
-宿主机端口只写 `127.0.0.1`。容器里的进程仍要听所有网卡，端口映射才进得去；不要把 Compose 的映射改成 `0.0.0.0`。Worker 健康检查在容器内 `127.0.0.1:3002`，没有映射到宿主机。
-
-API 在容器里用 `S3_ENDPOINT=http://minio:9000` 读写对象，用 `S3_PUBLIC_ENDPOINT=http://127.0.0.1:9000` 签浏览器能打开的地址。本机 HTTP 把 `COOKIE_SECURE=false`。放到 HTTPS 反代后改成 `true`。不要把真实口令写进仓库或镜像。
 
 `.env` 里保持：
 
@@ -47,12 +31,9 @@ S3_BUCKET=memora-local
 | redis | `127.0.0.1:6379` | BullMQ，AOF |
 | minio | `127.0.0.1:9000` / 控制台 `9001` | 对象存储 |
 | minio-init | 一次性 | 建桶并 `anonymous set none` |
-| ml | `127.0.0.1:8000/health` | CPU 推理桩，响应里 `device` 为 `cpu` |
-| api | `127.0.0.1:3001/health` | `--profile app`。容器内连 `postgres` / `redis` / `minio` |
-| worker | 不映射 | `--profile app`。健康检查只在容器内 `127.0.0.1:3002/health` |
-| web | `127.0.0.1:3000` | `--profile app`。页面把 `/api/v1` 转到容器内的 API |
+| ml | `127.0.0.1:8000/health` | 推理桩 |
 
-不带 profile 时，web / api / worker 用 `pnpm dev:*` 起。不要把 5432、6379、9000、9001、3000、3001、8000 改绑到 `0.0.0.0`。
+web / api / worker 用 `pnpm dev:*` 起。不要把 5432、6379、9000、9001 改绑到 `0.0.0.0`。
 
 API 第一次访问会建 `users` / `sessions` 表。第一次使用相册或分享时再建 `albums` / `album_assets` / `shares`（分享只存令牌哈希；可选密码只存 scrypt）。登录是邮箱加密码，会话 Cookie 名为 `memora_session`（HttpOnly）。本机 HTTP 不加 Secure；放到公网 HTTPS 前把 `COOKIE_SECURE=true`。页面入口是 `http://127.0.0.1:3000/login`，分享页是 `http://127.0.0.1:3000/s/<token>`。新建分享默认可以不设密码；要强制新链接带密码时设 `SHARE_REQUIRE_PASSWORD=true`。公网反代的打码和限流见下文。
 
@@ -124,7 +105,7 @@ users/{userId}/originals/{assetId}
 users/{userId}/derivatives/{assetId}/{thumb|preview|hero}.webp
 ```
 
-`minio-init` 会 `mc anonymous set none`。匿名拒绝的策略意图写在 `bucket-policy.json`，init **不会**把这份 Deny 套到桶上，避免误伤根用户。社区版不实现按桶 CORS（`mc cors set` 返回 501）。浏览器跨域靠 MinIO 的 `MINIO_API_CORS_ALLOW_ORIGIN`，Compose 默认只放行 `http://127.0.0.1:3000` 和 `http://localhost:3000`。`curl` 上传不经过 CORS。
+`minio-init` 会 `mc anonymous set none`。匿名拒绝的策略意图写在 `bucket-policy.json`，init **不会**把这份 Deny 套到桶上，避免误伤根用户。同一组固定镜像里 `mc cors set` 可能打印未实现的警告；`curl` 上传不依赖 CORS。浏览器从 3000 跨域 PUT 时，要在反代上加 CORS，或换更新的 MinIO。
 
 素材表在 API 或 Worker 第一次连上 Postgres 时创建，SQL 见 `packages/storage/migrations/001_assets.sql`。
 

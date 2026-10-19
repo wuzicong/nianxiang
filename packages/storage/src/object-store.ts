@@ -12,12 +12,6 @@ import type { RuntimeConfig } from "./runtime-config.js";
 
 export interface ObjectStoreConfig {
   endpoint: string;
-  /**
-   * 浏览器能打开的对象存储 origin。容器里 S3_ENDPOINT 往往是 http://minio:9000，
-   * 签进 URL 的 Host 必须是浏览器能访问的地址，否则上传和看图都会失败。
-   * 留空则与 endpoint 相同。
-   */
-  publicEndpoint?: string;
   region: string;
   bucket: string;
   accessKeyId: string;
@@ -67,7 +61,6 @@ export interface ObjectStore {
 export function objectStoreConfigFromRuntime(config: RuntimeConfig): ObjectStoreConfig {
   return {
     endpoint: config.s3.endpoint,
-    publicEndpoint: config.s3.publicEndpoint,
     region: config.s3.region,
     bucket: config.s3.bucket,
     accessKeyId: config.s3.accessKeyId,
@@ -99,11 +92,11 @@ function encryptionFields(kmsKeyId: string | undefined): Pick<
   };
 }
 
-function clientConfig(cfg: ObjectStoreConfig, endpoint: string): S3ClientConfig {
-  const trimmed = endpoint.trim();
+function clientConfig(cfg: ObjectStoreConfig): S3ClientConfig {
+  const endpoint = cfg.endpoint.trim();
   return {
     region: cfg.region,
-    endpoint: trimmed || undefined,
+    endpoint: endpoint || undefined,
     forcePathStyle: cfg.forcePathStyle,
     credentials: {
       accessKeyId: cfg.accessKeyId,
@@ -113,28 +106,6 @@ function clientConfig(cfg: ObjectStoreConfig, endpoint: string): S3ClientConfig 
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   };
-}
-
-/** 预签名的 Host 会进签名。公开地址必须是不带路径、查询和口令的 origin。 */
-export function resolveSigningEndpoint(publicEndpoint: string | undefined, dataEndpoint: string): string {
-  const raw = publicEndpoint?.trim();
-  if (!raw) return dataEndpoint;
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error("S3_PUBLIC_ENDPOINT must be an http(s) URL");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("S3_PUBLIC_ENDPOINT must be http(s)");
-  }
-  if (url.username || url.password) {
-    throw new Error("S3_PUBLIC_ENDPOINT must not include credentials");
-  }
-  if (url.pathname !== "/" || url.search || url.hash) {
-    throw new Error("S3_PUBLIC_ENDPOINT must be an origin without a path or query");
-  }
-  return url.origin;
 }
 
 export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
@@ -151,11 +122,7 @@ export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
     throw new Error("object store bucket, region, and credentials are required");
   }
 
-  const dataEndpoint = cfg.endpoint.trim();
-  const signingEndpoint = resolveSigningEndpoint(cfg.publicEndpoint, dataEndpoint);
-  const client = new S3Client(clientConfig(cfg, dataEndpoint));
-  const signingClient =
-    signingEndpoint === dataEndpoint ? client : new S3Client(clientConfig(cfg, signingEndpoint));
+  const client = new S3Client(clientConfig(cfg));
   const encryption = encryptionFields(cfg.kmsKeyId);
 
   return {
@@ -167,7 +134,7 @@ export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
         ContentLength: input.contentLength,
         ...encryption,
       });
-      const url = await getSignedUrl(signingClient, command, {
+      const url = await getSignedUrl(client, command, {
         expiresIn: cfg.presignTtlSeconds,
       });
       // S3 预签名器会把 content-type 标成 unsignable。类型约束放在完成接口的 HEAD 上。
@@ -192,7 +159,7 @@ export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
         Bucket: cfg.bucket,
         Key: input.key,
       });
-      const url = await getSignedUrl(signingClient, command, {
+      const url = await getSignedUrl(client, command, {
         expiresIn: cfg.presignTtlSeconds,
       });
       return {

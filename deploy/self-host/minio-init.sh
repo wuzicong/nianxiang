@@ -22,7 +22,10 @@ fi
 # 实际生效的是 anonymous none。bucket-policy.json 是同等意图的说明，
 # 不在这里 set-json：MinIO 上对 Principal * 的 Deny 可能把根用户也拒绝掉。
 mc anonymous set none "local/${S3_BUCKET}"
-# 社区版 PutBucketCors 固定 501。浏览器跨域靠 MinIO 的
-# MINIO_API_CORS_ALLOW_ORIGIN，不靠 mc cors set。
+if [ -f /minio-cors.xml ]; then
+  if ! mc cors set "local/${S3_BUCKET}" /minio-cors.xml; then
+    echo "warning: bucket CORS was not applied; browser PUT from the web origin may fail" >&2
+  fi
+fi
 mc stat "local/${S3_BUCKET}" >/dev/null
 echo "MinIO bucket ${S3_BUCKET} is private"

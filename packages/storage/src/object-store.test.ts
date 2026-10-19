@@ -75,34 +75,6 @@ test("presignGet signs a single derivative key for the same TTL", async () => {
   assert.ok(drift < 5_000);
 });
 
-test("presign URLs use the public endpoint while the key stays a derivative", async () => {
-  const store = createObjectStore(
-    baseConfig({
-      endpoint: "http://minio:9000",
-      publicEndpoint: "http://127.0.0.1:9000/",
-    }),
-  );
-  const signed = await store.presignGet({
-    key: "users/local/derivatives/asset-1/preview.webp",
-  });
-  const url = new URL(signed.url);
-  assert.equal(url.origin, "http://127.0.0.1:9000");
-  assert.equal(url.pathname, "/memora-local/users/local/derivatives/asset-1/preview.webp");
-  assert.equal(signed.url.includes("minio"), false);
-  assert.equal(signed.url.includes("/originals/"), false);
-  assert.equal(signed.url.includes(SECRET), false);
-});
-
-test("public endpoint rejects credentials and paths", () => {
-  assert.throws(() =>
-    createObjectStore(baseConfig({ publicEndpoint: "http://memora:secret@127.0.0.1:9000" })),
-  );
-  assert.throws(() =>
-    createObjectStore(baseConfig({ publicEndpoint: "http://127.0.0.1:9000/memora-local" })),
-  );
-  assert.throws(() => createObjectStore(baseConfig({ publicEndpoint: "not-a-url" })));
-});
-
 test("presign TTL outside 5–15 minutes is rejected", () => {
   assert.throws(() => createObjectStore(baseConfig({ presignTtlSeconds: 60 })));
   assert.throws(() => createObjectStore(baseConfig({ presignTtlSeconds: 3_600 })));
