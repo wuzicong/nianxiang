@@ -8,6 +8,11 @@
   --lib-duration-3: 180ms;
   --lib-duration-4: 280ms;
   --lib-ease-out: ease-out;
+  --lib-topbar-h: 3.25rem;
+  --lib-tabs-bar-h: 2.75rem;
+  --lib-chrome-ring: color-mix(in srgb, var(--share-brand) 85%, var(--share-text));
+  --lib-chrome-top-bg: color-mix(in srgb, var(--share-bg) 72%, transparent);
+  --lib-chrome-tabs-bg: color-mix(in srgb, var(--share-bg) 78%, transparent);
 
   position: relative;
   min-height: 100vh;
@@ -52,10 +57,17 @@
 .lib-top {
   position: sticky;
   top: 0;
-  z-index: 15;
-  background: color-mix(in srgb, var(--share-bg) 88%, transparent);
-  box-shadow: inset 0 3px 0 var(--share-brand);
-  backdrop-filter: blur(16px);
+  z-index: 30;
+  background: var(--lib-chrome-top-bg);
+  border-bottom: 1px solid var(--share-border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lib-top {
+    background: color-mix(in srgb, var(--share-bg) 92%, transparent);
+  }
 }
 
 .lib-wrap {
@@ -74,7 +86,8 @@
 }
 
 .lib-top-inner {
-  min-height: 4.2rem;
+  min-height: var(--lib-topbar-h);
+  max-height: var(--lib-topbar-h);
 }
 
 .lib-mark {
@@ -206,11 +219,11 @@
 .lib-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  padding: 0.28rem;
-  border: 1px solid var(--share-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--share-surface) 84%, transparent);
+  gap: 0.15rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .lib-tab,
@@ -221,17 +234,28 @@
 }
 
 .lib-tab {
+  position: relative;
   border: 0;
   background: transparent;
-  color: var(--share-text);
-  border-radius: 999px;
-  padding: 0.48rem 0.9rem;
+  color: var(--share-muted);
+  border-radius: 0;
+  padding: 0.65rem 0.85rem 0.55rem;
   font: inherit;
 }
 
 .lib-tab[aria-selected="true"] {
-  background: var(--share-text);
-  color: var(--share-bg);
+  color: var(--share-text);
+}
+
+.lib-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--lib-chrome-ring);
 }
 
 .lib-select {
@@ -314,7 +338,7 @@
   border: 0;
   border-radius: 18px;
   background: var(--share-surface);
-  box-shadow: var(--share-shadow);
+  box-shadow: none;
   color: inherit;
   cursor: pointer;
   user-select: none;
@@ -348,19 +372,20 @@
 
 .lib-check {
   position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  width: 1.45rem;
-  height: 1.45rem;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   border-radius: 999px;
-  border: 1.5px solid color-mix(in srgb, var(--share-text) 75%, white);
-  background: color-mix(in srgb, var(--share-surface) 86%, transparent);
+  border: 1.5px solid var(--share-border);
+  background: color-mix(in srgb, var(--share-bg) 40%, transparent);
   color: transparent;
   opacity: 0;
-  transform: scale(0.88);
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--share-text) 12%, transparent);
+  transform: scale(0.92);
+  box-shadow: none;
+  pointer-events: none;
 }
 
 .lib-selecting .lib-check,
@@ -371,18 +396,14 @@
 }
 
 .lib-tile[aria-pressed="true"] .lib-check {
-  background: var(--share-text);
+  background: var(--share-brand);
   color: var(--share-bg);
-  border-color: var(--share-text);
+  border-color: color-mix(in srgb, var(--share-brand) 88%, var(--share-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--share-border) 65%, transparent);
 }
 
-.lib-tile[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 3px solid var(--share-text);
-  border-radius: inherit;
-  pointer-events: none;
+.lib-tile[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--lib-chrome-ring);
 }
 
 .lib-check svg {
@@ -736,11 +757,21 @@ a.lib-primary {
       transform var(--lib-duration-2) var(--lib-ease-out);
   }
 
+  .lib-tile {
+    transition:
+      box-shadow var(--lib-duration-1) var(--lib-ease-out),
+      transform var(--lib-duration-1) var(--lib-ease-out);
+  }
+
   .lib-tile img,
   .lib-placeholder {
     transition:
-      transform var(--lib-duration-3) var(--lib-ease-out),
-      opacity var(--lib-duration-2) var(--lib-ease-out);
+      opacity var(--lib-duration-2) var(--lib-ease-out),
+      filter var(--lib-duration-2) var(--lib-ease-out);
+  }
+
+  .lib-main [role="tabpanel"] {
+    transition: opacity var(--lib-duration-3) var(--lib-ease-out);
   }
 
   .lib-tab,
@@ -772,14 +803,22 @@ a.lib-primary {
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
   .lib-tile:hover img,
   .lib-tile:hover .lib-placeholder {
-    opacity: 0.94;
-    transform: scale(1.02);
+    opacity: 0.92;
+    filter: brightness(0.97);
+  }
+
+  .lib-selecting .lib-tile:not([aria-pressed="true"]):hover {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--share-border) 85%, transparent);
+  }
+
+  .lib-tile:active {
+    transform: scale(0.98);
   }
 
   .lib-tile:active img,
   .lib-tile:active .lib-placeholder {
     opacity: 0.9;
-    transform: scale(0.99);
+    filter: brightness(0.95);
   }
 
   .lib-tab:active,
@@ -856,7 +895,7 @@ a.lib-primary {
   margin: 0;
   padding: 0;
   overflow: visible;
-  --library-sticky-top: 7.25rem;
+  --library-sticky-top: calc(var(--lib-topbar-h) + var(--lib-tabs-bar-h));
   --library-year-h: 2.75rem;
   --library-month-h: 2rem;
 }
@@ -877,11 +916,19 @@ a.lib-primary {
 
 .lib-tabs-wrap {
   position: sticky;
-  top: 3.6rem;
+  top: var(--lib-topbar-h);
   z-index: 29;
-  background: color-mix(in srgb, var(--share-bg) 90%, transparent);
-  backdrop-filter: blur(8px);
+  min-height: var(--lib-tabs-bar-h);
+  background: var(--lib-chrome-tabs-bg);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--share-border);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lib-tabs-wrap {
+    background: color-mix(in srgb, var(--share-bg) 92%, transparent);
+  }
 }
 
 .lib-soon {
@@ -897,6 +944,15 @@ a.lib-primary {
 }
 
 @media (min-width: 768px) {
+  .lib {
+    --lib-topbar-h: 3.5rem;
+  }
+
+  .lib-check {
+    top: 8px;
+    right: 8px;
+  }
+
   .lib-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
@@ -912,8 +968,9 @@ a.lib-primary {
 
 .lib-tile {
   aspect-ratio: 1;
-  border-radius: 4px;
+  border-radius: 2px;
   width: 100%;
+  box-shadow: none;
 }
 
 .lib-year-block,
@@ -993,7 +1050,7 @@ a.lib-primary {
   }
 
   .lib.share-shell {
-    --library-sticky-top: 6.5rem;
+    --library-sticky-top: calc(var(--lib-topbar-h) + var(--lib-tabs-bar-h));
     --library-year-h: 0px;
   }
 
@@ -1509,6 +1566,13 @@ a.lib-primary {
     background-position: 0 0;
   }
 
+  .lib-selecting .lib-check,
+  .lib-tile[aria-pressed="true"] .lib-check,
+  .lib-tile:focus-visible .lib-check {
+    transform: none;
+    transition: opacity var(--lib-duration-1) var(--lib-ease-out);
+  }
+
   .lib-tile img,
   .lib-placeholder,
   .lib-check,
@@ -1531,6 +1595,7 @@ a.lib-primary {
 
   .lib-tile:hover img,
   .lib-tile:hover .lib-placeholder,
+  .lib-tile:active,
   .lib-tile:active img,
   .lib-tile:active .lib-placeholder,
   .lib-theme:hover,
