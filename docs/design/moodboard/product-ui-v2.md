@@ -83,6 +83,13 @@
 - Paper Shaders repo — https://github.com/paper-design/shaders  
 - 己方 decor — `../specs/decor/` · `../handoff-decor-v1/`  
 
+### B7 · Album create / select flow
+- 规格：`../album-create-select-flow.md`（终稿 · didi §12 已签）
+- 前置：`library-home-spec.md` §4–5 · `../library-grid-chrome.md` · `../library-grid-gaps.md`
+- 下游：`../album-preview-cta.md`
+- 仓库对照：`apps/web/src/app/library/library-{home,grid,create-dialog}.*` · `lib/library{,-api}.ts`
+- Hang 目标：`docs/design/album-create-select-flow.md`
+
 ---
 
 ## C. 与既有文档关系
@@ -113,6 +120,7 @@
 | **相册侧栏 push** | [`docs/design/album-preview-sidebar-push-oos.md`](../album-preview-sidebar-push-oos.md)（**W6 OOS**） | stealbook **#7** 可选 | 不进 W6；#50 已覆盖呼吸/zoom |
 | **网格缝隙：gapless / hairline · 禁投影墙** | [`docs/design/library-grid-gaps.md`](../library-grid-gaps.md)（终稿） | stealbook **#9** · VSCO Studio / Frame.io density | `/library` 组内 2/4/6 · 组间呼吸 · 缩略零外投影 |
 | **三主题纹理：噪点 / 纸纹 / 金线薄规** | [`docs/design/theme-textures.md`](../theme-textures.md)（终稿） | stealbook **#5** · Canva Texture Check / Paper Shaders | unlock locked 三皮 + 空库 cotton grain；OOS album-preview #8 |
+| **建册 / 选图流收口（整模块）** | [`../album-create-select-flow.md`](../album-create-select-flow.md)（终稿 · didi §12 已签） | stealbook **#2** ring · **#3** 时长桶 · **#4** 浮动弹层 · **#9** 缝气质 · **#10** 失败结构 | `/library` 多选 · 选择栏 · `LibraryCreateDialog` → `/albums/[id]/preview` |
 
 - [成册预览 CTA 文案/层级](../album-preview-cta.md) — W6 单主动词「生成分享链接」+ 次级文字链
 - [分享图注短注](../share-gallery-captions.md) — ShareGallery 禁原始 filename；短日期或无脚注
