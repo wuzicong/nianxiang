@@ -380,7 +380,46 @@ docker compose -f compose.prod.yml exec -T web node -e "fetch('http://127.0.0.1:
 docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127.0.0.1:2019/config/
 ```
 
-建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。磁盘告警另做。备份节奏见「备份与恢复」。
+建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。磁盘、备份新鲜度和 429 计数见「监控告警」。备份节奏见「备份与恢复」。
+
+### 监控告警
+
+默认关闭。`compose.prod.yml` 不启动监控容器，仓库里没有已启用的 cron。不跑下面的脚本，生产栈和现在一样。
+
+建议看这些信号。可选脚本是 `deploy/self-host/monitoring/check.sh`，变量表在同目录的 README。
+
+| 信号 | 从哪看 | 脚本默认 |
+|------|--------|----------|
+| caddy、web、api、worker、postgres、redis、minio | `docker compose ps` 的 healthy | 不是 healthy 就记一笔。`starting` 只打印 |
+| 公网入口 | `GET /health`、`GET /login`、`GET /ready` | 连续 3 次失败再记成要外发 |
+| 磁盘 | `df` 使用率 | 达到 85%。默认看 `/`，备份目录在另一块盘时再看那一块 |
+| 备份 | 最新 `manifest-*.txt` 的修改时间 | 超过 26 小时，或目录里没有 manifest，就记一笔。不读正文 |
+| 解锁 429 | Caddy 进程日志 `zone=memora_share_unlock` | 只数新出现的行。一轮里达到 30 次再外发 |
+| 登录 429 | 同一份日志 `zone=memora_auth` | 一轮里达到 20 次再外发 |
+| 公开分享 429 | `zone=memora_public_shares` | 只打印次数 |
+
+ml 建议在 `docker compose ps` 里一起看，脚本不把它算进失败。应用没有 Prometheus 出口。进程日志保持 `INFO`，`rate limit exceeded` 那一行不带请求路径。脚本只输出次数。
+
+第一次真正执行会从日志末尾起算，不回放旧的 429。`--dry-run` 不写偏移。
+
+告警渠道写在仓库外。示例是 `deploy/self-host/monitoring/env.monitor.example` 里的 `https://hooks.example.com/memora` 和 `ops@example.com`。`MEMORA_ALERT_ENABLE` 默认 `0`：检查照常做，只打印，不外发。设成 `1` 之后才会 POST JSON `{"text":"..."}`，或交给本机的 `mail` / `sendmail`。示例地址即使打开开关也不会发出去。Webhook 用 https，URL 里不要夹带账号口令。SMTP 口令留在本机 MTA，不要写进 env。`MEMORA_ALERT_ENABLE=1` 时这个文件权限必须是 `400` 或 `600`。
+
+```bash
+deploy/self-host/monitoring/check.sh --self-test
+umask 077
+sudo mkdir -p /etc/memora
+sudo cp deploy/self-host/monitoring/env.monitor.example /etc/memora/monitor.env
+sudo chmod 600 /etc/memora/monitor.env
+MEMORA_MONITOR_ENV=/etc/memora/monitor.env deploy/self-host/monitoring/check.sh --dry-run
+```
+
+`--dry-run` 不写状态、不外发。输出里不应出现口令、Webhook URL 或邮箱。确认之后把仓库外文件的 `MEMORA_ALERT_ENABLE` 改成 `1`，换上自己的渠道，再加 cron（路径按机器改）。下面是每 5 分钟一次。要贴近上面「每 60 秒」的建议，把分钟改成 `*`，连续 3 次失败大约 3 分钟。
+
+```cron
+*/5 * * * * MEMORA_MONITOR_ENV=/etc/memora/monitor.env /opt/memora/deploy/self-host/monitoring/check.sh
+```
+
+同一组问题 6 小时内不重复外发。退出码 1 表示这一轮有要看的问题。跑 cron 的用户要能访问 Docker。
 
 ### 活体抽查
 
@@ -398,7 +437,7 @@ COMPOSE_ENV_FILES=/tmp/memora-prod.env docker compose -f compose.prod.yml up -d 
 
 下面的邮箱、口令和 Cookie 都是占位，换成一次性值。输出里打掉口令和 `memora_session`。注册和登录 POST 共用每分钟 5 次，先做完业务步骤，再做限流短测。解锁 POST 每分钟 6 次，公开分享 GET 每分钟 60 次，这两项不要放在同一分钟。
 
-1. 健康。上一节的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
+1. 健康。按「健康检查」的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
 2. 端口。`docker compose -f compose.prod.yml ps` 只发布 `80` 和 `443`。不要出现 5432、6379、9000、9001、3000、3001、3002。`docker ps` 里如果看到 `443/udp` 或 `2019/tcp`，但前面没有 `0.0.0.0:`，那是镜像暴露的端口，没有映射到宿主机。管理端口 2019 只在容器内。
 3. 注册或登录：
 
