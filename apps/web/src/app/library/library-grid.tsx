@@ -8,8 +8,19 @@ import {
   libraryPhotoSelectable,
   type LibraryPhoto,
 } from "../../lib/library";
+import {
+  buildDaySegments,
+  buildMonthAnchors,
+  libraryGridLayout,
+  segmentBlockHeight,
+  segmentHeaders,
+  virtualWindowForScroll,
+  type DaySegment,
+} from "../../lib/library-virtual";
+import { LibraryTimeline } from "./library-timeline";
 
 const LONG_PRESS_MS = 450;
+const MOBILE_MAX = 767;
 
 export function LibraryGrid({
   photos,
@@ -41,6 +52,50 @@ export function LibraryGrid({
   const firstId = orderedIds[0] ?? null;
   const frameRef = useRef<HTMLDivElement>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [width, setWidth] = useState(0);
+  const [mobile, setMobile] = useState(false);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(800);
+
+  const layout = useMemo(
+    () => libraryGridLayout(width > 0 ? width : 1280, mobile),
+    [width, mobile],
+  );
+  const segments = useMemo(() => buildDaySegments(groups, layout), [groups, layout]);
+  const monthAnchors = useMemo(() => buildMonthAnchors(segments), [segments]);
+  const virtual = useMemo(
+    () => virtualWindowForScroll(segments, scrollTop, viewportHeight, layout),
+    [segments, scrollTop, viewportHeight, layout],
+  );
+
+  const measure = useCallback(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    setWidth(frame.clientWidth);
+    setMobile(window.innerWidth <= MOBILE_MAX);
+    setViewportHeight(window.innerHeight);
+    const top = frame.getBoundingClientRect().top + window.scrollY;
+    setScrollTop(Math.max(0, window.scrollY - top));
+  }, []);
+
+  useEffect(() => {
+    measure();
+    const onScroll = () => measure();
+    const onResize = () => measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    const observer = new ResizeObserver(() => measure());
+    if (frameRef.current) observer.observe(frameRef.current);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      observer.disconnect();
+    };
+  }, [measure]);
+
+  useEffect(() => {
+    measure();
+  }, [photos.length, measure]);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -71,116 +126,186 @@ export function LibraryGrid({
   );
 
   useEffect(() => {
-    if (!focusId) return;
+    if (!focusId || !frameRef.current) return;
     const escaped = CSS.escape(focusId);
-    frameRef.current?.querySelector<HTMLButtonElement>(`[data-asset-id="${escaped}"]`)?.focus();
-  }, [focusId]);
+    const tile = frameRef.current.querySelector<HTMLButtonElement>(`[data-asset-id="${escaped}"]`);
+    if (tile) {
+      tile.focus();
+      return;
+    }
+    const index = segments.findIndex((segment) => segment.photos.some((p) => p.assetId === focusId));
+    if (index < 0) return;
+    const top = frameRef.current.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: top + segments[index]!.offset - layout.dayHeader, behavior: "smooth" });
+  }, [focusId, segments, layout.dayHeader]);
+
+  const jumpToOffset = useCallback(
+    (offset: number) => {
+      if (!frameRef.current) return;
+      const top = frameRef.current.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: top + offset, behavior: "auto" });
+      measure();
+    },
+    [measure],
+  );
+
+  const visibleSegments: { segment: DaySegment; index: number }[] = [];
+  if (virtual.end >= virtual.start) {
+    for (let index = virtual.start; index <= virtual.end; index += 1) {
+      const segment = segments[index];
+      if (segment) visibleSegments.push({ segment, index });
+    }
+  }
 
   return (
-    <div
-      ref={frameRef}
-      className={selecting ? "lib-frame lib-selecting" : "lib-frame"}
-      role="grid"
-      aria-multiselectable={selecting}
-      onKeyDown={onKeyDown}
-    >
-      {groups.years.map((year) => (
-        <section key={year.year} className="lib-year-block" aria-label={`${year.year} 年`}>
-          <div className="lib-sticky-year">
-            <span className="lib-sticky-year-num">{year.year}</span>
-          </div>
-          {year.months.map((month) => (
-            <div key={month.key} className="lib-month-block">
-              <p className="lib-sticky-month">
-                <span className="lib-sticky-month-inline">{year.year} · </span>
-                {month.month} 月
-              </p>
-              {month.days.map((day) => {
-                const selectableIds = day.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
-                const selectedInDay = selectableIds.filter((id) => selected.includes(id)).length;
-                const dayChecked =
-                  selectableIds.length > 0 && selectedInDay === selectableIds.length
-                    ? true
-                    : selectedInDay > 0
-                      ? "mixed"
-                      : false;
-                return (
-                  <section key={day.key} className="lib-day-block" aria-labelledby={`day-${day.key}`}>
-                    <div className="lib-sticky-day">
-                      <h3 id={`day-${day.key}`}>
-                        {month.month} 月 {day.day} 日 · {day.weekday} · {day.photos.length} 张
-                        {day.uploadFallback ? " · 按上传日期" : ""}
-                      </h3>
-                      <label className="lib-day-select">
-                        <input
-                          type="checkbox"
-                          checked={dayChecked === true}
-                          aria-checked={dayChecked === "mixed" ? "mixed" : dayChecked}
-                          disabled={locked || selectableIds.length === 0}
-                          onChange={() => {
-                            onSelectDay(selectableIds, dayChecked !== true);
-                          }}
-                        />
-                        选这天
-                      </label>
-                    </div>
-                    <div className="lib-grid" role="rowgroup">
-                      {day.photos.map((photo, index) => (
-                        <LibraryTile
-                          key={photo.assetId}
-                          photo={photo}
-                          indexInDay={index + 1}
-                          totalInDay={day.photos.length}
-                          timeZone={timeZone}
-                          selected={selected.includes(photo.assetId)}
-                          selectable={libraryPhotoSelectable(photo)}
-                          selecting={selecting}
-                          tabIndex={
-                            focusId ? (focusId === photo.assetId ? 0 : -1) : photo.assetId === firstId ? 0 : -1
-                          }
-                          locked={locked}
-                          pressTimer={pressTimer}
-                          onFocus={() => onFocus(photo.assetId)}
-                          onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
-                          onPreviewError={onPreviewError}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          ))}
-        </section>
-      ))}
-      {groups.undated.length > 0 ? (
-        <section className="lib-day-block">
-          <div className="lib-sticky-day">
-            <h3>日期待定</h3>
-          </div>
-          <div className="lib-grid" role="rowgroup">
-            {groups.undated.map((photo, index) => (
-              <LibraryTile
-                key={photo.assetId}
-                photo={photo}
-                indexInDay={index + 1}
-                totalInDay={groups.undated.length}
-                timeZone={timeZone}
-                selected={selected.includes(photo.assetId)}
-                selectable={libraryPhotoSelectable(photo)}
-                selecting={selecting}
-                tabIndex={-1}
-                locked={locked}
-                pressTimer={pressTimer}
-                onFocus={() => onFocus(photo.assetId)}
-                onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
-                onPreviewError={onPreviewError}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
+    <div className="lib-virtual-wrap">
+      <div
+        ref={frameRef}
+        className={selecting ? "lib-frame lib-selecting" : "lib-frame"}
+        role="grid"
+        aria-multiselectable={selecting}
+        onKeyDown={onKeyDown}
+        style={{ minHeight: virtual.totalHeight > 0 ? virtual.totalHeight : undefined }}
+      >
+        {virtual.totalHeight > 0 ? <div className="lib-virtual-spacer" style={{ height: virtual.topSpacer }} aria-hidden="true" /> : null}
+        {visibleSegments.map(({ segment, index }) => (
+          <DayBlock
+            key={segment.key}
+            segment={segment}
+            previous={index > 0 ? segments[index - 1]! : null}
+            layout={layout}
+            timeZone={timeZone}
+            selected={selected}
+            selecting={selecting}
+            focusId={focusId}
+            firstId={firstId}
+            locked={locked}
+            pressTimer={pressTimer}
+            onFocus={onFocus}
+            onToggle={onToggle}
+            onSelectDay={onSelectDay}
+            onPreviewError={onPreviewError}
+          />
+        ))}
+        {virtual.totalHeight > 0 ? (
+          <div className="lib-virtual-spacer" style={{ height: virtual.bottomSpacer }} aria-hidden="true" />
+        ) : null}
+      </div>
+      <LibraryTimeline
+        anchors={monthAnchors}
+        totalHeight={virtual.totalHeight}
+        scrollTop={scrollTop}
+        mobile={mobile}
+        onJump={jumpToOffset}
+      />
+      <p className="lib-sr" data-virtual-tiles={countTiles(visibleSegments)} data-virtual-total={photos.length} />
     </div>
+  );
+}
+
+function countTiles(items: { segment: DaySegment }[]): number {
+  return items.reduce((sum, item) => sum + item.segment.photos.length, 0);
+}
+
+function DayBlock({
+  segment,
+  previous,
+  layout,
+  timeZone,
+  selected,
+  selecting,
+  focusId,
+  firstId,
+  locked,
+  pressTimer,
+  onFocus,
+  onToggle,
+  onSelectDay,
+  onPreviewError,
+}: {
+  segment: DaySegment;
+  previous: DaySegment | null;
+  layout: ReturnType<typeof libraryGridLayout>;
+  timeZone: string;
+  selected: string[];
+  selecting: boolean;
+  focusId: string | null;
+  firstId: string | null;
+  locked: boolean;
+  pressTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  onFocus: (id: string) => void;
+  onToggle: (id: string, shift: boolean, gesture: "toggle" | "add") => void;
+  onSelectDay: (ids: string[], select: boolean) => void;
+  onPreviewError: (src: string) => void;
+}) {
+  const headers = segmentHeaders(segment, layout, previous);
+
+  const selectableIds = segment.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
+  const selectedInDay = selectableIds.filter((id) => selected.includes(id)).length;
+  const dayChecked =
+    selectableIds.length > 0 && selectedInDay === selectableIds.length
+      ? true
+      : selectedInDay > 0
+        ? "mixed"
+        : false;
+
+  return (
+    <section
+      className="lib-day-block"
+      aria-labelledby={segment.undated ? undefined : `day-${segment.key}`}
+      style={{ minHeight: segmentBlockHeight(segment, layout, previous) }}
+    >
+      {headers.year ? (
+        <div className="lib-sticky-year">
+          <span className="lib-sticky-year-num">{segment.year}</span>
+        </div>
+      ) : null}
+      {headers.month ? (
+        <p className="lib-sticky-month">
+          <span className="lib-sticky-month-inline">{segment.year} · </span>
+          {segment.month} 月
+        </p>
+      ) : null}
+      <div className="lib-sticky-day">
+        <h3 id={segment.undated ? undefined : `day-${segment.key}`}>
+          {segment.undated
+            ? "日期待定"
+            : `${segment.month} 月 ${segment.day} 日 · ${segment.weekday} · ${segment.photos.length} 张${segment.uploadFallback ? " · 按上传日期" : ""}`}
+        </h3>
+        {!segment.undated ? (
+          <label className="lib-day-select">
+            <input
+              type="checkbox"
+              checked={dayChecked === true}
+              aria-checked={dayChecked === "mixed" ? "mixed" : dayChecked}
+              disabled={locked || selectableIds.length === 0}
+              onChange={() => onSelectDay(selectableIds, dayChecked !== true)}
+            />
+            选这天
+          </label>
+        ) : null}
+      </div>
+      <div className="lib-grid" role="rowgroup">
+        {segment.photos.map((photo, index) => (
+          <LibraryTile
+            key={photo.assetId}
+            photo={photo}
+            indexInDay={index + 1}
+            totalInDay={segment.photos.length}
+            timeZone={timeZone}
+            selected={selected.includes(photo.assetId)}
+            selectable={libraryPhotoSelectable(photo)}
+            selecting={selecting}
+            tabIndex={focusId ? (focusId === photo.assetId ? 0 : -1) : photo.assetId === firstId ? 0 : -1}
+            locked={locked}
+            pressTimer={pressTimer}
+            onFocus={() => onFocus(photo.assetId)}
+            onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
+            onPreviewError={onPreviewError}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
