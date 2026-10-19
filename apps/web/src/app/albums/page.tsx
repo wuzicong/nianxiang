@@ -64,6 +64,8 @@ export default function AlbumsPage() {
       <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>相册</h1>
       <p style={{ lineHeight: 1.6, color: "#555" }}>
         在这里建相册、上传照片，并生成可撤销的分享链接。设密码的链接在打开时会先要求输入密码。
+        想先看版式，打开 <Link href="/preview">主题样张</Link>
+        。那里用的是示例照片，不会读取这本相册。
       </p>
       <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{message}</p>
 

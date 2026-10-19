@@ -1,0 +1,995 @@
+.album-shell {
+  --album-title-face: var(--share-font-title);
+  --album-body-face: var(--share-font-body);
+  --album-hand-face: var(--share-font-title);
+  min-height: 100vh;
+  margin: 0;
+  background: var(--share-bg);
+  color: var(--share-text);
+  font-family: var(--album-body-face);
+  position: relative;
+}
+
+.album-shell[data-theme="kyoto-lantern"] {
+  color-scheme: dark;
+}
+
+.album-shell[data-theme="magazine-heirloom"] {
+  background:
+    linear-gradient(var(--share-accent), var(--share-accent)) center top / 100% 4px no-repeat,
+    var(--share-bg);
+}
+
+.album-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: calc(var(--album-noise) * 2.4);
+  background-image: radial-gradient(rgba(44, 42, 41, 0.55) 0.6px, transparent 0.6px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+}
+
+.album-shell[data-theme="kyoto-lantern"]::before {
+  mix-blend-mode: soft-light;
+  opacity: calc(var(--album-noise) * 4);
+  background-image: radial-gradient(rgba(250, 250, 247, 0.85) 0.6px, transparent 0.6px);
+}
+
+.album-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.blob,
+.lantern-float {
+  position: absolute;
+}
+
+.blob {
+  width: min(46vw, 300px);
+}
+
+.blob svg,
+.lantern-float svg,
+.deco-gold svg,
+.deco-rule svg,
+.deco-tape svg,
+.deco-heart svg,
+.deco-heart-inline svg,
+.deco-lantern svg,
+.deco-lantern-inline svg,
+.deco-stamp svg,
+.deco-ticket svg,
+.deco-folio svg,
+.deco-torn svg,
+.deco-washi-edge svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.blob-a {
+  top: -2.5rem;
+  right: -2rem;
+  opacity: 0.95;
+}
+
+.blob-b {
+  left: -3rem;
+  bottom: 8%;
+  width: min(36vw, 230px);
+  transform: rotate(18deg);
+  opacity: 0.8;
+}
+
+.lantern-float {
+  width: 3.4rem;
+  top: 5.8rem;
+  left: 1rem;
+}
+
+.album-toolbar,
+.album-intro,
+.album-story,
+.album-flip-stage {
+  position: relative;
+  z-index: 1;
+}
+
+.album-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--share-bg) 86%, transparent);
+  border-bottom: 1px solid var(--share-border);
+  backdrop-filter: blur(12px);
+}
+
+.album-shell[data-theme="magazine-heirloom"] .album-toolbar {
+  background: var(--share-bg);
+  border-bottom: 1px solid var(--share-text);
+  backdrop-filter: none;
+}
+
+.toolbar-brand,
+.toolbar-brand a {
+  margin: 0;
+  color: var(--share-text);
+}
+
+.theme-switch,
+.layout-switch,
+.slot-nav,
+.flip-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.theme-switch a,
+.slot-nav a {
+  color: var(--share-text);
+  text-decoration: none;
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-button);
+  padding: 0.28rem 0.7rem;
+  font-size: 0.86rem;
+}
+
+.album-shell[data-theme="cotton-candy"] .theme-switch a,
+.album-shell[data-theme="cotton-candy"] .slot-nav a,
+.album-shell[data-theme="cotton-candy"] .layout-switch button,
+.album-shell[data-theme="cotton-candy"] .flip-controls button {
+  border-radius: var(--share-radius-pill);
+}
+
+.theme-switch a[aria-current="page"] {
+  background: var(--share-surface);
+  border-color: var(--share-brand);
+}
+
+.layout-switch button,
+.flip-controls button {
+  font: inherit;
+  color: var(--share-ink);
+  background: var(--share-brand);
+  border: 1px solid transparent;
+  border-radius: var(--share-radius-button);
+  padding: 0.42rem 0.85rem;
+  cursor: pointer;
+}
+
+.layout-switch button[aria-pressed="false"] {
+  color: var(--share-text);
+  background: transparent;
+  border-color: var(--share-border);
+}
+
+.album-shell[data-theme="magazine-heirloom"] .layout-switch button,
+.album-shell[data-theme="magazine-heirloom"] .flip-controls button,
+.album-shell[data-theme="magazine-heirloom"] .theme-switch a,
+.album-shell[data-theme="magazine-heirloom"] .slot-nav a {
+  border-radius: 2px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .layout-switch button[aria-pressed="true"],
+.album-shell[data-theme="magazine-heirloom"] .flip-controls button {
+  background: var(--share-text);
+  color: var(--share-bg);
+  border-color: var(--share-text);
+}
+
+.layout-switch button:disabled,
+.flip-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.layout-switch button:focus-visible,
+.flip-controls button:focus-visible,
+.theme-switch a:focus-visible,
+.slot-nav a:focus-visible,
+.toolbar-brand a:focus-visible {
+  outline: 2px solid var(--share-accent);
+  outline-offset: 3px;
+}
+
+.layout-note,
+.sample-note,
+.flip-hint,
+.lede,
+.caption,
+figcaption {
+  color: var(--share-muted);
+  line-height: 1.6;
+}
+
+.layout-note,
+.sample-note,
+.flip-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.album-intro {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 1.4rem 1rem 0.2rem;
+}
+
+.album-intro h1,
+.hero-title,
+.section-title,
+.quote-text,
+.preview-index-card h2 {
+  font-family: var(--album-title-face);
+}
+
+.album-intro h1 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(2.1rem, 5vw, 3.6rem);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.album-shell[data-theme="kyoto-lantern"] .album-intro h1,
+.album-shell[data-theme="kyoto-lantern"] .hero-title {
+  font-weight: 520;
+  letter-spacing: 0.04em;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .album-intro h1 {
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.kicker {
+  margin: 0;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  color: var(--share-muted);
+}
+
+.album-shell[data-theme="cotton-candy"] .kicker {
+  font-family: var(--album-title-face);
+  text-transform: none;
+  letter-spacing: 0.08em;
+  font-size: 1.02rem;
+  color: color-mix(in srgb, var(--share-brand) 28%, var(--share-text));
+}
+
+.album-shell[data-theme="kyoto-lantern"] .kicker {
+  font-family: var(--album-title-face);
+  color: var(--share-brand);
+  letter-spacing: 0.22em;
+}
+
+.lede,
+.caption,
+.sign,
+.folio-line {
+  margin: 0.35rem 0 0;
+}
+
+.slot-nav {
+  margin-top: 0.9rem;
+}
+
+.album-story {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 1.1rem 1rem 4.5rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.album-sheet {
+  display: flex;
+  min-height: min(760px, calc(100vh - 6.5rem));
+  background: var(--share-surface);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-card);
+  box-shadow: var(--share-shadow);
+  position: relative;
+  scroll-margin-top: 5.2rem;
+}
+
+.album-shell[data-theme="cotton-candy"] .album-sheet {
+  border-color: color-mix(in srgb, var(--share-brand) 58%, var(--share-border));
+  overflow: visible;
+}
+
+.album-shell[data-theme="kyoto-lantern"] .album-sheet {
+  border-color: color-mix(in srgb, var(--share-brand) 68%, var(--share-border));
+  overflow: hidden;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .album-sheet {
+  border-color: var(--share-text);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.slot {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: clamp(1.15rem, 3vw, 2.1rem);
+}
+
+.album-shell[data-theme="kyoto-lantern"] .slot {
+  padding-top: 1.7rem;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .slot {
+  padding-top: 2.5rem;
+}
+
+.hero,
+.spread-block,
+.wall-block,
+.quote,
+.timeline-block,
+.map-block,
+.closing,
+.bleed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.hero-title,
+.section-title {
+  margin: 0;
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+.hero-title {
+  font-size: clamp(2rem, 5vw, 4.4rem);
+}
+
+.section-title {
+  font-size: clamp(1.5rem, 3vw, 2.3rem);
+}
+
+.album-shell[data-theme="magazine-heirloom"] .slot[data-slot-id="cover"] .hero-title {
+  font-weight: 500;
+  font-size: clamp(3.4rem, 8vw, 6.6rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+}
+
+.spread figure,
+.polaroid {
+  position: relative;
+  margin: 0;
+  min-height: 0;
+}
+
+.spread .frame {
+  aspect-ratio: 3 / 4;
+  min-height: 200px;
+}
+
+.bleed {
+  flex: 1;
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--album-radius-sm);
+  background: color-mix(in srgb, var(--share-bg) 72%, var(--share-surface));
+  min-height: 140px;
+}
+
+.hero-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: clamp(280px, 46vh, 560px);
+}
+
+.hero-frame .frame {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  height: auto;
+}
+
+.frame img,
+.bleed img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.album-shell[data-theme="cotton-candy"] .hero-frame .frame,
+.album-shell[data-theme="cotton-candy"] .spread .frame {
+  border-radius: var(--share-radius-card);
+}
+
+.album-shell[data-theme="kyoto-lantern"] .frame {
+  border: 1px solid color-mix(in srgb, var(--share-brand) 72%, transparent);
+}
+
+.album-shell[data-theme="magazine-heirloom"] .frame,
+.album-shell[data-theme="magazine-heirloom"] .album-page {
+  border-radius: 0;
+}
+
+.spread {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  min-height: 0;
+}
+
+.spread figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.spread .frame {
+  flex: 1;
+  min-height: 220px;
+}
+
+.wall {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem 0.75rem;
+  align-content: start;
+}
+
+.polaroid .frame {
+  aspect-ratio: 1;
+  min-height: 0;
+}
+
+.album-shell[data-theme="cotton-candy"] .polaroid {
+  background: #fffdfb;
+  padding: 0.45rem 0.45rem 1.55rem;
+  border-radius: 3px;
+  box-shadow: var(--share-shadow);
+  transform: rotate(var(--tilt));
+}
+
+.album-shell[data-theme="cotton-candy"] .polaroid .frame {
+  border-radius: 2px;
+}
+
+.album-shell[data-theme="cotton-candy"] .polaroid:hover {
+  transform: rotate(var(--tilt)) translateY(calc(var(--album-hover-lift) * -1px));
+}
+
+.album-shell[data-theme="kyoto-lantern"] .polaroid {
+  transform: rotate(var(--tilt));
+  padding: 0.55rem 0.5rem 0.7rem;
+  border: 1px dashed color-mix(in srgb, var(--share-brand) 82%, transparent);
+  background: color-mix(in srgb, var(--share-bg) 35%, transparent);
+}
+
+.album-shell[data-theme="magazine-heirloom"] .polaroid .frame {
+  aspect-ratio: 4 / 5;
+}
+
+.album-shell[data-theme="magazine-heirloom"] figcaption {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.quote-text {
+  margin: 0;
+  font-family: var(--album-hand-face);
+  font-size: clamp(1.8rem, 4vw, 3.1rem);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .quote-text {
+  font-family: var(--album-title-face);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(2.1rem, 4.6vw, 3.5rem);
+  line-height: 1.12;
+}
+
+.album-shell[data-theme="kyoto-lantern"] .quote,
+.album-shell[data-theme="kyoto-lantern"] .map-block {
+  border: 1px solid color-mix(in srgb, var(--share-brand) 62%, transparent);
+  padding: 1.15rem 1.05rem 1rem;
+  background: color-mix(in srgb, var(--share-bg) 42%, var(--share-surface));
+}
+
+.timeline,
+.route,
+.contents {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.95rem;
+}
+
+.timeline li,
+.route li,
+.contents li {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.timeline li,
+.route li {
+  padding-left: 0.85rem;
+  border-left: 2px solid var(--share-brand);
+}
+
+.album-shell[data-theme="cotton-candy"] .timeline li {
+  border-left-style: dotted;
+  border-left-color: color-mix(in srgb, var(--share-secondary) 80%, var(--share-text));
+}
+
+.album-shell[data-theme="magazine-heirloom"] .timeline li,
+.album-shell[data-theme="magazine-heirloom"] .contents li {
+  border-left: 1px solid var(--share-text);
+  grid-template-columns: 3.2rem 1fr;
+}
+
+.beat-label {
+  font-family: var(--album-title-face);
+  color: var(--share-accent);
+}
+
+.album-shell[data-theme="kyoto-lantern"] .beat-label {
+  color: var(--share-brand);
+  letter-spacing: 0.08em;
+}
+
+.closing {
+  justify-content: center;
+}
+
+.album-shell[data-theme="cotton-candy"] .closing {
+  align-items: center;
+  text-align: center;
+}
+
+.sign {
+  font-family: var(--album-hand-face);
+  font-size: 1.35rem;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .sign {
+  font-family: var(--album-body-face);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+.album-shell .slot[data-slot-id="full-bleed"] {
+  padding: 0;
+}
+
+.bleed {
+  position: relative;
+  min-height: clamp(460px, 72vh, 760px);
+  margin: 0;
+}
+
+.bleed img {
+  position: absolute;
+  inset: 0;
+}
+
+.bleed-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 3rem 1.4rem 1.3rem;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--share-bg) 94%, transparent));
+  color: var(--share-text);
+}
+
+.deco-tape {
+  position: absolute;
+  width: 38%;
+  top: -0.45rem;
+  left: 18%;
+  z-index: 2;
+  transform: rotate(-8deg);
+  pointer-events: none;
+}
+
+.deco-heart {
+  position: absolute;
+  width: 2.7rem;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 2;
+  transform: rotate(8deg);
+  pointer-events: none;
+}
+
+.deco-heart-inline,
+.deco-lantern-inline {
+  width: 2.8rem;
+}
+
+.deco-lantern {
+  position: absolute;
+  width: 2.5rem;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.deco-stamp {
+  position: absolute;
+  width: 1.7rem;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.deco-ticket {
+  width: min(100%, 12rem);
+  margin-top: auto;
+}
+
+.deco-gold,
+.deco-rule {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+}
+
+.deco-gold {
+  width: 4.6rem;
+}
+
+.deco-rule {
+  width: min(100%, 18rem);
+}
+
+.deco-gold svg,
+.deco-rule svg {
+  width: 100%;
+  height: 3px;
+}
+
+.album-shell[data-theme="magazine-heirloom"] .slot[data-slot-id="cover"] .deco-gold {
+  width: 100%;
+}
+
+.deco-washi-edge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0.72rem;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.deco-washi-edge svg {
+  width: 100%;
+  height: 100%;
+}
+
+.deco-folio {
+  position: absolute;
+  top: 0.95rem;
+  right: 1rem;
+  width: 4rem;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.deco-torn {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 26px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.deco-torn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.album-flip-stage {
+  width: min(1120px, calc(100% - 1.5rem));
+  margin: 0.4rem auto 2.5rem;
+}
+
+.album-flip-mount {
+  width: 100%;
+  min-height: 640px;
+}
+
+.album-page {
+  background: var(--share-surface);
+  color: var(--share-text);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.album-shell[data-theme="cotton-candy"] .album-page {
+  border-radius: 16px;
+}
+
+.album-shell[data-theme="kyoto-lantern"] .album-page {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--share-brand) 58%, transparent);
+}
+
+.album-page .slot {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 0.85rem 0.9rem 1rem;
+}
+
+.album-shell[data-theme="kyoto-lantern"] .album-page .slot {
+  padding-top: 1.35rem;
+}
+
+.slot[data-mode="flip"] .hero-title {
+  font-size: 1.65rem;
+}
+
+.slot[data-mode="flip"] .section-title {
+  font-size: 1.2rem;
+}
+
+.slot[data-mode="flip"] .quote-text {
+  font-size: 1.35rem;
+}
+
+.slot[data-mode="flip"] .hero-frame {
+  min-height: 0;
+  flex: 1 1 0;
+}
+
+.slot[data-mode="flip"] .spread .frame {
+  min-height: 0;
+  aspect-ratio: 1;
+}
+
+.slot[data-mode="flip"] .wall {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.slot[data-mode="flip"] .deco-torn {
+  display: none;
+}
+
+.flip-controls {
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.flip-controls p {
+  margin: 0;
+  min-width: 7rem;
+  text-align: center;
+}
+
+.flip-hint {
+  text-align: center;
+  margin-top: 0.55rem;
+}
+
+.instant-book {
+  width: min(460px, 100%);
+  margin: 0 auto;
+}
+
+.instant-sheet {
+  min-height: 640px;
+}
+
+.preview-index {
+  min-height: 100vh;
+  padding: 3rem 1.25rem 4rem;
+  background: #fafaf7;
+  color: #2c2a29;
+}
+
+.preview-index-crumb {
+  margin: 0 0 1rem;
+}
+
+.preview-index h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.03em;
+}
+
+.preview-index-lead {
+  max-width: 38rem;
+  line-height: 1.6;
+  color: #5c564f;
+}
+
+.preview-index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  max-width: 980px;
+}
+
+.preview-index-card {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  min-height: 230px;
+  padding: 1.25rem 1.15rem 1.3rem;
+  text-decoration: none;
+  background: var(--share-bg);
+  color: var(--share-text);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-card);
+  box-shadow: var(--share-shadow);
+  font-family: var(--album-body-face, var(--share-font-body));
+}
+
+.preview-index-card h2 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 560;
+  letter-spacing: -0.03em;
+}
+
+.preview-index-card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.preview-index-card .layouts {
+  margin-top: auto;
+  color: var(--share-muted);
+  font-size: 0.85rem;
+}
+
+.preview-index-card[data-theme="kyoto-lantern"] h2 {
+  letter-spacing: 0.05em;
+  font-weight: 520;
+}
+
+.preview-index-card[data-theme="magazine-heirloom"] {
+  box-shadow: none;
+  border-color: var(--share-text);
+  border-radius: var(--share-radius-card);
+}
+
+.preview-index-card[data-theme="magazine-heirloom"] h2 {
+  font-weight: 500;
+  font-size: 2.5rem;
+}
+
+.preview-index-card[data-theme="cotton-candy"] .kicker {
+  font-family: var(--album-title-face, var(--share-font-title));
+  text-transform: none;
+  letter-spacing: 0.06em;
+  font-size: 1rem;
+  color: color-mix(in srgb, var(--share-brand) 30%, var(--share-text));
+}
+
+.preview-index-card[data-theme="kyoto-lantern"] .kicker {
+  color: var(--share-brand);
+  letter-spacing: 0.18em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .album-shell[data-motion="spring"] .album-sheet {
+    animation: album-pop 0.7s both;
+  }
+
+  .album-shell[data-motion="fade-up"] .album-sheet {
+    animation: album-up 0.75s both;
+  }
+
+  .album-shell[data-motion="editorial-fade"] .album-sheet {
+    animation: album-fade 0.8s both;
+  }
+
+  .album-shell[data-theme="cotton-candy"] .polaroid,
+  .album-shell[data-theme="kyoto-lantern"] .polaroid {
+    transition: transform 0.2s ease;
+  }
+}
+
+@keyframes album-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes album-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes album-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .spread,
+  .wall {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .timeline li,
+  .route li,
+  .contents li {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .lantern-float,
+  .blob-b {
+    display: none;
+  }
+
+  .album-shell[data-theme="magazine-heirloom"] .slot[data-slot-id="cover"] .hero-title {
+    font-size: 3rem;
+  }
+}
