@@ -60,6 +60,7 @@ export {
 } from "./runtime-config.js";
 export {
   createAlbumRepository,
+  shareCapturedAt,
   MAX_ALBUMS_PER_USER,
   MAX_ASSETS_PER_ALBUM,
   type ActiveShareGate,

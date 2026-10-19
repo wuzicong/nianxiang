@@ -24,6 +24,7 @@ import {
   type ObjectStore,
   type PendingAlbumTarget,
   type PresignPutInput,
+  shareCapturedAt,
   type PublicShareView,
   type ReservePendingResult,
   type ShareReadAccess,
@@ -422,10 +423,10 @@ export function memoryAlbums(
         if (!asset || asset.userId !== album.userId) continue;
         viewAssets.push({
           assetId: asset.id,
-          filename: asset.filename,
           width: asset.width,
           height: asset.height,
           derivatives: asset.derivatives,
+          capturedAt: shareCapturedAt(asset.exif),
         });
       }
       return {
