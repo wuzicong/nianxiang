@@ -1,24 +1,12 @@
-/* 照片库桌面。底色和品牌粉来自棉花糖，顶上的金线来自杂志。
-   三套主题只在「生成相册」的卡片里各自上色。悬停抬起 4px，和棉花糖的 hoverLift 一致。 */
+/* 照片库：色板与圆角仅走 share-shell 注入的 --share-*（见 shareThemeStyle）。
+   首页固定棉花糖；建册弹层里各主题卡自带 share-shell。悬停抬起 4px，与 hoverLift 一致。 */
 
 .lib {
-  --lib-bg: #f7ede2;
-  --lib-ink: #2c2a29;
-  --lib-surface: #fff8f5;
-  --lib-moon: #fafaf7;
-  --lib-brand: #f5c6c6;
-  --lib-secondary: #c9b8e8;
-  --lib-accent: #b7c4a3;
-  --lib-gold: #c2a878;
-  --lib-muted: #8a8279;
-  --lib-border: #f0e0d6;
-  --lib-shadow: 0 8px 24px rgba(44, 42, 41, 0.08);
-  --lib-radius: 28px;
   position: relative;
   min-height: 100vh;
-  color: var(--lib-ink);
-  background: var(--lib-bg);
-  font-family: var(--font-inter), system-ui, "PingFang SC", sans-serif;
+  color: var(--share-text);
+  background: var(--share-bg);
+  font-family: var(--share-font-body, var(--font-inter), system-ui, "PingFang SC", sans-serif);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -27,10 +15,10 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 108% -10%, color-mix(in srgb, var(--lib-brand) 88%, transparent), transparent 42%),
-    radial-gradient(circle at -12% 16%, color-mix(in srgb, var(--lib-secondary) 66%, transparent), transparent 36%),
-    radial-gradient(circle at 78% 108%, color-mix(in srgb, var(--lib-accent) 42%, transparent), transparent 34%),
-    var(--lib-bg);
+    radial-gradient(circle at 108% -10%, color-mix(in srgb, var(--share-brand) 88%, transparent), transparent 42%),
+    radial-gradient(circle at -12% 16%, color-mix(in srgb, var(--share-secondary) 66%, transparent), transparent 36%),
+    radial-gradient(circle at 78% 108%, color-mix(in srgb, var(--share-accent) 42%, transparent), transparent 34%),
+    var(--share-bg);
 }
 
 .lib-skip {
@@ -39,8 +27,8 @@
   top: -4rem;
   z-index: 40;
   padding: 0.45rem 0.8rem;
-  background: var(--lib-ink);
-  color: var(--lib-moon);
+  background: var(--share-text);
+  color: var(--share-bg);
   border-radius: 999px;
 }
 
@@ -58,8 +46,8 @@
   position: sticky;
   top: 0;
   z-index: 15;
-  background: color-mix(in srgb, var(--lib-bg) 78%, transparent);
-  box-shadow: inset 0 3px 0 var(--lib-gold);
+  background: color-mix(in srgb, var(--share-bg) 88%, transparent);
+  box-shadow: inset 0 3px 0 var(--share-brand);
   backdrop-filter: blur(16px);
 }
 
@@ -93,7 +81,7 @@
 .lib-mark-en {
   font-family: var(--font-caveat), cursive;
   font-size: 1.15rem;
-  color: color-mix(in srgb, var(--lib-ink) 72%, var(--lib-brand));
+  color: color-mix(in srgb, var(--share-text) 72%, var(--share-brand));
 }
 
 .lib-mark-zh {
@@ -123,7 +111,7 @@
 .lib-nav button,
 .lib-text-button,
 .lib-quiet {
-  color: var(--lib-ink);
+  color: var(--share-text);
   text-decoration: none;
   background: transparent;
   border: 0;
@@ -133,8 +121,8 @@
 }
 
 .lib-nav a[aria-current="page"] {
-  background: var(--lib-ink);
-  color: var(--lib-moon);
+  background: var(--share-text);
+  color: var(--share-bg);
 }
 
 .lib-nav button {
@@ -152,7 +140,7 @@
   margin: 1.2rem 0 0;
   font-family: var(--font-caveat), cursive;
   font-size: 1.55rem;
-  color: var(--lib-muted);
+  color: var(--share-muted);
 }
 
 .lib h1,
@@ -195,7 +183,7 @@
 .lib-note,
 .lib-hint,
 .lib-count {
-  color: var(--lib-muted);
+  color: var(--share-muted);
 }
 
 .lib-note {
@@ -213,9 +201,9 @@
   flex-wrap: wrap;
   gap: 0.3rem;
   padding: 0.28rem;
-  border: 1px solid var(--lib-border);
+  border: 1px solid var(--share-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--lib-surface) 84%, transparent);
+  background: color-mix(in srgb, var(--share-surface) 84%, transparent);
 }
 
 .lib-tab,
@@ -228,27 +216,27 @@
 .lib-tab {
   border: 0;
   background: transparent;
-  color: var(--lib-ink);
+  color: var(--share-text);
   border-radius: 999px;
   padding: 0.48rem 0.9rem;
   font: inherit;
 }
 
 .lib-tab[aria-selected="true"] {
-  background: var(--lib-ink);
-  color: var(--lib-moon);
+  background: var(--share-text);
+  color: var(--share-bg);
 }
 
 .lib-select {
-  border: 1px solid var(--lib-ink);
+  border: 1px solid var(--share-text);
   background: transparent;
-  color: var(--lib-ink);
+  color: var(--share-text);
   border-radius: 999px;
   padding: 0.5rem 0.95rem;
 }
 
 .lib-select[aria-pressed="true"] {
-  background: var(--lib-brand);
+  background: var(--share-brand);
   border-color: transparent;
 }
 
@@ -261,7 +249,7 @@
 .lib-more,
 .lib-draft {
   margin: 1rem 0 0;
-  color: var(--lib-muted);
+  color: var(--share-muted);
 }
 
 .lib-frame {
@@ -277,7 +265,7 @@
   margin: 0.8rem 0 0;
   font-size: 0.78rem;
   letter-spacing: 0.18em;
-  color: var(--lib-muted);
+  color: var(--share-muted);
 }
 
 .lib-day {
@@ -294,7 +282,7 @@
 
 .lib-day p {
   margin: 0;
-  color: var(--lib-muted);
+  color: var(--share-muted);
   font-size: 0.86rem;
 }
 
@@ -318,8 +306,8 @@
   overflow: hidden;
   border: 0;
   border-radius: 18px;
-  background: var(--lib-surface);
-  box-shadow: var(--lib-shadow);
+  background: var(--share-surface);
+  box-shadow: var(--share-shadow);
   color: inherit;
   cursor: pointer;
   user-select: none;
@@ -347,7 +335,7 @@
   padding: 0.7rem;
   text-align: center;
   background:
-    linear-gradient(160deg, color-mix(in srgb, var(--lib-brand) 70%, white), color-mix(in srgb, var(--lib-secondary) 45%, white));
+    linear-gradient(160deg, color-mix(in srgb, var(--share-brand) 70%, white), color-mix(in srgb, var(--share-secondary) 45%, white));
   font-size: 0.82rem;
 }
 
@@ -360,8 +348,8 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  border: 1.5px solid color-mix(in srgb, var(--lib-ink) 75%, white);
-  background: color-mix(in srgb, var(--lib-surface) 86%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--share-text) 75%, white);
+  background: color-mix(in srgb, var(--share-surface) 86%, transparent);
   color: transparent;
   opacity: 0;
   box-shadow: 0 4px 10px rgba(44, 42, 41, 0.12);
@@ -374,16 +362,16 @@
 }
 
 .lib-tile[aria-pressed="true"] .lib-check {
-  background: var(--lib-ink);
-  color: var(--lib-moon);
-  border-color: var(--lib-ink);
+  background: var(--share-text);
+  color: var(--share-bg);
+  border-color: var(--share-text);
 }
 
 .lib-tile[aria-pressed="true"]::after {
   content: "";
   position: absolute;
   inset: 0;
-  border: 3px solid var(--lib-ink);
+  border: 3px solid var(--share-text);
   border-radius: inherit;
   pointer-events: none;
 }
@@ -401,10 +389,10 @@
 .lib-shell,
 .lib-empty,
 .lib-dialog-card {
-  background: color-mix(in srgb, var(--lib-surface) 92%, transparent);
-  border: 1px solid var(--lib-border);
-  border-radius: var(--lib-radius);
-  box-shadow: var(--lib-shadow);
+  background: color-mix(in srgb, var(--share-surface) 92%, transparent);
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-card);
+  box-shadow: var(--share-shadow);
 }
 
 .lib-shell,
@@ -420,8 +408,8 @@
   margin: 0;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--lib-gold) 28%, white);
-  color: var(--lib-ink);
+  background: color-mix(in srgb, var(--share-accent) 28%, var(--share-surface));
+  color: var(--share-text);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
 }
@@ -437,30 +425,30 @@
   height: 7.5rem;
   margin-bottom: 0.8rem;
   border-radius: 18px;
-  border: 1px dashed color-mix(in srgb, var(--lib-ink) 25%, var(--lib-border));
+  border: 1px dashed color-mix(in srgb, var(--share-text) 25%, var(--share-border));
 }
 
 .lib-shell-art-place {
   background:
-    linear-gradient(color-mix(in srgb, var(--lib-gold) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(90deg, color-mix(in srgb, var(--lib-gold) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
-    color-mix(in srgb, var(--lib-surface) 70%, var(--lib-bg));
+    linear-gradient(color-mix(in srgb, var(--share-accent) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, color-mix(in srgb, var(--share-accent) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    color-mix(in srgb, var(--share-surface) 70%, var(--share-bg));
 }
 
 .lib-shell-art-scene {
   background:
-    linear-gradient(var(--lib-surface), var(--lib-surface)) 12% 50% / 28% 70% no-repeat,
-    linear-gradient(var(--lib-brand), var(--lib-brand)) 50% 42% / 22% 58% no-repeat,
-    linear-gradient(var(--lib-secondary), var(--lib-secondary)) 76% 55% / 16% 46% no-repeat,
-    color-mix(in srgb, var(--lib-bg) 70%, white);
+    linear-gradient(var(--share-surface), var(--share-surface)) 12% 50% / 28% 70% no-repeat,
+    linear-gradient(var(--share-brand), var(--share-brand)) 50% 42% / 22% 58% no-repeat,
+    linear-gradient(var(--share-secondary), var(--share-secondary)) 76% 55% / 16% 46% no-repeat,
+    color-mix(in srgb, var(--share-bg) 70%, white);
 }
 
 .lib-shell-art-people {
   background:
-    radial-gradient(circle at 32% 48%, transparent 0 18px, color-mix(in srgb, var(--lib-ink) 18%, transparent) 19px 20px, transparent 21px),
-    radial-gradient(circle at 50% 46%, transparent 0 22px, color-mix(in srgb, var(--lib-ink) 22%, transparent) 23px 24px, transparent 25px),
-    radial-gradient(circle at 68% 50%, transparent 0 16px, color-mix(in srgb, var(--lib-ink) 16%, transparent) 17px 18px, transparent 19px),
-    color-mix(in srgb, var(--lib-secondary) 24%, var(--lib-surface));
+    radial-gradient(circle at 32% 48%, transparent 0 18px, color-mix(in srgb, var(--share-text) 18%, transparent) 19px 20px, transparent 21px),
+    radial-gradient(circle at 50% 46%, transparent 0 22px, color-mix(in srgb, var(--share-text) 22%, transparent) 23px 24px, transparent 25px),
+    radial-gradient(circle at 68% 50%, transparent 0 16px, color-mix(in srgb, var(--share-text) 16%, transparent) 17px 18px, transparent 19px),
+    color-mix(in srgb, var(--share-secondary) 24%, var(--share-surface));
 }
 
 .lib-skeletons {
@@ -491,10 +479,10 @@
 
 .lib-dock-inner {
   padding: 0.65rem 0.65rem 0.65rem 1.05rem;
-  border: 1px solid var(--lib-border);
+  border: 1px solid var(--share-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--lib-surface) 88%, transparent);
-  box-shadow: var(--lib-shadow);
+  background: color-mix(in srgb, var(--share-surface) 88%, transparent);
+  box-shadow: var(--share-shadow);
   backdrop-filter: blur(16px);
 }
 
@@ -516,14 +504,14 @@
 }
 
 .lib-quiet {
-  border: 1px solid var(--lib-border);
+  border: 1px solid var(--share-border);
   background: transparent;
 }
 
 .lib-primary {
   border: 0;
-  background: var(--lib-ink);
-  color: var(--lib-moon);
+  background: var(--share-text);
+  color: var(--share-bg);
 }
 
 a.lib-primary {
@@ -577,10 +565,10 @@ a.lib-primary {
 .lib-field input {
   width: 100%;
   padding: 0.7rem 0.8rem;
-  border: 1px solid var(--lib-border);
+  border: 1px solid var(--share-border);
   border-radius: 14px;
-  background: var(--lib-moon);
-  color: var(--lib-ink);
+  background: var(--share-surface);
+  color: var(--share-text);
   font: inherit;
 }
 
@@ -641,7 +629,7 @@ a.lib-primary {
 }
 
 .lib-theme[data-checked="true"] {
-  outline: 2px solid var(--lib-ink);
+  outline: 2px solid var(--share-text);
   outline-offset: 3px;
 }
 
@@ -654,11 +642,11 @@ a.lib-primary {
 
 .lib-alert {
   margin: 0.8rem 0 0;
-  color: var(--lib-ink);
+  color: var(--share-text);
 }
 
 .lib :focus-visible {
-  outline: 2px solid var(--lib-ink);
+  outline: 2px solid var(--share-text);
   outline-offset: 3px;
 }
 
@@ -728,25 +716,17 @@ a.lib-primary {
 
 /* —— 规范 v1：share-shell 变量 + 方格网格 + 吸顶 + 选择栏 —— */
 .lib.share-shell {
-  --lib-sticky-top: 7.25rem;
-  --lib-year-h: 2.75rem;
-  --lib-month-h: 2rem;
-  color: var(--share-text, var(--lib-ink));
-  background: var(--share-bg, var(--lib-bg));
-  font-family: var(--share-font-body, var(--font-inter), system-ui, "PingFang SC", sans-serif);
-}
-
-.lib-top {
-  box-shadow: inset 0 3px 0 var(--share-brand, var(--lib-gold));
-  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 88%, transparent);
+  --library-sticky-top: 7.25rem;
+  --library-year-h: 2.75rem;
+  --library-month-h: 2rem;
 }
 
 .lib-privacy-badge {
   font-size: 0.82rem;
-  color: var(--share-muted, var(--lib-muted));
+  color: var(--share-muted);
   padding: 0.25rem 0.55rem;
   border-radius: var(--share-radius-pill, 999px);
-  border: 1px solid var(--share-border, var(--lib-border));
+  border: 1px solid var(--share-border);
 }
 
 .lib-top-actions {
@@ -759,15 +739,15 @@ a.lib-primary {
   position: sticky;
   top: 3.6rem;
   z-index: 29;
-  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 90%, transparent);
+  background: color-mix(in srgb, var(--share-bg) 90%, transparent);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--share-border, var(--lib-border));
+  border-bottom: 1px solid var(--share-border);
 }
 
 .lib-soon {
   margin-left: 0.25rem;
   font-size: 0.65rem;
-  color: var(--share-muted, var(--lib-muted));
+  color: var(--share-muted);
 }
 
 .lib-grid {
@@ -805,32 +785,32 @@ a.lib-primary {
 .lib-sticky-year,
 .lib-sticky-month,
 .lib-sticky-day {
-  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 88%, transparent);
+  background: color-mix(in srgb, var(--share-bg) 88%, transparent);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--share-border, var(--lib-border));
+  border-bottom: 1px solid var(--share-border);
 }
 
 .lib-sticky-year {
   position: sticky;
-  top: var(--lib-sticky-top);
+  top: var(--library-sticky-top);
   z-index: 8;
   font-family: var(--share-font-title, var(--font-fraunces), serif);
   font-size: clamp(1.6rem, 3vw, 2rem);
   padding: 0.35rem 0;
-  min-height: var(--lib-year-h);
+  min-height: var(--library-year-h);
   display: flex;
   align-items: center;
 }
 
 .lib-sticky-month {
   position: sticky;
-  top: calc(var(--lib-sticky-top) + var(--lib-year-h));
+  top: calc(var(--library-sticky-top) + var(--library-year-h));
   z-index: 7;
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
   padding: 0.2rem 0;
-  min-height: var(--lib-month-h);
+  min-height: var(--library-month-h);
   display: flex;
   align-items: center;
 }
@@ -841,14 +821,14 @@ a.lib-primary {
 
 .lib-sticky-day {
   position: sticky;
-  top: calc(var(--lib-sticky-top) + var(--lib-year-h) + var(--lib-month-h));
+  top: calc(var(--library-sticky-top) + var(--library-year-h) + var(--library-month-h));
   z-index: 6;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.88rem;
-  color: var(--share-muted, var(--lib-muted));
+  color: var(--share-muted);
   padding: 0.25rem 0 0.45rem;
 }
 
@@ -856,7 +836,7 @@ a.lib-primary {
   margin: 0;
   font-size: inherit;
   font-weight: 500;
-  color: var(--share-text, var(--lib-ink));
+  color: var(--share-text);
 }
 
 .lib-day-select {
@@ -869,8 +849,8 @@ a.lib-primary {
 
 @media (max-width: 767px) {
   .lib.share-shell {
-    --lib-sticky-top: 6.5rem;
-    --lib-year-h: 0px;
+    --library-sticky-top: 6.5rem;
+    --library-year-h: 0px;
   }
 
   .lib-sticky-year {
@@ -890,8 +870,8 @@ a.lib-primary {
   gap: 0.6rem;
   min-height: 4rem;
   padding: 0.5rem 1rem;
-  background: color-mix(in srgb, var(--share-surface, var(--lib-surface)) 92%, transparent);
-  border-bottom: 1px solid var(--share-border, var(--lib-border));
+  background: color-mix(in srgb, var(--share-surface) 92%, transparent);
+  border-bottom: 1px solid var(--share-border);
 }
 
 .lib-selection-bar-bottom {
@@ -901,7 +881,7 @@ a.lib-primary {
   right: 0;
   bottom: 0;
   padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  box-shadow: var(--share-shadow, var(--lib-shadow));
+  box-shadow: var(--share-shadow);
 }
 
 .lib-selection-bar-top {
@@ -953,8 +933,8 @@ a.lib-primary {
   z-index: 50;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--share-text, #000) 35%, transparent);
-  color: var(--share-surface, #fff);
+  background: color-mix(in srgb, var(--share-text) 35%, transparent);
+  color: var(--share-surface);
   font-size: 1.4rem;
 }
 
@@ -962,7 +942,7 @@ a.lib-primary {
   margin: 0;
   padding: 0.55rem 1rem;
   text-align: center;
-  background: color-mix(in srgb, var(--share-muted, #888) 12%, var(--share-bg, #fff));
+  background: color-mix(in srgb, var(--share-muted) 12%, var(--share-bg));
   font-size: 0.9rem;
 }
 
@@ -983,7 +963,7 @@ a.lib-primary {
   max-height: 100vh;
   margin-left: auto;
   padding: 1rem;
-  background: var(--share-bg, var(--lib-bg));
+  background: var(--share-bg);
   overflow: auto;
 }
 
@@ -1023,7 +1003,7 @@ a.lib-primary {
 }
 
 .lib-tile[data-failed="true"] {
-  outline: 1px dashed var(--share-muted, var(--lib-muted));
+  outline: 1px dashed var(--share-muted);
 }
 
 .lib-no-taken {
@@ -1035,6 +1015,6 @@ a.lib-primary {
 }
 
 .lib :focus-visible {
-  outline: 2px solid var(--share-accent, var(--lib-accent));
+  outline: 2px solid var(--share-accent);
   outline-offset: 2px;
 }
