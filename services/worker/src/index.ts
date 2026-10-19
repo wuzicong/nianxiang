@@ -1,5 +1,6 @@
 import { Worker, type Job } from "bullmq";
 import { Redis } from "ioredis";
+import type { Server } from "node:http";
 import {
   ALL_JOB_NAMES,
   JOB_NAMES,
@@ -21,6 +22,7 @@ import {
 import { runMediaDerivative } from "./derivative.js";
 import { runMetaExif } from "./exif.js";
 import { onJobFailed } from "./failure.js";
+import { startWorkerHealthServer, workerHealthHost } from "./health.js";
 
 const runtime = loadRuntimeConfig();
 const objects = createObjectStore(objectStoreConfigFromRuntime(runtime));
@@ -131,7 +133,29 @@ console.log(
   `[memora-worker] ready; derivative+exif live, stubs: ${ALL_JOB_NAMES.filter((name) => !implemented.has(name)).join(", ")}`,
 );
 
+const healthHost = workerHealthHost(process.env.WORKER_HEALTH_HOST);
+const healthPortRaw = Number(process.env.WORKER_HEALTH_PORT ?? "3002");
+const healthPort =
+  Number.isInteger(healthPortRaw) && healthPortRaw > 0 && healthPortRaw < 65536 ? healthPortRaw : 3002;
+const probeRedis = new Redis(redisConnectionOptions(runtime.redisUrl));
+connections.push(probeRedis);
+const healthServer: Server = startWorkerHealthServer({
+  port: healthPort,
+  host: healthHost,
+  probe: async () => {
+    const reply = await Promise.race([
+      probeRedis.ping(),
+      new Promise<string>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("redis ping timeout")), 2_000);
+      }),
+    ]);
+    return reply === "PONG";
+  },
+});
+console.log(`[memora-worker] health on ${healthHost}:${healthPort}`);
+
 async function shutdown(): Promise<void> {
+  await new Promise<void>((resolve) => healthServer.close(() => resolve()));
   await Promise.all(workers.map((worker) => worker.close()));
   await Promise.all(connections.map((connection) => connection.quit()));
   await assets.close();

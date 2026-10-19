@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { DEFAULT_THEME_ID } from "@memora/shared";
-import { loadPublicShare } from "../../../lib/share";
+import { loadPublicShare } from "../../../lib/share-server";
 import { resolveLockedThemeId, themeIdFromHint, themeSkin } from "../../../lib/themes";
 import { ShareGallery } from "../share-gallery";
 import { ShareStatus } from "../share-status";
