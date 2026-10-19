@@ -89,7 +89,7 @@ API 第一次访问会建 `users` / `sessions` 表。第一次使用相册或分
 - 防火墙只开放 80 和 443（80 用来签证书并跳到 HTTPS；SSH 按你自己的跳板策略）。不要把 5432、6379、9000、9001 暴露出去
 - 密钥放 `.env` 或 Docker secrets，禁止提交
 - 做好系统更新、磁盘告警；单盘有坏盘和停电风险，备份请放到另一块盘或另一台机器
-- 备份与恢复见下面的专章。脚本不把口令写进日志。演练用 `deploy/self-host/restore-drill.sh`
+- 备份与恢复见下面的专章。脚本不把口令写进日志。演练用 `deploy/self-host/restore-drill.sh`。备份离开过这台机器，或口令泄漏，按「密钥轮换」。介质可能被别人碰过，再按「备份离机后的会话收口」
 
 ## 公网反代
 
@@ -774,7 +774,215 @@ BACKUP_DIR=/var/backups/memora deploy/self-host/backup-config.sh --yes
 
 Docker secret 的口令文件在仓库外或 `secrets/`（已 gitignore）。override 示例见上面「环境」。恢复配置是手动把这些文件放回原处，脚本不会自动覆盖正在使用的 `.env`。
 
-`--dry-run` 只打印每个候选文件在不在，不读内容。
+`--dry-run` 只打印每个候选文件在不在，不读内容。要换口令时做下一节「密钥轮换」，不要把 `config-<时间>/` 里的旧口令抄回去。
+
+#### 密钥轮换
+
+备份离开过这台机器、`.env` 或 `deploy/self-host/secrets/` 泄漏，或到了你们的轮换周期，做这一节。验收清单里「备份若离开过本机」那一项，做完再勾。副本怎么留见上面「密钥与配置」，不要把口令贴进工单。
+
+换这些，规则和「环境」相同：
+
+- `POSTGRES_PASSWORD`。不改 `POSTGRES_USER`
+- `MINIO_ROOT_PASSWORD` 和 `S3_SECRET_ACCESS_KEY`，必须仍是同一个新口令。不改 `MINIO_ROOT_USER`
+- 用了 Docker secret 时，改 `deploy/self-host/secrets/postgres_password`、`minio_root_password`、`s3_secret_access_key`。`.env` 里这几项留空。`compose.prod.override.yml` 不用改，`file:` 仍是「环境」里那三份
+- `.env` 里若有未注释的 `DATABASE_URL=`，先把其中的口令换成新的 Postgres 口令，或删掉这一行让入口自己拼。下面的命令碰到这一行会停
+
+现象：`BACKUP_DIR` 或 `config-<时间>/` 离开过这台机器，或口令文件出现在工单、聊天、别的仓库。
+
+检查（不要打开文件内容）：
+
+```bash
+test -f compose.prod.override.yml && echo override=yes || echo override=no
+```
+
+`override=yes`，且 `file:` 就是上面三个路径：写 secret 文件。`override=no`：改 `.env`。`file:` 指到仓库外时，把同样的两份新口令写进那些文件，`.env` 里的口令行留空，然后只做下面脚本里的 `up -d --force-recreate`。
+
+处理：在仓库根目录用 bash 贴。会先停下 api / worker。口令用 `od` 生成，只进变量和权限 `600` 的文件，不进 `docker compose` 的参数，也不要 `set -x`。项目名是 `memora-prod`。脚本会清掉演练留下的 `COMPOSE_PROJECT_NAME`，避免打到 `memora-backup-drill`。
+
+已经有 `memora_pg_data` 时，Postgres 镜像只在空卷第一次初始化时读 `POSTGRES_PASSWORD`。所以先在容器本地套接字上 `ALTER ROLE`，再改文件。MinIO 这一版重建之后才从 `MINIO_ROOT_PASSWORD` 或 `MINIO_ROOT_PASSWORD_FILE` 读新的根口令。
+
+用 `up -d --force-recreate` 让 postgres、minio、minio-init 读到新口令。不要加 `-v`，也不要 `docker compose down -v`。`-v` 会删掉数据库、对象和证书卷。
+
+「恢复」之后相册还没抽查、api / worker 还不能对外：把 `START_APPS` 改成 `0`。抽查通过后再 `--force-recreate` 拉起 api / worker。不要用「恢复」里的 `start`：`start` 沿用容器创建时的旧环境。
+
+```bash
+set -euo pipefail
+umask 077
+cd "$(git rev-parse --show-toplevel)"
+unset COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_ENV_FILES
+# 恢复后还不能对外时改为 0
+START_APPS=1
+if [[ "$START_APPS" != "0" && "$START_APPS" != "1" ]]; then
+  printf '[memora] START_APPS 只能是 0 或 1\n' >&2
+  exit 1
+fi
+if [[ ! -f .env ]]; then
+  printf '[memora] 缺少 .env\n' >&2
+  exit 1
+fi
+if grep -q '^DATABASE_URL=' .env; then
+  printf '[memora] .env 里有 DATABASE_URL。先改掉其中的口令，或删掉这一行\n' >&2
+  exit 1
+fi
+if [[ -f compose.prod.override.yml ]]; then
+  missing=0
+  grep -q 'deploy/self-host/secrets/postgres_password' compose.prod.override.yml || missing=1
+  grep -q 'deploy/self-host/secrets/minio_root_password' compose.prod.override.yml || missing=1
+  grep -q 'deploy/self-host/secrets/s3_secret_access_key' compose.prod.override.yml || missing=1
+  if [[ "$missing" == "1" ]]; then
+    printf '[memora] override 的口令文件不是 deploy/self-host/secrets/ 下那三份\n' >&2
+    exit 1
+  fi
+  mode=secrets
+  for secret_file in \
+    deploy/self-host/secrets/postgres_password \
+    deploy/self-host/secrets/minio_root_password \
+    deploy/self-host/secrets/s3_secret_access_key
+  do
+    if [[ ! -f "$secret_file" ]]; then
+      printf '[memora] 缺少 %s\n' "$secret_file" >&2
+      exit 1
+    fi
+  done
+else
+  mode=env
+  grep -q '^POSTGRES_PASSWORD=' .env || { printf '[memora] .env 缺少 POSTGRES_PASSWORD=\n' >&2; exit 1; }
+  grep -q '^MINIO_ROOT_PASSWORD=' .env || { printf '[memora] .env 缺少 MINIO_ROOT_PASSWORD=\n' >&2; exit 1; }
+fi
+if [[ -z "${POSTGRES_USER:-}" ]]; then
+  POSTGRES_USER=$(awk -F= '/^POSTGRES_USER=/{print substr($0, index($0,"=")+1); exit}' .env)
+  POSTGRES_USER=${POSTGRES_USER:-memora}
+fi
+if [[ -z "${POSTGRES_DB:-}" ]]; then
+  POSTGRES_DB=$(awk -F= '/^POSTGRES_DB=/{print substr($0, index($0,"=")+1); exit}' .env)
+  POSTGRES_DB=${POSTGRES_DB:-memora}
+fi
+export POSTGRES_USER POSTGRES_DB
+if [[ ! "$POSTGRES_USER" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+  printf '[memora] POSTGRES_USER 只允许字母、数字和下划线\n' >&2
+  exit 1
+fi
+printf '[memora] 轮换方式=%s\n' "$mode"
+args=(-f compose.prod.yml)
+if [[ "$mode" == "secrets" ]]; then
+  args+=(-f compose.prod.override.yml)
+fi
+docker compose "${args[@]}" stop api worker
+NEW_POSTGRES_PASSWORD=$(od -An -N 24 -tx1 /dev/urandom | tr -d ' \n')
+NEW_MINIO_ROOT_PASSWORD=$(od -An -N 24 -tx1 /dev/urandom | tr -d ' \n')
+export NEW_POSTGRES_PASSWORD NEW_MINIO_ROOT_PASSWORD
+if [[ ! "$NEW_POSTGRES_PASSWORD" =~ ^[0-9a-f]{16,}$ || ! "$NEW_MINIO_ROOT_PASSWORD" =~ ^[0-9a-f]{16,}$ ]]; then
+  printf '[memora] 新口令生成失败\n' >&2
+  exit 1
+fi
+sql=$(mktemp)
+tmp=$(mktemp)
+chmod 600 "$sql" "$tmp"
+trap 'rm -f "$sql" "$tmp"; unset NEW_POSTGRES_PASSWORD NEW_MINIO_ROOT_PASSWORD' EXIT
+awk 'BEGIN {
+  printf "ALTER ROLE %s PASSWORD '\''%s'\'';\n", ENVIRON["POSTGRES_USER"], ENVIRON["NEW_POSTGRES_PASSWORD"]
+}' >"$sql"
+docker compose "${args[@]}" exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <"$sql"
+rm -f "$sql"
+if [[ "$mode" == "secrets" ]]; then
+  awk 'BEGIN { printf "%s\n", ENVIRON["NEW_POSTGRES_PASSWORD"] }' >deploy/self-host/secrets/postgres_password
+  awk 'BEGIN { printf "%s\n", ENVIRON["NEW_MINIO_ROOT_PASSWORD"] }' >deploy/self-host/secrets/minio_root_password
+  awk 'BEGIN { printf "%s\n", ENVIRON["NEW_MINIO_ROOT_PASSWORD"] }' >deploy/self-host/secrets/s3_secret_access_key
+  chmod 600 deploy/self-host/secrets/postgres_password \
+    deploy/self-host/secrets/minio_root_password \
+    deploy/self-host/secrets/s3_secret_access_key
+  awk '
+    /^POSTGRES_PASSWORD=/ { print "POSTGRES_PASSWORD="; next }
+    /^MINIO_ROOT_PASSWORD=/ { print "MINIO_ROOT_PASSWORD="; next }
+    /^S3_SECRET_ACCESS_KEY=/ { print "S3_SECRET_ACCESS_KEY="; next }
+    { print }
+  ' .env >"$tmp"
+else
+  if ! awk '
+    BEGIN { pg = ENVIRON["NEW_POSTGRES_PASSWORD"]; mio = ENVIRON["NEW_MINIO_ROOT_PASSWORD"] }
+    /^POSTGRES_PASSWORD=/ { print "POSTGRES_PASSWORD=" pg; pg_done = 1; next }
+    /^MINIO_ROOT_PASSWORD=/ { print "MINIO_ROOT_PASSWORD=" mio; mio_done = 1; next }
+    /^S3_SECRET_ACCESS_KEY=/ { print "S3_SECRET_ACCESS_KEY=" mio; next }
+    { print }
+    END { if (!pg_done || !mio_done) exit 4 }
+  ' .env >"$tmp"; then
+    printf '[memora] 没有写上 Postgres 或 MinIO 口令\n' >&2
+    exit 1
+  fi
+fi
+mv "$tmp" .env
+chmod 600 .env
+unset NEW_POSTGRES_PASSWORD NEW_MINIO_ROOT_PASSWORD
+services=(postgres minio minio-init)
+if [[ "$START_APPS" == "1" ]]; then
+  services+=(api worker)
+fi
+docker compose "${args[@]}" up -d --force-recreate "${services[@]}"
+trap - EXIT
+rm -f "$sql" "$tmp"
+if [[ "$START_APPS" == "1" ]]; then
+  docker compose "${args[@]}" ps
+  printf '[memora] 口令已轮换\n'
+else
+  printf '[memora] 口令已写入。api / worker 仍停止，抽查后用 up -d --force-recreate 拉起\n'
+fi
+```
+
+重建的退出码是 0 之后，按「健康检查」看 `ps`。有域名时把主机换成 `https://photos.example.com`，和「启动」一样。
+
+```bash
+docker compose -f compose.prod.yml ps
+curl -fsS http://127.0.0.1/health
+curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/login
+curl -fsS http://127.0.0.1/ready
+```
+
+`/login` 为 200 后，用原来的账号登录一次。这次不改用户口令哈希。不是 healthy，或这三条不是 200，按「健康检查失败时的自检清单」。备份介质可能被别人接触过时，做「备份离机后的会话收口」。
+
+然后给新口令留一份副本。`BACKUP_DIR` 没有离开过这台机器时，用「密钥与配置」那条 `backup-config.sh --yes`。目录就是离开过的那一份时，改走「新口令不要写回离机目录」。旧的 `config-<时间>/` 不要再当现行口令。
+
+整段可以重跑。重跑会再换一对新口令。`START_APPS=0` 时，抽查通过后在仓库根目录：
+
+```bash
+docker compose -f compose.prod.yml up -d --force-recreate api worker
+```
+
+有 `compose.prod.override.yml` 时按「启动」再加一个 `-f`。
+
+#### 备份离机后的会话收口
+
+验收清单里「备份介质可能被他人接触」这一项做这里。只在介质可能被别人碰到时做。单纯到了轮换周期、备份仍在你手里，不必截断会话。
+
+`sessions` 只存会话令牌的哈希，用户表和口令哈希不动（表在 `packages/storage/migrations/002_auth.sql`）。覆盖恢复会把备份里的会话写回来，所以放在这次 `restore.sh` 成功之后。Postgres 在跑就可以做，不必先拉起 api / worker。表要等 API 第一次访问才创建；还没有 `sessions` 时下面第一条会失败，库里本来就没有会话。
+
+```bash
+docker compose -f compose.prod.yml exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-memora}" -d "${POSTGRES_DB:-memora}" \
+  -c "TRUNCATE sessions;"
+```
+
+检查，输出应是 `0`：
+
+```bash
+docker compose -f compose.prod.yml exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -tA -U "${POSTGRES_USER:-memora}" -d "${POSTGRES_DB:-memora}" \
+  -c "SELECT count(*) FROM sessions;"
+```
+
+有 `compose.prod.override.yml` 时按「启动」再加一个 `-f`。浏览器里的 `memora_session` 会失效，用原来的账号重新登录。不要 `docker compose down -v`。
+
+#### 新口令不要写回离机目录
+
+「密钥轮换」之后要给新口令留副本。命令仍是「密钥与配置」的 `backup-config.sh --yes`，不要另写一套复制。原来的 `BACKUP_DIR` 若就是离开过这台机器的那块盘或那个目录，不要再往那里写。换一个还在你手里的目录：
+
+```bash
+mkdir -p /var/backups/memora-kept
+chmod 700 /var/backups/memora-kept
+BACKUP_DIR=/var/backups/memora-kept deploy/self-host/backup-config.sh --yes
+```
+
+能装 age 时，先按「加密、权限、口令」设 `BACKUP_AGE_RECIPIENT`，再跑上面这条。没设时脚本留下明文 `config-<时间>/`，权限 `600`。验收清单里的「加密副本」指设了 age 的那一份。已经离机的 `config-<时间>/` 不要拷回来盖住现行 `.env` 或 `deploy/self-host/secrets/`。不要把这些文件贴进工单。
 
 #### 加密、权限、口令
 
@@ -788,8 +996,8 @@ Docker secret 的口令文件在仓库外或 `secrets/`（已 gitignore）。ove
 恢复不会改应用用户的口令哈希。对外服务前：
 
 1. 先别启动 api / worker，抽查相册
-2. 备份离开过这台机器时，轮换 Postgres、MinIO 和 `.env` 里的口令，并改掉对应的 Docker secret
-3. 备份介质可能被别人接触过时，在库里执行 `TRUNCATE sessions;`，让旧会话失效
+2. 备份离开过这台机器时，按「密钥轮换」做，并把 `START_APPS` 留在 `0`。那里会改 Postgres、MinIO 和 `.env` 的口令，以及对应的 Docker secret。api / worker 仍先别拉起
+3. 备份介质可能被别人接触过时，按「备份离机后的会话收口」在库里 `TRUNCATE sessions;`。放在这次恢复成功之后，避免旧会话被备份写回来
 4. Redis 保持空的
 
 #### 恢复
@@ -817,6 +1025,8 @@ BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
 ```bash
 docker compose -f compose.prod.yml start api worker
 ```
+
+没有改过口令时用上面的 `start`。按「密钥轮换」改过口令时，停着的容器仍是旧环境，改用那一节的 `up -d --force-recreate`，不要 `start`。
 
 没有 `--yes` 时脚本直接退出。`--dry-run` 不连接数据库。
 
@@ -1057,10 +1267,10 @@ printf '[memora] drill rollback ok project=memora-backup-drill\n'
 - [ ] 标准输出和标准错误里没有 Postgres、MinIO、`.env` 的口令；`~/.mc` 没有新增这份口令
 - [ ] `pg_restore -l` 能列出 dump。加密的先解密到权限 `600` 的临时文件，用完删除
 - [ ] manifest 存在，dump 和对象的 sha256 与 manifest 一致
-- [ ] `.env` 和 Docker secret 另有一份加密副本，且不在 git 里
+- [ ] `.env` 和 Docker secret 另有一份加密副本，且不在 git 里。离机过的目录不要再收新口令，见「新口令不要写回离机目录」
 - [ ] 恢复步骤先停 api / worker；确认后再启动
-- [ ] 备份若离开过本机：已计划轮换 Postgres / MinIO / `.env` 口令
-- [ ] 备份介质可能被他人接触时：已计划 `TRUNCATE sessions`
+- [ ] 备份若离开过本机：已按「密钥轮换」轮换 Postgres / MinIO / `.env` 口令
+- [ ] 备份介质可能被他人接触时：已按「备份离机后的会话收口」执行 `TRUNCATE sessions`
 - [ ] Redis 保持空队列，没有恢复旧 AOF
 - [ ] 记下演练日期、耗时、备份时间点、数据体积和结果
 
