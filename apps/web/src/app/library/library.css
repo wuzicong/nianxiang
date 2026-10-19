@@ -352,7 +352,7 @@
   background: color-mix(in srgb, var(--share-surface) 86%, transparent);
   color: transparent;
   opacity: 0;
-  box-shadow: 0 4px 10px rgba(44, 42, 41, 0.12);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--share-text) 12%, transparent);
 }
 
 .lib-selecting .lib-check,
@@ -461,7 +461,12 @@
   height: 168px;
   flex: 1 1 0;
   border-radius: 18px;
-  background: linear-gradient(90deg, #f3e6da, #fff8f5, #f3e6da);
+  background: linear-gradient(
+    90deg,
+    var(--share-border),
+    var(--share-surface),
+    var(--share-border)
+  );
   background-size: 200% 100%;
 }
 
@@ -541,7 +546,7 @@ a.lib-primary {
 }
 
 .lib-dialog::backdrop {
-  background: rgba(44, 42, 41, 0.48);
+  background: color-mix(in srgb, var(--share-text) 48%, transparent);
 }
 
 .lib-dialog-card {
@@ -955,7 +960,7 @@ a.lib-primary {
 }
 
 .lib-drawer::backdrop {
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, var(--share-text) 35%, transparent);
 }
 
 .lib-drawer-panel {

@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="28" viewBox="0 0 360 28" fill="none">
-  <path d="M0 8c14 7 22-8 38-5 16 3 20 12 38 9 18-3 22-13 40-8 16 4 22 11 38 7 18-5 24-13 42-7 16 6 26 9 42 3 16-6 22-11 40-5 18 7 22 12 40 7 16-4 20 1 42-1v20H0V8z" fill="#FFF8F5"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="24" viewBox="0 0 360 24" fill="none" aria-hidden="true" focusable="false"><path d="M0 9l9-4 7 5 10-6 8 6 11-3 6 4 12-5 9 5 10-4 7 3 12-6 8 6 10-2 9 4 11-6 7 5 12-4 8 4 9-5 11 6 7-3 10 4 12-6 8 5 9-3 11 5 7-4 12 3 9-5 8 6 10-4 11 3 9-4 4 2v17H0z" fill="currentColor" fill-opacity=".28" style="fill:var(--share-border,currentColor)"/><path d="M0 11l9-4 7 5 10-6 8 6 11-3 6 4 12-5 9 5 10-4 7 3 12-6 8 6 10-2 9 4 11-6 7 5 12-4 8 4 9-5 11 6 7-3 10 4 12-6 8 5 9-3 11 5 7-4 12 3 9-5 8 6 10-4 11 3 9-4 4 2v15H0z" fill="currentColor" style="fill:var(--share-surface,currentColor)"/></svg>
