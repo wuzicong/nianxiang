@@ -8,7 +8,7 @@ export default function Home() {
       </h1>
       <p style={{ lineHeight: 1.6, color: "#555" }}>
         登录在 <a href="/login">/login</a>
-        ，相册与分享在 <a href="/albums">/albums</a>
+        ，相册、上传和分享在 <a href="/albums">/albums</a>
         。打开分享请访问 <code>/s/&lt;token&gt;</code>
         。设了密码的链接会先要求输入密码。页面颜色来自三套 theme.json。选片排版还没接到这个首页。
       </p>

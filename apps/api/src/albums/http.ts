@@ -6,11 +6,15 @@ import type { Express, Request, Response } from "express";
 import { hashPassword } from "../auth/password.js";
 import { resolveSession, type PublicUser } from "../auth/service.js";
 import { HttpError, asyncRoute } from "../http.js";
-import { toPublicAsset } from "../present.js";
 import { sharePasswordMatches } from "../shares/password.js";
 import { hashShareToken, newShareToken } from "../shares/token.js";
 import { asRecord } from "../validate.js";
-import { presentAlbum, presentPublicShare, presentShare } from "./present.js";
+import {
+  presentAlbum,
+  presentOwnedAlbumAssets,
+  presentPublicShare,
+  presentShare,
+} from "./present.js";
 import {
   parseAlbumTitle,
   parseAssetIds,
@@ -121,9 +125,18 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
       const album = await deps.albums.getOwnedAlbum(albumId, user.id);
       if (!album) throw new HttpError(404, "album_not_found", "相册不存在");
       const assets = await deps.albums.listOwnedAssets(albumId, user.id);
+      let presented: Awaited<ReturnType<typeof presentOwnedAlbumAssets>>;
+      try {
+        presented = await presentOwnedAlbumAssets(assets ?? [], deps.objects);
+      } catch (err) {
+        console.error("[memora-api] album presign failed", safeErrorMessage(err));
+        throw new HttpError(502, "presign_failed", "签发读取地址失败");
+      }
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Referrer-Policy", "no-referrer");
       res.json({
         album: presentAlbum(album),
-        assets: (assets ?? []).map((asset) => toPublicAsset(asset)),
+        assets: presented,
       });
     }),
   );

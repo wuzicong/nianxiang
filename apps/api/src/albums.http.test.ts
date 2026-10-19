@@ -144,6 +144,136 @@ test("owner can create albums, add only their assets, and list them", async () =
   });
 });
 
+test("album detail signs derivative previews and omits original keys", async () => {
+  const assets = memoryAssets();
+  const albums = memoryAlbums(assets);
+  const objects = fakeObjects();
+  const logs = captureLogs();
+  try {
+    const { app } = createTestApp({ assets, albums, objects });
+    await withServer(app, async (base) => {
+      const owner = await registerSession(base, "preview-owner@memora.test");
+      const readyId = "ready-photo";
+      const thumb = derivativeObjectKey(owner.user.id, readyId, "thumb");
+      const preview = derivativeObjectKey(owner.user.id, readyId, "preview");
+      const original = originalObjectKey(owner.user.id, readyId);
+      assets.rows.set(
+        readyId,
+        record({
+          id: readyId,
+          userId: owner.user.id,
+          status: "ready",
+          filename: "harbor.jpg",
+          width: 640,
+          height: 480,
+          derivatives: { thumb, preview, hero: original },
+          exif: { hasGps: true, lat: 12.3456, lng: 99.9 },
+        }),
+      );
+      assets.rows.set(
+        "processing-photo",
+        record({
+          id: "processing-photo",
+          userId: owner.user.id,
+          status: "processing",
+          filename: "queue.jpg",
+          error: null,
+        }),
+      );
+      const created = await postJson(
+        base,
+        "/api/v1/albums",
+        { title: "海港", themeId: "kyoto-lantern" },
+        owner.cookie,
+      );
+      const albumId = (created.body as { album: { albumId: string } }).album.albumId;
+      await postJson(
+        base,
+        `/api/v1/albums/${albumId}/assets`,
+        { assetIds: ["processing-photo", readyId] },
+        owner.cookie,
+      );
+
+      const detail = await getJson(base, `/api/v1/albums/${albumId}`, owner.cookie);
+      assert.equal(detail.status, 200);
+      assert.equal(detail.cacheControl, "private, no-store");
+      assert.equal(detail.referrerPolicy, "no-referrer");
+      const body = detail.body as {
+        assets: {
+          assetId: string;
+          filename: string;
+          status: string;
+          key?: string;
+          userId?: string;
+          exif?: unknown;
+          derivatives?: unknown;
+          error: string | null;
+          previews: { thumb?: { url: string }; preview?: { url: string }; hero?: { url: string } };
+        }[];
+      };
+      assert.equal(body.assets[0]?.assetId, "processing-photo");
+      assert.equal(body.assets[0]?.status, "processing");
+      assert.deepEqual(body.assets[0]?.previews, {});
+      assert.equal(body.assets[1]?.filename, "harbor.jpg");
+      assert.equal(body.assets[1]?.status, "ready");
+      assert.match(body.assets[1]?.previews.thumb?.url ?? "", /\/derivatives\//);
+      assert.match(body.assets[1]?.previews.preview?.url ?? "", /\/derivatives\//);
+      assert.equal(body.assets[1]?.previews.hero, undefined);
+      assert.equal(body.assets[1]?.key, undefined);
+      assert.equal(body.assets[1]?.userId, undefined);
+      assert.equal(body.assets[1]?.exif, undefined);
+      assert.equal(body.assets[1]?.derivatives, undefined);
+      const json = JSON.stringify(body);
+      assert.equal(json.includes("/originals/"), false);
+      assert.equal(json.includes("12.3456"), false);
+      assert.equal(json.includes(original), false);
+      assert.deepEqual(objects.presignGets, [thumb, preview]);
+      assert.equal(logs.lines.join("\n").includes("supersecret"), false);
+    });
+  } finally {
+    logs.restore();
+  }
+});
+
+test("album detail presign failures do not echo the signed url", async () => {
+  const assets = memoryAssets();
+  const albums = memoryAlbums(assets);
+  const objects = fakeObjects({
+    presignGetError: new Error(
+      "http://127.0.0.1:9000/memora-local/users/u/derivatives/a/thumb.webp?X-Amz-Signature=supersecret",
+    ),
+  });
+  const logs = captureLogs();
+  try {
+    const { app } = createTestApp({ assets, albums, objects });
+    await withServer(app, async (base) => {
+      const owner = await registerSession(base, "album-presign@memora.test");
+      const assetId = "broken-preview";
+      assets.rows.set(
+        assetId,
+        record({
+          id: assetId,
+          userId: owner.user.id,
+          status: "ready",
+          derivatives: { thumb: derivativeObjectKey(owner.user.id, assetId, "thumb") },
+        }),
+      );
+      const created = await postJson(base, "/api/v1/albums", { title: "失败" }, owner.cookie);
+      const albumId = (created.body as { album: { albumId: string } }).album.albumId;
+      await postJson(base, `/api/v1/albums/${albumId}/assets`, { assetIds: [assetId] }, owner.cookie);
+      const detail = await getJson(base, `/api/v1/albums/${albumId}`, owner.cookie);
+      assert.equal(detail.status, 502);
+      assert.equal((detail.body as { error: string }).error, "presign_failed");
+      assert.equal(JSON.stringify(detail.body).includes("supersecret"), false);
+      const text = logs.lines.join("\n");
+      assert.equal(text.includes("supersecret"), false);
+      assert.equal(text.includes("X-Amz-Signature"), false);
+    });
+  } finally {
+    logs.restore();
+  }
+});
+
 test("share token is returned once, stored hashed, and dies on revoke or expiry", async () => {
   const assets = memoryAssets();
   const albums = memoryAlbums(assets);
