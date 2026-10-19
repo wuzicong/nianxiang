@@ -174,7 +174,14 @@ async function requestUploadGrant(
   filename: string,
   mime: string,
   size: number,
+  albumId?: string,
 ): Promise<{ ok: true; grant: UploadGrant } | { ok: false; message: string }> {
+  const payload: { filename: string; mime: string; size: number; albumId?: string } = {
+    filename,
+    mime,
+    size,
+  };
+  if (albumId) payload.albumId = albumId;
   let grantResponse: Response;
   try {
     grantResponse = await fetchImpl("/api/v1/assets/upload-url", {
@@ -182,7 +189,7 @@ async function requestUploadGrant(
       credentials: "include",
       cache: "no-store",
       headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ filename, mime, size }),
+      body: JSON.stringify(payload),
     });
   } catch {
     return { ok: false, message: "API 暂时不可达" };
@@ -219,7 +226,7 @@ export async function uploadPhotoToAlbum(
   let presignAttempt = 0;
   while (presignAttempt <= MAX_PRESIGN_RETRIES) {
     input.onPhase?.("request");
-    const granted = await requestUploadGrant(fetchImpl, filename, mime, input.body.size);
+    const granted = await requestUploadGrant(fetchImpl, filename, mime, input.body.size, input.albumId);
     if (!granted.ok) return granted;
     grant = granted.grant;
 
@@ -255,20 +262,5 @@ export async function uploadPhotoToAlbum(
     return { ok: true, assetId: grant.assetId };
   }
 
-  input.onPhase?.("attach");
-  let attachResponse: Response;
-  try {
-    attachResponse = await fetchImpl(`/api/v1/albums/${encodeURIComponent(input.albumId)}/assets`, {
-      method: "POST",
-      credentials: "include",
-      cache: "no-store",
-      headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ assetIds: [grant.assetId] }),
-    });
-  } catch {
-    return { ok: false, message: "API 暂时不可达" };
-  }
-  const attached = await readApi(attachResponse);
-  if (!attached.ok) return attached;
   return { ok: true, assetId: grant.assetId };
 }
