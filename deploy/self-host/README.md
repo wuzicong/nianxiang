@@ -158,7 +158,7 @@ secrets:
 
 `NEXT_PUBLIC_SHARE_REQUIRE_PASSWORD` 在构建 web 镜像时写进页面。改了要重新构建，不能只重启容器。
 
-证书通知邮箱不会从环境变量读。需要的话，在 `proxy/Caddyfile` 的全局块加一行 `email you@example.com`。
+证书通知邮箱不会从环境变量读。怎么续期、证书放在哪，见下面的「TLS 证书续期」。
 
 ### 启动
 
@@ -184,7 +184,9 @@ curl -fsS "https://photos.example.com/health"
 
 `/login` 是页面。`/health` 是 API 健康检查，由 Caddy 转到 api，不经过登录。页面上的 `/api/v1` 仍由 web 转到 api。
 
-没有域名、只想在这台机器上看一眼时，把 `MEMORA_DOMAIN` 留空。Caddy 只听 80。用 `http://127.0.0.1/login` 和 `http://127.0.0.1/health`。这种开法不要放到公网。`COOKIE_SECURE=true` 时，浏览器不会在明文 HTTP 上保存会话 Cookie。
+没有域名、只想在这台机器上看一眼时，把 `MEMORA_DOMAIN` 留空。Caddy 只听 80。用 `http://127.0.0.1/login` 和 `http://127.0.0.1/health`。这种开法不要放到公网。`COOKIE_SECURE=true` 时，浏览器和 curl 都不会在明文 HTTP 上带会话 Cookie。本机要走注册、登录、建册时，把 `COOKIE_SECURE=false`，公网 HTTPS 再改回 `true`。
+
+各服务怎么探活、上线后怎么抽查，见「健康检查」和「活体抽查」。
 
 ### 登录限流
 
@@ -195,6 +197,162 @@ docker compose -f compose.prod.yml up -d --force-recreate caddy
 ```
 
 Nginx、Traefik 的档位见上面「公网反代」。出口 IP 很多人共用时把次数调高。登录密码在 JSON 正文里，访问日志不记正文。不要开 debug。
+
+### TLS 证书续期
+
+生产站点地址是 `{$MEMORA_DOMAIN}`，写在 `proxy/Caddyfile.prod`。设成纯域名（例如 `photos.example.com`，不要带 `https://`、端口或路径）后，Caddy 打开自动 HTTPS：用 ACME 申请证书，80 上的 HTTP 会跳到 HTTPS。本仓库没有改 `acme_ca`，默认机构是 Let's Encrypt。不要把测试 CA 留在公网配置里。
+
+续期由 Caddy 在后台做，不需要 cron。默认大约每 10 分钟检查一次已加载的证书；剩余寿命不到大约三分之一时开始续（90 天的证书大约还剩 30 天）。续期仍然走 ACME，公网要能访问这台机器的 80（HTTP-01）和 443（TLS-ALPN-01），DNS 要指过来。
+
+`MEMORA_DOMAIN` 留空时，Compose 传入 `:80`。Caddy 只提供明文 HTTP，不申请证书，站点也不听 443。用 `http://127.0.0.1`。这种开法不要放到公网。`compose.prod.yml` 仍映射了宿主机的 443，但里面没有证书站点。
+
+证书和 ACME 账号在卷 `caddy_data`，容器里是 `/data`（官方镜像的 `XDG_DATA_HOME`）。某个域名的证书通常在：
+
+```text
+/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<域名>/
+```
+
+目录里有 `.crt`、`.key` 和元数据，私钥在这里。进程用户是镜像里的 `caddy`（非 root）。构建时 `/data`、`/config`、`/var/log/caddy` 交给这个用户，日志目录权限是 `750`。不要把卷改成所有人可读，也不要用 root 拥有的宿主机目录盖住 `/data` 却不改属主。`docker compose down -v` 会连证书一起删掉。升级不要加 `-v`。
+
+通知邮箱写在 `proxy/Caddyfile` 的全局块：`email you@example.com`。改完执行：
+
+```bash
+docker compose -f compose.prod.yml up -d --force-recreate caddy
+```
+
+没有邮箱也能签发。Let's Encrypt 只是不会发过期邮件。
+
+查看配置、版本和存储（不会打印私钥内容时，不要把 `cat` 出来的 `.key` 贴到工单）：
+
+```bash
+docker compose -f compose.prod.yml exec -T caddy caddy version
+docker compose -f compose.prod.yml exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose -f compose.prod.yml exec -T caddy ls -la /data/caddy
+docker compose -f compose.prod.yml logs --since 24h caddy
+```
+
+访问日志在卷 `caddy_logs` 的 `/var/log/caddy/memora-access.log`，进程日志在同目录的 `memora-system.log`。续期失败看进程日志。
+
+常见原因：
+
+- DNS 还没指到这台机器，或防火墙没放行 80/443
+- `MEMORA_DOMAIN` 写成了 IP、`localhost`、带协议或带路径
+- 域名留空：这是本机明文，本来就没有证书
+- 系统时间偏差太大
+- `/data` 不可写，日志里是 permission denied
+- Let's Encrypt 速率限制。先看日志里的原话，不要连续重试
+- 只执行 `reload` 时，内存里的旧证书还在
+
+没有单独的「立即续期」子命令。配置没问题、证书仍然有效时，重载不会重签：
+
+```bash
+docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+只有证书被吊销，或确认必须重新签发时，才删掉**该域名**目录再重启容器。`reload` 不够。这会消耗 Let's Encrypt 额度，不要拿来做例行检查：
+
+```bash
+docker compose -f compose.prod.yml exec -T caddy \
+  rm -rf /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/photos.example.com
+docker compose -f compose.prod.yml restart caddy
+```
+
+把 `photos.example.com` 换成实际域名。不要删整个 `caddy_data` 卷。排查时如果要先打测试 CA，临时在全局块加上下面这一行，测完删掉，再按上面的办法换成正式证书。测试证书浏览器不认：
+
+```caddy
+acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+```
+
+### 健康检查
+
+`restart: unless-stopped` 只在进程退出时拉起，不会因为 healthcheck 变成 unhealthy 就重启。外部监控要看 `docker compose ps`，也要看公网 curl。
+
+| 服务 | 容器内检查 | 间隔 | 超时 | 重试 | 启动宽限 |
+|------|------------|------|------|------|----------|
+| web | `GET http://127.0.0.1:3000/login` | 10s | 5s | 8 | 20s |
+| api | `GET http://127.0.0.1:3001/health` | 10s | 5s | 8 | 10s |
+| worker | `GET http://127.0.0.1:3002/health` | 10s | 5s | 8 | 15s |
+| postgres | `pg_isready -U <POSTGRES_USER> -d <POSTGRES_DB>` | 5s | 5s | 10 | 无 |
+| redis | `redis-cli ping` | 5s | 3s | 10 | 无 |
+| minio | `mc ready local` | 5s | 5s | 10 | 10s |
+| caddy | `GET http://127.0.0.1:2019/config/` | 10s | 5s | 8 | 5s |
+
+Caddy 的管理接口只绑在容器内的 localhost，没有映射到宿主机。ml 另有内部 `GET :8000/health`，同样没有宿主机端口。minio-init 是一次性任务，没有 healthcheck，退出码 0 才算完成。
+
+人工检查。有域名时把主机换成 `https://photos.example.com`。`/health` 经 Caddy 直达 api，不经过登录。`/login` 是页面。`/ready` 由 Caddy 自己返回 `ok`，只说明反代进程在应答。worker 的 `/health` 只表示进程还活着。
+
+```bash
+docker compose -f compose.prod.yml ps
+curl -fsS http://127.0.0.1/health
+curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/login
+curl -fsS http://127.0.0.1/ready
+docker compose -f compose.prod.yml exec -T postgres pg_isready -U "${POSTGRES_USER:-memora}" -d "${POSTGRES_DB:-memora}"
+docker compose -f compose.prod.yml exec -T redis redis-cli ping
+docker compose -f compose.prod.yml exec -T minio mc ready local
+docker compose -f compose.prod.yml exec -T api node -e "fetch('http://127.0.0.1:3001/health').then(async (r)=>console.log(r.status, await r.text()))"
+docker compose -f compose.prod.yml exec -T worker node -e "fetch('http://127.0.0.1:3002/health').then(async (r)=>console.log(r.status, await r.text()))"
+docker compose -f compose.prod.yml exec -T web node -e "fetch('http://127.0.0.1:3000/login').then((r)=>console.log(r.status))"
+docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127.0.0.1:2019/config/
+```
+
+建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。磁盘告警另做。备份节奏见「备份与恢复」。
+
+### 活体抽查
+
+第一次上线、升级之后，以及每季度，和「备份与恢复」里的演练一起做。演练是否通过仍以那一节的验收清单为准。这里是对外服务能不能用的顺序：登录、相册、备份、恢复命令。
+
+口令放临时 env 或 Docker secret，不要写进仓库、工单或日志。项目名保持 `memora-prod`。演练项目是 `memora-backup-drill`。开发栈是 `memora`。不要对着生产库做演练删除。
+
+本机已经有开发用的 `.env` 时不要覆盖它。另写一份权限 `600` 的文件（放在 `/tmp` 或仓库外），用 Compose v2 的 `COMPOSE_ENV_FILES`。指定之后，这次 Compose 不再读项目目录里的 `.env`。`backup.sh` 和 `restore.sh` 内部的 `docker compose` 会继承这个变量。
+
+```bash
+COMPOSE_ENV_FILES=/tmp/memora-prod.env docker compose -f compose.prod.yml up -d --build
+```
+
+没有域名时按「启动」把 `MEMORA_DOMAIN` 留空，只用 `http://127.0.0.1`。明文抽查设 `COOKIE_SECURE=false`。公网改回 `true`。
+
+下面的邮箱、口令和 Cookie 都是占位，换成一次性值。输出里打掉口令和 `memora_session`。注册和登录 POST 共用每分钟 5 次，先做完业务步骤，再做限流短测。
+
+1. 健康。上一节的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
+2. 端口。`docker compose -f compose.prod.yml ps` 只发布 `80` 和 `443`。不要出现 5432、6379、9000、9001、3000、3001、3002。
+3. 注册或登录：
+
+```bash
+umask 077
+curl -sS -c /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"email":"spotcheck@example.com","password":"replace-with-8-plus-chars"}'
+curl -sS -b /tmp/memora.cookies http://127.0.0.1/api/v1/auth/me
+```
+
+4. 建相册：
+
+```bash
+curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
+  -H 'content-type: application/json' \
+  -d '{"title":"抽查","themeId":"kyoto-lantern"}'
+```
+
+5. 上传探针。`POST /api/v1/assets/upload-url`，正文带 `filename`、`mime`、`size`，可以带上一步的 `albumId`。返回的 `url` 指向内部的 `minio:9000`，宿主机解析不了，也不要打印这个 URL。把响应存进权限 `600` 的临时文件，在 api 容器里按返回的 `headers` 做 PUT，再 `POST /api/v1/assets/<assetId>/complete`。浏览器里的拖拽上传标「需运维人工」。
+6. 备份。按「做一次备份」执行 `backup.sh --compose`。目录里要有 `manifest-<时间>.txt`，目录权限 `700`，dump 权限 `600`。标准输出里没有口令。
+7. 恢复命令。`restore.sh --dry-run --stamp <时间>` 只核对文件，不改库。隔离的完整路径用「演练」里的 `restore-drill.sh`（先 `--dry-run`，再不带参数）。不要对 `memora-prod` 加 `--yes` 做演练。
+8. 访问日志。向 Caddy 打一条带假 `Cookie`、假 `Authorization` 和 `?password=` 的请求，再看 `/var/log/caddy/memora-access.log`。日志里不应出现 Cookie 值、Authorization 或查询串里的口令。登录密码在 JSON 正文里，访问日志不记正文。
+9. 登录限流。同一来源连续 POST `/api/v1/auth/login`，第 6 次是 429，正文含 `请稍后再试`。测完等一分钟再给真人登录。
+10. 页面点击（打开登录页、进入相册、拖拽上传）标「需运维人工」。第 3 到 5 步的 curl 是替代。
+
+勾选：
+
+- [ ] 七个服务 healthy，minio-init 退出码 0
+- [ ] 宿主机只发布 80 和 443
+- [ ] `/health`、`/login`、`/ready` 正常
+- [ ] 注册或登录后 `/api/v1/auth/me` 为 200
+- [ ] 建册成功
+- [ ] 上传探针已完成，或注明需运维人工并留下 curl
+- [ ] `backup.sh --compose` 写出 manifest，权限正确，输出无口令
+- [ ] `restore.sh --dry-run --stamp` 成功；`restore-drill.sh` 按「演练」通过，没有动 `memora` / `memora-prod`
+- [ ] 访问日志无 Cookie、Authorization 和口令
+- [ ] 登录第 6 次 429
+- [ ] 浏览器点击已由运维人工过，或明确留下未做
 
 ### 升级
 
@@ -221,7 +379,7 @@ docker compose -f compose.prod.yml up -d --build
 | `restore-drill.sh` | 隔离演练，或 `--dry-run` 做不连库的自检 |
 | `compose.drill.yml` | 演练专用项目 `memora-backup-drill`。不映射端口，不动 `memora` / `memora-prod` 的卷 |
 
-在仓库根目录执行。`BACKUP_DIR` 放到另一块盘或另一台机器，不要和数据库、MinIO 卷同一块盘。
+在仓库根目录执行。`BACKUP_DIR` 放到另一块盘或另一台机器，不要和数据库、MinIO 卷同一块盘。上线或升级后的整路径（登录、相册、备份、恢复命令、日志和限流）见「活体抽查」。
 
 #### 目标与节奏
 
