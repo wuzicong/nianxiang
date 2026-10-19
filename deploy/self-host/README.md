@@ -230,7 +230,7 @@ curl -fsS "https://photos.example.com/health"
 
 没有域名、只想在这台机器上看一眼时，把 `MEMORA_DOMAIN` 留空。Caddy 只听 80。用 `http://127.0.0.1/login` 和 `http://127.0.0.1/health`。这种开法不要放到公网。`COOKIE_SECURE=true` 时，浏览器和 curl 都不会在明文 HTTP 上带会话 Cookie。本机要走注册、登录、建册时，把 `COOKIE_SECURE=false`，公网 HTTPS 再改回 `true`。
 
-各服务怎么探活、失败时怎么看日志，以及上线后怎么抽查，见「健康检查」、「健康检查失败时的自检清单」和「活体抽查」。
+各服务怎么探活、失败时怎么看日志，以及上线后怎么抽查，见「健康检查」、「何时看哪一节」、「健康检查失败时的自检清单」和「活体抽查」。
 
 ### 登录限流
 
@@ -426,11 +426,29 @@ docker compose -f compose.prod.yml exec -T web node -e "fetch('http://127.0.0.1:
 docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127.0.0.1:2019/config/
 ```
 
-建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。unhealthy 或这三条 curl 失败时，按下一节看日志。磁盘、备份新鲜度和 429 计数见「监控告警」。备份节奏见「备份与恢复」。
+建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。unhealthy 或这三条 curl 失败时，按「何时看哪一节」进入自检清单看日志。磁盘、备份新鲜度和 429 计数见「监控告警」。备份节奏见「备份与恢复」。
+
+### 何时看哪一节
+
+先分清两条路径。入口或容器不健康走自检清单；证书、磁盘、429、备份目录走速查。两条可以连着做。
+
+`docker compose ps` 里有服务不是 healthy，或 `/health`、`/login`、`/ready` 不是 200（连不上时状态码是 `000`）：先做「健康检查失败时的自检清单」。按那一节的三条 curl，再按服务看 `logs`。
+
+证书过期或不被信任、磁盘满、响应 429、备份目录权限不对：做「常见故障速查」。这四件事有时三条 GET 仍是 200，自检清单盖不住。速查每件只写现象、检查、处理，长步骤留在专章。
+
+| 你看到的 | 打开 |
+|----------|------|
+| 有服务不是 healthy，或 `/health`、`/login`、`/ready` 不是 200 | 「健康检查失败时的自检清单」 |
+| 浏览器报证书过期或不被信任 | 「常见故障速查」的「证书续期失败」 |
+| 磁盘到了告警，或上传失败但入口仍是 200 | 「常见故障速查」的「磁盘满」 |
+| 响应是 429，而这三条 GET 仍是 200 | 「常见故障速查」的「429 误判」 |
+| `backup.sh` 的 `mkdir` / `chmod` 失败，或没有新的 `manifest-*.txt` | 「常见故障速查」的「备份目录权限」 |
+
+自检的日志已经指到证书卷、磁盘、429 或备份目录时，再打开速查里同名的小节。打开速查之前，先看过 `ps` 和这三条 GET。磁盘使用率和备份新鲜度仍见「监控告警」。备份节奏见「备份与恢复」。
 
 ### 健康检查失败时的自检清单
 
-`ps` 里有服务不是 healthy，或下面三条不是 200，在仓库根目录按这个顺序做。项目名是 `compose.prod.yml` 里的 `memora-prod`。命令和本文其他地方一样，写 `-f compose.prod.yml`。有域名时把主机换成 `https://photos.example.com`。开发栈 `docker compose up -d` 的项目名是 `memora`，里面没有 web、api、worker、caddy。
+`ps` 里有服务不是 healthy，或下面三条不是 200，在仓库根目录按这个顺序做。项目名是 `compose.prod.yml` 里的 `memora-prod`。命令和本文其他地方一样，写 `-f compose.prod.yml`。有域名时把主机换成 `https://photos.example.com`。开发栈 `docker compose up -d` 的项目名是 `memora`，里面没有 web、api、worker、caddy。和「常见故障速查」怎么分工，见「何时看哪一节」。
 
 公网只探这三条 GET。路径和 `deploy/self-host/proxy/Caddyfile.prod` 一致。
 
@@ -440,7 +458,7 @@ docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127
 | `/login` | Caddy 转到 `web:3000` 的登录页 | 200 |
 | `/ready` | Caddy 自己返回 `ok` | 200 |
 
-`/health` 不经过登录。`/ready` 只说明反代进程在应答。worker 的 `GET http://127.0.0.1:3002/health`、ml 的 `GET http://127.0.0.1:8000/health`、Caddy 管理接口 `GET http://127.0.0.1:2019/config/` 没有映射到宿主机，探法在上一节。不要用 `POST /api/v1/auth/login` 做探活。
+`/health` 不经过登录。`/ready` 只说明反代进程在应答。worker 的 `GET http://127.0.0.1:3002/health`、ml 的 `GET http://127.0.0.1:8000/health`、Caddy 管理接口 `GET http://127.0.0.1:2019/config/` 没有映射到宿主机，探法在「健康检查」。不要用 `POST /api/v1/auth/login` 做探活。
 
 ```bash
 docker compose -f compose.prod.yml ps
@@ -467,7 +485,7 @@ docker compose -f compose.prod.yml logs --tail 100 web api worker postgres redis
 
 ### 常见故障速查
 
-服务不是 healthy，或 `/health`、`/login`、`/ready` 不是 200，先做上一节。这里只收那一节盖不住的四件事：现象、检查、处理。长步骤留在专章。
+服务不是 healthy，或 `/health`、`/login`、`/ready` 不是 200，先做「健康检查失败时的自检清单」。这里只收那一节盖不住的四件事：证书续期、磁盘满、429、备份目录权限。每件是现象、检查、处理。长步骤留在专章。两条怎么选，见「何时看哪一节」。
 
 #### 证书续期失败
 
@@ -512,6 +530,8 @@ chmod 700 /var/backups/memora
 ```
 
 不要把目录改成所有人可写。
+
+这四件对不上，或 `ps` 不是 healthy、三条 GET 不是 200，回到「健康检查失败时的自检清单」。
 
 ### 监控告警
 
@@ -613,14 +633,49 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 
 ### 升级
 
-先做下面的「备份与恢复」，至少留下一份带 `manifest-*.txt` 的备份。然后：
+在仓库根目录做。项目名是 `compose.prod.yml` 里的 `memora-prod`。命令写 `-f compose.prod.yml`。不要加 `-v`，也不要 `docker compose down -v`。`-v` 会删掉数据库、对象和证书卷。
+
+1. 升级前备份。用「做一次备份」里升级前那一条（`--compose --pause-writers`）。成功时最后一行是 `[memora] backup written under <目录> stamp=<时间>`。把这一行里的 stamp 记下来，回滚用它。目录里要有 `manifest-<时间>.txt`。
+
+```bash
+BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/backup.sh --compose --pause-writers
+```
+
+`--pause-writers` 只停止当时正在跑的 api / worker，失败也会尽量拉起来。不要在脚本外面再 `stop postgres` 或 `stop minio`。见「停写，还是不停库」。
+
+2. 升级。用了 `compose.prod.override.yml` 时，按「启动」再加一个 `-f`，项目名不变。
 
 ```bash
 git pull
 docker compose -f compose.prod.yml up -d --build
 ```
 
-不要加 `-v`。`-v` 会删掉数据库、对象和证书卷。
+无单独迁移步骤。表仍按「存储」在 API 或 Worker 第一次连上 Postgres 时创建。
+
+3. 升级后核对。按「健康检查」看 `ps` 和下面三条。有域名时把主机换成 `https://photos.example.com`。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。不是 healthy，或这三条不是 200，按「健康检查失败时的自检清单」看日志。登录、相册和限流见「活体抽查」。
+
+```bash
+docker compose -f compose.prod.yml ps
+curl -fsS http://127.0.0.1/health
+curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/login
+curl -fsS http://127.0.0.1/ready
+```
+
+4. 不行就回滚。用第 1 步记下的 stamp，走「恢复」里的覆盖命令。stamp 换成升级前那一份。那一节的 `--fresh` 只给新卷、空库，升级回滚不要加，也不要 `down -v`：
+
+```bash
+BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/restore.sh --compose --stamp 20260101T000000Z --yes
+```
+
+`--compose` 会停下正在跑的 api / worker，恢复完不自动拉起。抽查通过后再：
+
+```bash
+docker compose -f compose.prod.yml start api worker
+```
+
+Redis 保持空队列，不要把旧 AOF 拷回来。没有 `--yes` 不会改数据。
 
 ### 备份与恢复
 
