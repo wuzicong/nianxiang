@@ -550,17 +550,26 @@ a.lib-primary {
 }
 
 .lib-empty-library .lib-empty-secondary {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   color: var(--share-muted);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--share-muted) 70%, transparent);
 }
 
 .lib-empty-library .lib-empty-secondary:hover {
   color: var(--share-text);
+  text-decoration-color: color-mix(in srgb, var(--share-text) 45%, transparent);
 }
 
 .lib-empty-library .lib-empty-secondary:focus-visible {
   outline: 2px solid var(--share-accent);
   outline-offset: 3px;
+  border-radius: 2px;
 }
 
 .lib-dialog {
