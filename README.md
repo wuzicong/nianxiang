@@ -22,8 +22,8 @@
 │   └── ml/           # FastAPI /health 桩
 ├── templates/        # W6 三套主题（theme.json + assets/）
 ├── deploy/
-│   ├── self-host/    # Compose 说明与备份占位
-│   └── cloud/        # 云托管 env 与安全清单
+│   ├── self-host/    # Compose 说明、备份与恢复演练
+│   └── cloud/        # 云托管 env 与 Terraform 草稿（禁止 apply）
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -82,7 +82,7 @@
 - 开发 Compose 里 Postgres / Redis / MinIO / ML 只绑定 `127.0.0.1`（见 `docker-compose.yml`）
 - 生产 Compose（`compose.prod.yml`）公网只映射 80/443，其余在内部网络。见 [deploy/self-host/README.md](deploy/self-host/README.md) 的「生产部署」
 - 公网只暴露反代后的 Web/API，并强制 HTTPS
-- 加固：防火墙只开 443、系统更新、磁盘告警、备份落到本机以外
+- 加固：防火墙只开 443、系统更新、磁盘告警、备份落到本机以外。演练和验收清单在 [deploy/self-host/README.md](deploy/self-host/README.md)
 - 开发口令写在 `.env.example` 里，只为对齐 Compose；换到非本机前必须改掉
 
 ---
@@ -127,7 +127,7 @@ PRESIGN_TTL_MINUTES=10      # 超出 5–15 会被夹紧
 CDN_BASE_URL=https://cdn.example.com/memora-prod
 ```
 
-然后用同一套 web / api / worker / ml 进程或镜像启动。可执行的桶骨架在 [`deploy/cloud/terraform`](deploy/cloud/terraform/README.md)，阅读用摘要仍是 `deploy/cloud/s3-bucket-policy.hcl.example`。两处都没有生产凭证。
+然后用同一套 web / api / worker / ml 进程或镜像启动。云上把 `COOKIE_SECURE=true` 写进密钥库，桶保持私有，预签名 TTL 维持在 5–15 分钟。Terraform 草稿在 [`deploy/cloud/terraform`](deploy/cloud/terraform/README.md)，**禁止 terraform apply**，等主人自己的云账号。阅读用摘要仍是 `deploy/cloud/s3-bucket-policy.hcl.example`。两处都没有生产凭证。
 
 ---
 

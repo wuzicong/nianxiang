@@ -1,3 +1,6 @@
+# 草稿。禁止 terraform apply / destroy。用同目录的 terraform.sh。
+# validate 不需要云凭证。plan 会被 allow_apply=false 拦住，因此也不会创建资源。
+
 terraform {
   required_version = ">= 1.5.0"
 
