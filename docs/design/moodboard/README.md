@@ -30,6 +30,7 @@
 
 - 实现刀：`../library-empty-upload-fail.md` — **定稿须先过本 moodboard**。
 - 建册 / 选图流：`../album-create-select-flow.md` — 终稿 · didi §12 已签。
+- 产品壳视觉整模块：`../product-shell-chrome.md` — 终稿 · §11 默认已签。
 - 材料库：`../materials/catalog.md` — 可再分发条目 + 链接型待采条目。
 - 偷法全书：`../research/canva-awards-stealbook.md` — 模式拆解 + Top 10 刀序。
 - 动效笔记：`../materials/NOTES-motion-media.md` — 动效 / 视频 / GIF 授权候选（链接优先，不落二进制）。

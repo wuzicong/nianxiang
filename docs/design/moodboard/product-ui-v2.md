@@ -90,6 +90,13 @@
 - 仓库对照：`apps/web/src/app/library/library-{home,grid,create-dialog}.*` · `lib/library{,-api}.ts`
 - Hang 目标：`docs/design/album-create-select-flow.md`
 
+### B8 · Product shell chrome
+- 规格：`../product-shell-chrome.md`（终稿 · §11 默认已签）
+- 前置：`library-grid-chrome` · `library-empty-upload-fail` · `album-create-select-flow` · `theme-textures` · `album-preview-cta`
+- 仓库对照（bare→shell）：`apps/web/src/app/login/page.tsx` · `albums/page.tsx` · `albums/[albumId]/page.tsx` · `album-asset-grid.tsx`；已肤保留 `album-upload.css` / `album-share.css` / `library.css` / `share-theme.css`
+- Hang 目标：`docs/design/product-shell-chrome.md`
+- 建议 PR：`docs(design): 产品壳视觉整模块 (product-shell-chrome)`
+
 ---
 
 ## C. 与既有文档关系
@@ -121,6 +128,7 @@
 | **网格缝隙：gapless / hairline · 禁投影墙** | [`docs/design/library-grid-gaps.md`](../library-grid-gaps.md)（终稿） | stealbook **#9** · VSCO Studio / Frame.io density | `/library` 组内 2/4/6 · 组间呼吸 · 缩略零外投影 |
 | **三主题纹理：噪点 / 纸纹 / 金线薄规** | [`docs/design/theme-textures.md`](../theme-textures.md)（终稿） | stealbook **#5** · Canva Texture Check / Paper Shaders | unlock locked 三皮 + 空库 cotton grain；OOS album-preview #8 |
 | **建册 / 选图流收口（整模块）** | [`../album-create-select-flow.md`](../album-create-select-flow.md)（终稿 · didi §12 已签） | stealbook **#2** ring · **#3** 时长桶 · **#4** 浮动弹层 · **#9** 缝气质 · **#10** 失败结构 | `/library` 多选 · 选择栏 · `LibraryCreateDialog` → `/albums/[id]/preview` |
+| **产品壳视觉整模块** | [`../product-shell-chrome.md`](../product-shell-chrome.md)（终稿 · §11 默认已签） | stealbook **#2** 照片压 chrome · **#3** 时长桶 · **#4** 浮动卡 · **#5** 纹理加厚 · **#10** 失败结构 | `/login` · `/albums` · `/albums/[id]` 外框 · `/library` 占位 Tab · preview/share 加厚 |
 
 - [成册预览 CTA 文案/层级](../album-preview-cta.md) — W6 单主动词「生成分享链接」+ 次级文字链
 - [分享图注短注](../share-gallery-captions.md) — ShareGallery 禁原始 filename；短日期或无脚注
