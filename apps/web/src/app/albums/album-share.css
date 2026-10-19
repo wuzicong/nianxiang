@@ -1,0 +1,231 @@
+@import "../s/share-theme.css";
+
+.album-share-shell {
+  min-height: auto;
+  display: block;
+  margin-top: 2rem;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.album-share-shell .share-backdrop {
+  display: none;
+}
+
+.album-share-shell .share-card {
+  width: 100%;
+  max-width: 32rem;
+}
+
+.album-share-shell .share-card-decor {
+  display: none;
+}
+
+.album-share-heading {
+  margin: 0;
+  font-family: var(--share-font-title);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--share-text);
+}
+
+.album-share-lede {
+  margin: 0.55rem 0 0;
+  line-height: 1.65;
+  color: var(--share-muted);
+  font-size: 0.92rem;
+}
+
+.album-share-field-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--share-muted);
+}
+
+.album-share-password-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.album-share-password-row input {
+  min-width: 0;
+}
+
+.album-share-password-toggle {
+  width: auto !important;
+  padding: 0.75rem 0.85rem !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  background: color-mix(in srgb, var(--share-bg) 40%, var(--share-surface)) !important;
+  color: var(--share-text) !important;
+  border: 1px solid var(--share-border) !important;
+}
+
+.album-share-success {
+  margin-top: 1.25rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-card);
+  background: color-mix(in srgb, var(--share-bg) 35%, var(--share-surface));
+}
+
+.album-share-success strong {
+  color: var(--share-text);
+}
+
+.album-share-success-copy {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.album-share-link-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.album-share-link-field label {
+  font-size: 0.82rem;
+  color: var(--share-muted);
+}
+
+.album-share-link-readonly {
+  width: 100%;
+  font: inherit;
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--share-radius-button);
+  border: 1px solid var(--share-border);
+  background: var(--share-surface);
+  color: var(--share-text);
+  word-break: break-all;
+}
+
+.album-share-shell .album-share-copy-btn {
+  width: 100%;
+  font: inherit;
+  border-radius: var(--share-radius-button);
+  padding: 0.78rem 0.9rem;
+  font-weight: 650;
+  color: var(--share-ink);
+  background: var(--share-brand);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.album-share-shell .album-share-copy-btn:focus-visible {
+  outline: 2px solid var(--share-accent);
+  outline-offset: 3px;
+}
+
+.album-share-callout {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--share-radius-button);
+  border: 1px solid color-mix(in srgb, var(--share-accent) 55%, var(--share-border));
+  background: color-mix(in srgb, var(--share-accent) 12%, var(--share-surface));
+  color: var(--share-text);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.album-share-list-section {
+  margin-top: 2.5rem;
+  max-width: 32rem;
+}
+
+.album-share-list-section h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.album-share-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.album-share-list-item {
+  border: 1px solid #e7e0d8;
+  border-radius: 10px;
+  padding: 0.8rem 0.95rem;
+  background: #fff;
+}
+
+.album-share-list-meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #6b6560;
+}
+
+.album-share-list-id {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #44403c;
+  word-break: break-all;
+}
+
+.album-share-status {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  vertical-align: 0.05em;
+}
+
+.album-share-status[data-status="active"] {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.album-share-status[data-status="expired"] {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.album-share-status[data-status="revoked"] {
+  color: #57534e;
+  background: #f5f5f4;
+}
+
+.album-share-revoke-btn {
+  margin-top: 0.55rem;
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 1px solid #d6d3d1;
+  background: #fff;
+  color: #b91c1c;
+}
+
+.album-share-revoke-btn:hover {
+  background: #fef2f2;
+}
+
+.album-share-revoke-btn:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 2px;
+}
+
+.album-share-revoke-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
