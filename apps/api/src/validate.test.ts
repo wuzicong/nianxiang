@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { HttpError } from "./http.js";
-import { readTraceId, validateUploadRequest } from "./validate.js";
+import { parseOptionalAlbumId, readTraceId, validateUploadRequest } from "./validate.js";
 
 const MAX = 1024;
 
@@ -43,6 +43,18 @@ test("rejects missing fields, svg, traversal, and oversized payloads", () => {
     assert.equal(err.code, "payload_too_large");
     return true;
   });
+});
+
+test("albumId on an upload is optional", () => {
+  assert.equal(parseOptionalAlbumId(undefined), null);
+  assert.equal(parseOptionalAlbumId(null), null);
+  assert.equal(parseOptionalAlbumId(""), null);
+  assert.equal(parseOptionalAlbumId("album_1"), "album_1");
+  assert.throws(
+    () => parseOptionalAlbumId("../x"),
+    (err: unknown) => err instanceof HttpError && err.status === 400,
+  );
+  assert.throws(() => parseOptionalAlbumId(12), HttpError);
 });
 
 test("trace id is optional and bounded", () => {

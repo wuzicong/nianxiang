@@ -1,4 +1,5 @@
 import { isSafeStorageId, isThemeId, DEFAULT_THEME_ID, type ThemeId } from "@memora/shared";
+import { MAX_ASSETS_PER_ALBUM } from "@memora/storage";
 import { isAcceptablePassword } from "../auth/password.js";
 import { HttpError } from "../http.js";
 
@@ -61,6 +62,31 @@ export function parseSharePassword(value: unknown, required: boolean): string | 
     throw new HttpError(400, "weak_password", "分享密码需要 8 到 128 个字符，且不能包含控制字符");
   }
   return value;
+}
+
+/**
+ * 建册时可选的一批素材。省略、null、空数组都表示先建空册。
+ * 数组长度超过相册上限即 400，不先查这些 id 在不在。重复 id 按首次出现去掉。
+ */
+export function parseCreateAlbumAssetIds(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, "invalid_request", "assetIds 需要是素材 id 数组");
+  }
+  if (value.length > MAX_ASSETS_PER_ALBUM) {
+    throw new HttpError(400, "invalid_request", `一次最多 ${MAX_ASSETS_PER_ALBUM} 张`);
+  }
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string" || !isSafeStorageId(item)) {
+      throw new HttpError(400, "invalid_request", "素材 id 不合法");
+    }
+    if (seen.has(item)) continue;
+    seen.add(item);
+    ids.push(item);
+  }
+  return ids;
 }
 
 export function parseAssetIds(value: unknown): string[] {

@@ -44,6 +44,14 @@ export interface NewAsset {
   sizeBytes: number;
 }
 
+/** 预签名时顺便把这张还没传完的照片放进相册。maxAssets 与相册上限一致。 */
+export interface PendingAlbumTarget {
+  albumId: string;
+  maxAssets: number;
+}
+
+export type ReservePendingResult = "ok" | "limit" | "album_not_found" | "album_full";
+
 export interface AssetRecord {
   id: string;
   userId: string;
@@ -67,8 +75,14 @@ export interface AssetRepository {
   /**
    * 同一用户的 pending_upload 达到 maxPending 时不插入。
    * 计数和插入在同一个事务里，并用咨询锁挡住并发申请。
+   * target 有相册时，同一事务里确认相册属于该用户且未满，再写入 album_assets。
+   * 相册不存在、不是本人的、或已满，都不留下 pending 行。
    */
-  reservePendingUpload(asset: NewAsset, maxPending: number): Promise<"ok" | "limit">;
+  reservePendingUpload(
+    asset: NewAsset,
+    maxPending: number,
+    target?: PendingAlbumTarget | null,
+  ): Promise<ReservePendingResult>;
   deletePending(id: string): Promise<void>;
   get(id: string): Promise<AssetRecord | null>;
   markUploaded(id: string): Promise<AssetRecord | null>;
@@ -288,13 +302,25 @@ export function createAssetRepository(options: {
       await ready();
       await insertPendingRow(pool, asset);
     },
-    async reservePendingUpload(asset, maxPending) {
+    async reservePendingUpload(asset, maxPending, target = null) {
       if (!Number.isInteger(maxPending) || maxPending < 1) return "limit";
       return withTransaction(async (client) => {
         await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, $2::bigint))`, [
           asset.userId,
           PENDING_UPLOAD_ADVISORY_SEED,
         ]);
+        if (target) {
+          const album = await client.query(
+            `SELECT id FROM albums WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+            [target.albumId, asset.userId],
+          );
+          if (album.rows.length === 0) return "album_not_found";
+          const albumCount = await client.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM album_assets WHERE album_id = $1`,
+            [target.albumId],
+          );
+          if (Number(albumCount.rows[0]?.n ?? 0) >= target.maxAssets) return "album_full";
+        }
         const count = await client.query<{ n: number }>(
           `SELECT count(*)::int AS n
            FROM assets
@@ -303,6 +329,19 @@ export function createAssetRepository(options: {
         );
         if (Number(count.rows[0]?.n ?? 0) >= maxPending) return "limit";
         await insertPendingRow(client, asset);
+        if (target) {
+          const max = await client.query<{ max_pos: number }>(
+            `SELECT COALESCE(MAX(position), 0)::int AS max_pos
+             FROM album_assets WHERE album_id = $1`,
+            [target.albumId],
+          );
+          const position = Number(max.rows[0]?.max_pos ?? 0) + 1;
+          await client.query(
+            `INSERT INTO album_assets (album_id, asset_id, position)
+             VALUES ($1, $2, $3)`,
+            [target.albumId, asset.id, position],
+          );
+        }
         return "ok";
       });
     },
