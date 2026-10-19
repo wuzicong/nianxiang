@@ -180,6 +180,17 @@ test("postgres albums and shares revoke, expire, and keep only the token hash", 
     assert.equal(await albums.findActiveShareByTokenHash(tokenHash), null);
     const stranger = await albums.revokeShare(share.share.id, otherId);
     assert.equal(stranger, null);
+
+    const ownAssets = await assets.listByUser(ownerId, 10);
+    assert.deepEqual(
+      ownAssets.map((row) => row.id),
+      [assetId],
+    );
+    const otherAssets = await assets.listByUser(otherId, 10);
+    assert.equal(
+      otherAssets.some((row) => row.id === assetId),
+      false,
+    );
   } finally {
     await pool.query(`DELETE FROM users WHERE id = ANY($1::text[])`, [[ownerId, otherId]]);
     await pool.query(`DELETE FROM assets WHERE id = ANY($1::text[])`, [[assetId, foreignAssetId]]);

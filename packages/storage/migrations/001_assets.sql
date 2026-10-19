@@ -27,3 +27,6 @@ CREATE INDEX IF NOT EXISTS assets_user_id_idx ON assets (user_id);
 CREATE INDEX IF NOT EXISTS assets_pending_upload_created_idx
   ON assets (created_at)
   WHERE status = 'pending_upload';
+
+-- 照片库按上传时间倒序取一页。拍摄时间在 exif JSON 里，不在这里排序。
+CREATE INDEX IF NOT EXISTS assets_user_created_idx ON assets (user_id, created_at DESC, id DESC);

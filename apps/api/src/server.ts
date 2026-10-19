@@ -32,6 +32,7 @@ import {
 import { registerAlbumRoutes } from "./albums/http.js";
 import type { AppConfig } from "./config.js";
 import { HttpError, asyncRoute } from "./http.js";
+import { parseLibraryLimit, presentLibraryAssets } from "./library/present.js";
 import { toPublicAsset } from "./present.js";
 import { asRecord, readTraceId, validateUploadRequest } from "./validate.js";
 
@@ -294,6 +295,31 @@ export function createApp(deps: AppDeps): Express {
         status: asset.status,
         jobs: [JOB_NAMES.MEDIA_DERIVATIVE, JOB_NAMES.META_EXIF],
       });
+    }),
+  );
+
+  app.get(
+    "/api/v1/assets",
+    asyncRoute(async (req, res) => {
+      const user = await requireUser(deps, req);
+      const limit = parseLibraryLimit(req.query.limit);
+      await deps.assets.ready();
+      const rows = await deps.assets.listByUser(user.id, limit + 1);
+      const hasMore = rows.length > limit;
+      const page = hasMore ? rows.slice(0, limit) : rows;
+      let assets: Awaited<ReturnType<typeof presentLibraryAssets>>;
+      try {
+        assets = await presentLibraryAssets(page, deps.objects);
+      } catch (err) {
+        console.error("[memora-api] library presign failed", safeErrorMessage(err));
+        throw new HttpError(502, "presign_failed", "签发读取地址失败");
+      }
+      console.log(
+        `[memora-api] library list user=${user.id} count=${assets.length} more=${hasMore ? "yes" : "no"}`,
+      );
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.json({ assets, hasMore });
     }),
   );
 
