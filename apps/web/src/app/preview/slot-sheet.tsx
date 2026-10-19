@@ -147,7 +147,7 @@ function Hero({
         <SvgMark markup={decorations["gold-accent-line"]} className="deco-gold" stretch />
       ) : null}
       <figure className="hero-frame">
-        <div className="frame">
+        <div className={photo ? "frame" : "frame frame-empty"}>
           <FramePhoto photo={photo} onError={onPhotoError} />
         </div>
         {themeId === "cotton-candy" ? (
@@ -159,7 +159,7 @@ function Hero({
         {themeId === "kyoto-lantern" ? <SvgMark markup={decorations["lantern-glow"]} className="deco-lantern" /> : null}
       </figure>
       <div className="hero-copy">
-        {photo ? <p className="caption">{photo.caption}</p> : null}
+        {photo?.caption ? <p className="caption">{photo.caption}</p> : null}
         <p className="lede">{slot.body}</p>
       </div>
     </div>
@@ -174,7 +174,7 @@ function Bleed({ slot, onPhotoError }: { slot: FilledSlot; onPhotoError?: (src: 
       <div className="bleed-copy">
         <p className="kicker">{slot.kicker}</p>
         <h2 className="hero-title">{slot.title}</h2>
-        <p>{photo?.caption}</p>
+        {photo?.caption ? <p>{photo.caption}</p> : null}
       </div>
     </div>
   );
@@ -198,10 +198,14 @@ function Spread({
       <div className="spread">
         {cells.map((photo, index) => (
           <figure key={photo?.id ?? `gap-${index}`}>
-            <div className="frame">
+            <div className={photo ? "frame" : "frame frame-empty"}>
               <FramePhoto photo={photo} onError={onPhotoError} />
             </div>
-            <figcaption>{photo?.caption ?? "空位"}</figcaption>
+            {photo?.caption ? (
+              <figcaption>{photo.caption}</figcaption>
+            ) : photo ? null : (
+              <figcaption className="slot-empty">空位</figcaption>
+            )}
           </figure>
         ))}
       </div>
@@ -231,10 +235,14 @@ function Wall({
           const tilt = tilts[index % tilts.length] ?? 0;
           return (
             <figure key={photo?.id ?? "gap"} className="polaroid" style={{ ["--tilt" as string]: `${tilt}deg` }}>
-              <div className="frame">
+              <div className={photo ? "frame" : "frame frame-empty"}>
                 <FramePhoto photo={photo} onError={onPhotoError} />
               </div>
-              <figcaption>{photo?.caption ?? "空位"}</figcaption>
+              {photo?.caption ? (
+                <figcaption>{photo.caption}</figcaption>
+              ) : photo ? null : (
+                <figcaption className="slot-empty">空位</figcaption>
+              )}
               {theme.skin.id === "cotton-candy" ? (
                 <SvgMark markup={decorations["washi-tape"]} className="deco-tape" />
               ) : null}

@@ -167,7 +167,7 @@ test("album detail signs derivative previews and omits original keys", async () 
           width: 640,
           height: 480,
           derivatives: { thumb, preview, hero: original },
-          exif: { hasGps: true, lat: 12.3456, lng: 99.9 },
+          exif: { capturedAt: "2020:01:02 03:04:05", hasGps: true, lat: 12.3456, lng: 99.9 },
         }),
       );
       assets.rows.set(
@@ -208,6 +208,7 @@ test("album detail signs derivative previews and omits original keys", async () 
           exif?: unknown;
           derivatives?: unknown;
           error: string | null;
+          takenAt?: string | null;
           previews: { thumb?: { url: string }; preview?: { url: string }; hero?: { url: string } };
         }[];
       };
@@ -222,6 +223,7 @@ test("album detail signs derivative previews and omits original keys", async () 
       assert.equal(body.assets[1]?.key, undefined);
       assert.equal(body.assets[1]?.userId, undefined);
       assert.equal(body.assets[1]?.exif, undefined);
+      assert.equal(body.assets[1]?.takenAt, "2020-01-02T03:04:05");
       assert.equal(body.assets[1]?.derivatives, undefined);
       const json = JSON.stringify(body);
       assert.equal(json.includes("/originals/"), false);

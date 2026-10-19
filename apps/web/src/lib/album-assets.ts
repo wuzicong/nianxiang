@@ -10,6 +10,8 @@ export interface AlbumAssetView {
   width: number | null;
   height: number | null;
   error: string | null;
+  /** 拍摄时间（与照片库相同形状），用于成册图注，不是坐标。 */
+  takenAt: string | null;
   previews: Partial<Record<"thumb" | "preview" | "hero", AlbumPreview>>;
 }
 
@@ -82,6 +84,7 @@ function parseAsset(value: unknown): AlbumAssetView | null {
     width?: unknown;
     height?: unknown;
     error?: unknown;
+    takenAt?: unknown;
     previews?: unknown;
   };
   if (typeof row.assetId !== "string" || row.assetId.length < 1 || row.assetId.length > 64) return null;
@@ -96,6 +99,7 @@ function parseAsset(value: unknown): AlbumAssetView | null {
   }
   const error =
     typeof row.error === "string" ? visibleMessage(row.error, "") || null : null;
+  const takenAt = typeof row.takenAt === "string" && row.takenAt.length <= 40 ? row.takenAt : null;
   return {
     assetId: row.assetId,
     filename: row.filename,
@@ -103,6 +107,7 @@ function parseAsset(value: unknown): AlbumAssetView | null {
     width: typeof row.width === "number" ? row.width : null,
     height: typeof row.height === "number" ? row.height : null,
     error,
+    takenAt,
     previews,
   };
 }
@@ -119,6 +124,11 @@ export function parseAlbumAssets(value: unknown): AlbumAssetView[] {
 
 export function previewUrl(previews: AlbumAssetView["previews"]): string | null {
   return previews.thumb?.url ?? previews.preview?.url ?? previews.hero?.url ?? null;
+}
+
+/** 灯箱用大图：preview → hero → thumb，仍走衍生图 URL 校验。 */
+export function lightboxUrl(previews: AlbumAssetView["previews"]): string | null {
+  return previews.preview?.url ?? previews.hero?.url ?? previews.thumb?.url ?? null;
 }
 
 export function albumRefreshDelay(assets: AlbumAssetView[]): number | null {

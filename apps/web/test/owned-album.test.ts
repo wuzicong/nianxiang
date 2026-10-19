@@ -5,7 +5,13 @@ import kyotoLantern from "../../../templates/kyoto-lantern/theme.json";
 import magazineHeirloom from "../../../templates/magazine-heirloom/theme.json";
 import { parseAlbumAssets, type AlbumAssetView } from "../src/lib/album-assets";
 import type { AlbumTheme } from "../src/lib/album-theme";
-import { buildOwnedAlbum, derivativeSheetUrl, isDerivativeHttpUrl } from "../src/lib/owned-album";
+import {
+  buildOwnedAlbum,
+  derivativeSheetUrl,
+  isDerivativeHttpUrl,
+  OWNED_PHOTO_ALT,
+  shortShootCaption,
+} from "../src/lib/owned-album";
 
 const expiresAt = "2026-01-01T00:10:00.000Z";
 
@@ -41,6 +47,7 @@ function view(
   previews: AlbumAssetView["previews"],
   status = "ready",
   filename = `${assetId}.jpg`,
+  takenAt: string | null = null,
 ): AlbumAssetView {
   return {
     assetId,
@@ -49,6 +56,7 @@ function view(
     width: 1200,
     height: 800,
     error: null,
+    takenAt,
     previews,
   };
 }
@@ -57,6 +65,12 @@ function sheet(assetId: string, file: "hero.webp" | "preview.webp" | "thumb.webp
   const size = file.replace(".webp", "") as "hero" | "preview" | "thumb";
   return { [size]: { url: signed("derivatives", assetId, file), expiresAt } };
 }
+
+test("short shoot captions omit filenames", () => {
+  assert.equal(shortShootCaption("2024-05-02T12:00:00"), "2024.5");
+  assert.equal(shortShootCaption(null), "");
+  assert.equal(shortShootCaption("not-a-date"), "");
+});
 
 test("sheet urls prefer the slot size and refuse originals", () => {
   const hero = signed("derivatives", "a", "hero.webp");
@@ -94,6 +108,7 @@ test("owned cotton album fills cover, spread, then wall from derivatives only", 
       filename: "window.jpg",
       status: "ready",
       key: "users/owner/originals/cover",
+      takenAt: "2024-05-02T12:00:00",
       previews: {
         hero: { url: signed("derivatives", "cover", "hero.webp"), expiresAt },
         preview: { url: signed("originals", "cover", "raw.jpg"), expiresAt },
@@ -103,6 +118,7 @@ test("owned cotton album fills cover, spread, then wall from derivatives only", 
       assetId: "left",
       filename: "kitchen.png",
       status: "ready",
+      takenAt: "2023-11-08T09:00:00",
       previews: {
         hero: { url: signed("derivatives", "left", "hero.webp"), expiresAt },
         preview: { url: signed("derivatives", "left", "preview.webp"), expiresAt },
@@ -138,12 +154,12 @@ test("owned cotton album fills cover, spread, then wall from derivatives only", 
   assert.equal(filled.album.title, "我们的春天");
   assert.equal(byId.cover?.title, "我们的春天");
   assert.equal(byId.cover?.photos[0]?.src, signed("derivatives", "cover", "hero.webp"));
-  assert.equal(byId.cover?.photos[0]?.caption, "window");
+  assert.equal(byId.cover?.photos[0]?.caption, "2024.5");
+  assert.equal(byId.cover?.photos[0]?.alt, OWNED_PHOTO_ALT);
   assert.equal(byId["spread-a"]?.photos[0]?.src, signed("derivatives", "left", "preview.webp"));
   assert.equal(byId["spread-a"]?.photos[1]?.src, signed("derivatives", "right", "thumb.webp"));
   assert.equal(byId.polaroid?.photos.length, 1);
-  assert.equal(byId.polaroid?.photos[0]?.caption.endsWith("…"), true);
-  assert.equal((byId.polaroid?.photos[0]?.caption.length ?? 0) <= 43, true);
+  assert.equal(byId.polaroid?.photos[0]?.caption, "");
   assert.equal(byId.days?.photos.length, 0);
   assert.equal(filled.placed, 4);
   assert.equal(filled.ready, 4);
@@ -158,6 +174,9 @@ test("owned cotton album fills cover, spread, then wall from derivatives only", 
     .join("\n");
   assert.equal(visible.includes("X-Amz"), false);
   assert.equal(visible.includes("sekret"), false);
+  assert.equal(visible.includes("window.jpg"), false);
+  assert.equal(visible.includes("kitchen.png"), false);
+  assert.equal(visible.includes("photo-1"), false);
 });
 
 test("extra derivatives stay unplaced once each theme's photo slots are full", () => {

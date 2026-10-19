@@ -1,4 +1,5 @@
 import { DERIVATIVE_SIZES, derivativeObjectKey, type DerivativeSize } from "@memora/shared";
+import { libraryTakenAt } from "../library/present.js";
 import type {
   AlbumSummary,
   AssetRecord,
@@ -59,7 +60,7 @@ export async function signStoredDerivatives(
   return derivatives;
 }
 
-/** 相册主人看到的素材。不含原图键、原始衍生图键和 EXIF。 */
+/** 相册主人看到的素材。不含原图键、原始衍生图键和完整 EXIF（仅 normalized 拍摄时间）。 */
 export async function presentOwnedAlbumAssets(
   assets: AssetRecord[],
   objects: Pick<ObjectStore, "presignGet">,
@@ -76,6 +77,7 @@ export async function presentOwnedAlbumAssets(
       height: asset.height,
       error: asset.error,
       createdAt: asset.createdAt,
+      takenAt: libraryTakenAt(asset.exif),
       previews: await signStoredDerivatives(
         objects,
         asset.userId,
