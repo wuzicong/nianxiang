@@ -1,5 +1,6 @@
 /* 照片库：色板与圆角仅走 share-shell 注入的 --share-*（见 shareThemeStyle）。
-   首页固定棉花糖；建册弹层里各主题卡自带 share-shell。悬停抬起 4px，与 hoverLift 一致。 */
+   首页固定棉花糖；建册弹层里各主题卡自带 share-shell。
+   网格悬停：Linear 式不位移，仅照片层 opacity/scale（见 NOTES-motion-media）。 */
 
 .lib {
   --lib-duration-1: 80ms;
@@ -735,7 +736,8 @@ a.lib-primary {
       transform var(--lib-duration-2) var(--lib-ease-out);
   }
 
-  .lib-tile {
+  .lib-tile img,
+  .lib-placeholder {
     transition:
       transform var(--lib-duration-3) var(--lib-ease-out),
       opacity var(--lib-duration-2) var(--lib-ease-out);
@@ -768,12 +770,16 @@ a.lib-primary {
 }
 
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
-  .lib-tile:hover {
-    transform: translateY(-4px);
+  .lib-tile:hover img,
+  .lib-tile:hover .lib-placeholder {
+    opacity: 0.94;
+    transform: scale(1.02);
   }
 
-  .lib-tile:active {
-    transform: translateY(-2px) scale(0.98);
+  .lib-tile:active img,
+  .lib-tile:active .lib-placeholder {
+    opacity: 0.9;
+    transform: scale(0.99);
   }
 
   .lib-tab:active,
@@ -788,18 +794,18 @@ a.lib-primary {
   }
 
   .lib-theme:hover {
-    transform: translateY(-2px);
+    transform: scale(1.01);
   }
 
   .lib-theme:active {
-    transform: translateY(0) scale(0.99);
+    transform: scale(0.99);
   }
 }
 
 @keyframes lib-selection-in {
   from {
     opacity: 0;
-    transform: translateY(100%);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -1124,21 +1130,21 @@ a.lib-primary {
   background: var(--share-bg);
   overflow: auto;
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(8px);
   transition:
-    transform var(--lib-duration-4) var(--lib-ease-out),
+    transform var(--lib-duration-3) var(--lib-ease-out),
     opacity var(--lib-duration-3) var(--lib-ease-out);
 }
 
 .lib-drawer[open] .lib-drawer-panel {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0);
 }
 
 @starting-style {
   .lib-drawer[open] .lib-drawer-panel {
     opacity: 0;
-    transform: translateX(100%);
+    transform: translateY(8px);
   }
 }
 
@@ -1503,7 +1509,8 @@ a.lib-primary {
     background-position: 0 0;
   }
 
-  .lib-tile,
+  .lib-tile img,
+  .lib-placeholder,
   .lib-check,
   .lib-tab,
   .lib-primary,
@@ -1522,8 +1529,10 @@ a.lib-primary {
     animation-duration: 0.01ms !important;
   }
 
-  .lib-tile:hover,
-  .lib-tile:active,
+  .lib-tile:hover img,
+  .lib-tile:hover .lib-placeholder,
+  .lib-tile:active img,
+  .lib-tile:active .lib-placeholder,
   .lib-theme:hover,
   .lib-theme:active,
   .lib-tab:active,
