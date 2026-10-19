@@ -119,6 +119,16 @@ export function memoryAssets(
     async markFailed() {},
     async saveExif() {},
     async noteExifFailure() {},
+    async listByUser(userId, limit) {
+      const size = Math.min(500, Math.max(1, Math.trunc(limit)));
+      return [...rows.values()]
+        .filter((row) => row.userId === userId)
+        .sort((a, b) => {
+          if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+          return a.id < b.id ? 1 : -1;
+        })
+        .slice(0, size);
+    },
     async close() {},
   };
 }

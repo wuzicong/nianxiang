@@ -1,0 +1,1040 @@
+/* 照片库桌面。底色和品牌粉来自棉花糖，顶上的金线来自杂志。
+   三套主题只在「生成相册」的卡片里各自上色。悬停抬起 4px，和棉花糖的 hoverLift 一致。 */
+
+.lib {
+  --lib-bg: #f7ede2;
+  --lib-ink: #2c2a29;
+  --lib-surface: #fff8f5;
+  --lib-moon: #fafaf7;
+  --lib-brand: #f5c6c6;
+  --lib-secondary: #c9b8e8;
+  --lib-accent: #b7c4a3;
+  --lib-gold: #c2a878;
+  --lib-muted: #8a8279;
+  --lib-border: #f0e0d6;
+  --lib-shadow: 0 8px 24px rgba(44, 42, 41, 0.08);
+  --lib-radius: 28px;
+  position: relative;
+  min-height: 100vh;
+  color: var(--lib-ink);
+  background: var(--lib-bg);
+  font-family: var(--font-inter), system-ui, "PingFang SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lib-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 108% -10%, color-mix(in srgb, var(--lib-brand) 88%, transparent), transparent 42%),
+    radial-gradient(circle at -12% 16%, color-mix(in srgb, var(--lib-secondary) 66%, transparent), transparent 36%),
+    radial-gradient(circle at 78% 108%, color-mix(in srgb, var(--lib-accent) 42%, transparent), transparent 34%),
+    var(--lib-bg);
+}
+
+.lib-skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 40;
+  padding: 0.45rem 0.8rem;
+  background: var(--lib-ink);
+  color: var(--lib-moon);
+  border-radius: 999px;
+}
+
+.lib-skip:focus {
+  top: 0.8rem;
+}
+
+.lib-top,
+.lib-main {
+  position: relative;
+  z-index: 1;
+}
+
+.lib-top {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: color-mix(in srgb, var(--lib-bg) 78%, transparent);
+  box-shadow: inset 0 3px 0 var(--lib-gold);
+  backdrop-filter: blur(16px);
+}
+
+.lib-wrap {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.lib-top-inner,
+.lib-toolbar,
+.lib-day,
+.lib-dock-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.lib-top-inner {
+  min-height: 4.2rem;
+}
+
+.lib-mark {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.lib-mark-en {
+  font-family: var(--font-caveat), cursive;
+  font-size: 1.15rem;
+  color: color-mix(in srgb, var(--lib-ink) 72%, var(--lib-brand));
+}
+
+.lib-mark-zh {
+  font-family: var(--font-fraunces), "Songti SC", serif;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.lib-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.lib-nav a,
+.lib-nav button,
+.lib-text-button,
+.lib-select,
+.lib-quiet,
+.lib-primary,
+.lib-theme {
+  font: inherit;
+}
+
+.lib-nav a,
+.lib-nav button,
+.lib-text-button,
+.lib-quiet {
+  color: var(--lib-ink);
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+
+.lib-nav a[aria-current="page"] {
+  background: var(--lib-ink);
+  color: var(--lib-moon);
+}
+
+.lib-nav button {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-main {
+  padding: 0.4rem 0 6.5rem;
+}
+
+.lib-kicker {
+  margin: 1.2rem 0 0;
+  font-family: var(--font-caveat), cursive;
+  font-size: 1.55rem;
+  color: var(--lib-muted);
+}
+
+.lib h1,
+.lib-year,
+.lib-shell h2,
+.lib-empty h2,
+.lib-dialog h2 {
+  font-family: var(--font-fraunces), "Songti SC", serif;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.lib h1 {
+  margin: 0.1rem 0 0;
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  line-height: 0.95;
+}
+
+.lib-hand {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-caveat), cursive;
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+}
+
+.lib-lede,
+.lib-note,
+.lib-hint,
+.lib-shell p,
+.lib-empty p,
+.lib-dialog p {
+  line-height: 1.65;
+}
+
+.lib-lede {
+  max-width: 38rem;
+  margin: 0.35rem 0 0;
+  font-size: 1.02rem;
+}
+
+.lib-note,
+.lib-hint,
+.lib-count {
+  color: var(--lib-muted);
+}
+
+.lib-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.92rem;
+}
+
+.lib-toolbar {
+  align-items: flex-end;
+  margin-top: 1.5rem;
+}
+
+.lib-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.28rem;
+  border: 1px solid var(--lib-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lib-surface) 84%, transparent);
+}
+
+.lib-tab,
+.lib-select,
+.lib-quiet,
+.lib-primary {
+  cursor: pointer;
+}
+
+.lib-tab {
+  border: 0;
+  background: transparent;
+  color: var(--lib-ink);
+  border-radius: 999px;
+  padding: 0.48rem 0.9rem;
+  font: inherit;
+}
+
+.lib-tab[aria-selected="true"] {
+  background: var(--lib-ink);
+  color: var(--lib-moon);
+}
+
+.lib-select {
+  border: 1px solid var(--lib-ink);
+  background: transparent;
+  color: var(--lib-ink);
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+}
+
+.lib-select[aria-pressed="true"] {
+  background: var(--lib-brand);
+  border-color: transparent;
+}
+
+.lib-hint {
+  margin: 0.7rem 0 0;
+  font-size: 0.86rem;
+}
+
+.lib-status,
+.lib-more,
+.lib-draft {
+  margin: 1rem 0 0;
+  color: var(--lib-muted);
+}
+
+.lib-frame {
+  margin-top: 0.4rem;
+}
+
+.lib-year {
+  margin: 1.8rem 0 0;
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+}
+
+.lib-month {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  color: var(--lib-muted);
+}
+
+.lib-day {
+  align-items: baseline;
+  margin: 0.55rem 0 0.45rem;
+}
+
+.lib-day h3 {
+  margin: 0;
+  font-family: var(--font-caveat), cursive;
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+.lib-day p {
+  margin: 0;
+  color: var(--lib-muted);
+  font-size: 0.86rem;
+}
+
+.lib-rows {
+  display: grid;
+  gap: 12px;
+}
+
+.lib-row,
+.lib-fallback-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.lib-tile {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  background: var(--lib-surface);
+  box-shadow: var(--lib-shadow);
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  scroll-margin-top: 5.5rem;
+  scroll-margin-bottom: 6rem;
+}
+
+.lib-tile img,
+.lib-placeholder {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lib-tile img {
+  object-fit: cover;
+}
+
+.lib-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 0.7rem;
+  text-align: center;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--lib-brand) 70%, white), color-mix(in srgb, var(--lib-secondary) 45%, white));
+  font-size: 0.82rem;
+}
+
+.lib-check {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--lib-ink) 75%, white);
+  background: color-mix(in srgb, var(--lib-surface) 86%, transparent);
+  color: transparent;
+  opacity: 0;
+  box-shadow: 0 4px 10px rgba(44, 42, 41, 0.12);
+}
+
+.lib-selecting .lib-check,
+.lib-tile[aria-pressed="true"] .lib-check,
+.lib-tile:focus-visible .lib-check {
+  opacity: 1;
+}
+
+.lib-tile[aria-pressed="true"] .lib-check {
+  background: var(--lib-ink);
+  color: var(--lib-moon);
+  border-color: var(--lib-ink);
+}
+
+.lib-tile[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--lib-ink);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.lib-check svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.lib-fallback-row .lib-tile {
+  height: 148px;
+  flex: 1 1 140px;
+}
+
+.lib-shell,
+.lib-empty,
+.lib-dialog-card {
+  background: color-mix(in srgb, var(--lib-surface) 92%, transparent);
+  border: 1px solid var(--lib-border);
+  border-radius: var(--lib-radius);
+  box-shadow: var(--lib-shadow);
+}
+
+.lib-shell,
+.lib-empty {
+  margin-top: 1.4rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  max-width: 40rem;
+}
+
+.lib-shell-seal,
+.lib-kicker-small {
+  display: inline-flex;
+  margin: 0;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lib-gold) 28%, white);
+  color: var(--lib-ink);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.lib-shell h2,
+.lib-empty h2 {
+  margin: 0.7rem 0 0;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+}
+
+.lib-shell-art {
+  width: 100%;
+  height: 7.5rem;
+  margin-bottom: 0.8rem;
+  border-radius: 18px;
+  border: 1px dashed color-mix(in srgb, var(--lib-ink) 25%, var(--lib-border));
+}
+
+.lib-shell-art-place {
+  background:
+    linear-gradient(color-mix(in srgb, var(--lib-gold) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, color-mix(in srgb, var(--lib-gold) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    color-mix(in srgb, var(--lib-surface) 70%, var(--lib-bg));
+}
+
+.lib-shell-art-scene {
+  background:
+    linear-gradient(var(--lib-surface), var(--lib-surface)) 12% 50% / 28% 70% no-repeat,
+    linear-gradient(var(--lib-brand), var(--lib-brand)) 50% 42% / 22% 58% no-repeat,
+    linear-gradient(var(--lib-secondary), var(--lib-secondary)) 76% 55% / 16% 46% no-repeat,
+    color-mix(in srgb, var(--lib-bg) 70%, white);
+}
+
+.lib-shell-art-people {
+  background:
+    radial-gradient(circle at 32% 48%, transparent 0 18px, color-mix(in srgb, var(--lib-ink) 18%, transparent) 19px 20px, transparent 21px),
+    radial-gradient(circle at 50% 46%, transparent 0 22px, color-mix(in srgb, var(--lib-ink) 22%, transparent) 23px 24px, transparent 25px),
+    radial-gradient(circle at 68% 50%, transparent 0 16px, color-mix(in srgb, var(--lib-ink) 16%, transparent) 17px 18px, transparent 19px),
+    color-mix(in srgb, var(--lib-secondary) 24%, var(--lib-surface));
+}
+
+.lib-skeletons {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.4rem;
+}
+
+.lib-skel {
+  height: 168px;
+  flex: 1 1 0;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #f3e6da, #fff8f5, #f3e6da);
+  background-size: 200% 100%;
+}
+
+.lib-skel:nth-child(2) { flex-basis: 22%; }
+.lib-skel:nth-child(3) { flex-basis: 30%; }
+
+.lib-dock {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: min(40rem, calc(100% - 1.25rem));
+}
+
+.lib-dock-inner {
+  padding: 0.65rem 0.65rem 0.65rem 1.05rem;
+  border: 1px solid var(--lib-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lib-surface) 88%, transparent);
+  box-shadow: var(--lib-shadow);
+  backdrop-filter: blur(16px);
+}
+
+.lib-dock strong {
+  font-family: var(--font-fraunces), "Songti SC", serif;
+  font-weight: 500;
+  font-size: 1.15rem;
+}
+
+.lib-dock-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.lib-primary,
+.lib-quiet {
+  border-radius: 999px;
+  padding: 0.62rem 1rem;
+}
+
+.lib-quiet {
+  border: 1px solid var(--lib-border);
+  background: transparent;
+}
+
+.lib-primary {
+  border: 0;
+  background: var(--lib-ink);
+  color: var(--lib-moon);
+}
+
+a.lib-primary {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.lib-primary:disabled,
+.lib-quiet:disabled,
+.lib-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.lib-link {
+  color: inherit;
+}
+
+.lib-dialog {
+  width: min(52rem, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.lib-dialog::backdrop {
+  background: rgba(44, 42, 41, 0.48);
+}
+
+.lib-dialog-card {
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.25rem 1.2rem 1.15rem;
+}
+
+.lib-dialog h2 {
+  margin: 0.2rem 0 0;
+  font-size: 2rem;
+}
+
+.lib-field {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  font-size: 0.92rem;
+}
+
+.lib-field input {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--lib-border);
+  border-radius: 14px;
+  background: var(--lib-moon);
+  color: var(--lib-ink);
+  font: inherit;
+}
+
+.lib-themes {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.lib-theme {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 0.28rem;
+  min-height: 9.2rem;
+  padding: 0.85rem 0.9rem 0.9rem;
+  overflow: visible;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.lib-theme input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.lib-theme-bar {
+  width: 2.2rem;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.lib-theme-en {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  opacity: 0.72;
+}
+
+.lib-theme strong {
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.lib-theme small {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  opacity: 0.84;
+}
+
+.lib-theme[data-checked="true"] {
+  outline: 2px solid var(--lib-ink);
+  outline-offset: 3px;
+}
+
+.lib-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.lib-alert {
+  margin: 0.8rem 0 0;
+  color: var(--lib-ink);
+}
+
+.lib :focus-visible {
+  outline: 2px solid var(--lib-ink);
+  outline-offset: 3px;
+}
+
+.lib-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 800px) {
+  .lib-themes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (hover: hover) {
+  .lib-tile:hover .lib-check {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lib-skel {
+    animation: lib-shimmer 1.6s ease-in-out infinite;
+  }
+
+  .lib-tile {
+    transition: transform 0.18s ease;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .lib-tile:hover {
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 640px) {
+  .lib-toolbar,
+  .lib-dock-inner,
+  .lib-day {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lib-dock-actions,
+  .lib-dialog-actions {
+    width: 100%;
+  }
+
+  .lib-primary,
+  .lib-quiet {
+    flex: 1;
+  }
+}
+
+@keyframes lib-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* —— 规范 v1：share-shell 变量 + 方格网格 + 吸顶 + 选择栏 —— */
+.lib.share-shell {
+  --lib-sticky-top: 7.25rem;
+  --lib-year-h: 2.75rem;
+  --lib-month-h: 2rem;
+  color: var(--share-text, var(--lib-ink));
+  background: var(--share-bg, var(--lib-bg));
+  font-family: var(--share-font-body, var(--font-inter), system-ui, "PingFang SC", sans-serif);
+}
+
+.lib-top {
+  box-shadow: inset 0 3px 0 var(--share-brand, var(--lib-gold));
+  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 88%, transparent);
+}
+
+.lib-privacy-badge {
+  font-size: 0.82rem;
+  color: var(--share-muted, var(--lib-muted));
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--share-radius-pill, 999px);
+  border: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-top-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.lib-tabs-wrap {
+  position: sticky;
+  top: 3.6rem;
+  z-index: 29;
+  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 90%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-soon {
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+  color: var(--share-muted, var(--lib-muted));
+}
+
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+
+@media (min-width: 768px) {
+  .lib-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .lib-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+
+.lib-tile {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.lib-year-block,
+.lib-month-block,
+.lib-day-block {
+  position: relative;
+}
+
+.lib-sticky-year,
+.lib-sticky-month,
+.lib-sticky-day {
+  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-sticky-year {
+  position: sticky;
+  top: var(--lib-sticky-top);
+  z-index: 8;
+  font-family: var(--share-font-title, var(--font-fraunces), serif);
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  padding: 0.35rem 0;
+  min-height: var(--lib-year-h);
+  display: flex;
+  align-items: center;
+}
+
+.lib-sticky-month {
+  position: sticky;
+  top: calc(var(--lib-sticky-top) + var(--lib-year-h));
+  z-index: 7;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.2rem 0;
+  min-height: var(--lib-month-h);
+  display: flex;
+  align-items: center;
+}
+
+.lib-sticky-month-inline {
+  display: none;
+}
+
+.lib-sticky-day {
+  position: sticky;
+  top: calc(var(--lib-sticky-top) + var(--lib-year-h) + var(--lib-month-h));
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--share-muted, var(--lib-muted));
+  padding: 0.25rem 0 0.45rem;
+}
+
+.lib-sticky-day h3 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--share-text, var(--lib-ink));
+}
+
+.lib-day-select {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .lib.share-shell {
+    --lib-sticky-top: 6.5rem;
+    --lib-year-h: 0px;
+  }
+
+  .lib-sticky-year {
+    display: none;
+  }
+
+  .lib-sticky-month-inline {
+    display: inline;
+    font-weight: 600;
+  }
+}
+
+.lib-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 4rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--share-surface, var(--lib-surface)) 92%, transparent);
+  border-bottom: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-selection-bar-bottom {
+  position: fixed;
+  z-index: 35;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--share-shadow, var(--lib-shadow));
+}
+
+.lib-selection-bar-top {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .lib-selection-bar-bottom {
+    display: none;
+  }
+  .lib-selection-bar-top {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .lib-top {
+    display: none;
+  }
+}
+
+.lib-shell-art,
+.lib-empty-art {
+  position: relative;
+  min-height: 6rem;
+  margin-bottom: 0.8rem;
+}
+
+.lib-decor-main svg,
+.lib-decor-bg svg,
+.lib-decor-fg svg {
+  width: 100%;
+  max-width: 12rem;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.lib-decor-fg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lib-page-drop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--share-text, #000) 35%, transparent);
+  color: var(--share-surface, #fff);
+  font-size: 1.4rem;
+}
+
+.lib-offline {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--share-muted, #888) 12%, var(--share-bg, #fff));
+  font-size: 0.9rem;
+}
+
+.lib-drawer {
+  border: 0;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+  background: transparent;
+}
+
+.lib-drawer::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.lib-drawer-panel {
+  width: min(420px, 100vw);
+  max-height: 100vh;
+  margin-left: auto;
+  padding: 1rem;
+  background: var(--share-bg, var(--lib-bg));
+  overflow: auto;
+}
+
+.lib-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-top: 0.8rem;
+}
+
+.lib-skel-bar {
+  height: 1.2rem;
+  border-radius: 8px;
+  margin-bottom: 0.4rem;
+}
+
+.lib-skel-bar.short {
+  width: 40%;
+}
+
+.lib-theme-cover {
+  display: block;
+  height: 4.5rem;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.lib-theme-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lib-theme-layouts {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.lib-tile[data-failed="true"] {
+  outline: 1px dashed var(--share-muted, var(--lib-muted));
+}
+
+.lib-no-taken {
+  position: absolute;
+  bottom: 0.2rem;
+  left: 0.25rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.lib :focus-visible {
+  outline: 2px solid var(--share-accent, var(--lib-accent));
+  outline-offset: 2px;
+}

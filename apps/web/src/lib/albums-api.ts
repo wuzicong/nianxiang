@@ -32,8 +32,9 @@ export interface CreateShareInput {
 async function apiFetch<T>(
   path: string,
   init?: RequestInit,
+  fetchImpl: FetchImpl = fetch,
 ): Promise<{ ok: true; status: number; data: T } | { ok: false; status: number; body: ApiErrorBody | null }> {
-  const response = await fetch(path, {
+  const response = await fetchImpl(path, {
     credentials: "include",
     cache: "no-store",
     headers: { accept: "application/json", ...(init?.headers ?? {}) },
@@ -54,22 +55,68 @@ export async function listAlbums(): Promise<
   return { ok: true, albums: result.data.albums ?? [] };
 }
 
-export async function createAlbum(input: {
-  title: string;
-  themeId: string;
-}): Promise<{ ok: true; album: AlbumSummary } | { ok: false; status: number; message: string }> {
-  const result = await apiFetch<{ album?: AlbumSummary }>("/api/v1/albums", {
+const ALBUM_ASSET_BATCH = 50;
+
+/**
+ * 建册并可选关联一批资产。后端尚无「一次 POST 带 assetIds」时，前端按批 POST .../assets。
+ * 若日后 API 扩展 createAlbum({ assetIds })，可在这里收敛为单次请求。
+ */
+type FetchImpl = (input: string, init?: RequestInit) => Promise<Response>;
+
+export async function createAlbum(
+  input: {
+    title: string;
+    themeId: string;
+    assetIds?: readonly string[];
+  },
+  deps: { fetchImpl?: FetchImpl } = {},
+): Promise<
+  | { ok: true; album: AlbumSummary }
+  | { ok: false; status: number; message: string; albumId?: string; attachFailed?: boolean }
+> {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const result = await apiFetch<{ album?: AlbumSummary }>(
+    "/api/v1/albums",
+    {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
+    body: JSON.stringify({ title: input.title, themeId: input.themeId }),
+    },
+    fetchImpl,
+  );
   if (!result.ok) {
     return { ok: false, status: result.status, message: apiMessage(result.body) };
   }
   if (!result.data.album) {
     return { ok: false, status: 500, message: "响应不完整" };
   }
-  return { ok: true, album: result.data.album };
+  const album = result.data.album;
+  const assetIds = input.assetIds ? [...new Set(input.assetIds)] : [];
+  if (assetIds.length === 0) {
+    return { ok: true, album };
+  }
+  for (let offset = 0; offset < assetIds.length; offset += ALBUM_ASSET_BATCH) {
+    const chunk = assetIds.slice(offset, offset + ALBUM_ASSET_BATCH);
+    const added = await apiFetch<unknown>(
+      `/api/v1/albums/${encodeURIComponent(album.albumId)}/assets`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ assetIds: chunk }),
+      },
+      fetchImpl,
+    );
+    if (!added.ok) {
+      return {
+        ok: false,
+        status: added.status,
+        message: apiMessage(added.body),
+        albumId: album.albumId,
+        attachFailed: true,
+      };
+    }
+  }
+  return { ok: true, album };
 }
 
 export async function getAlbum(

@@ -196,7 +196,8 @@ async function requestUploadGrant(
 
 export async function uploadPhotoToAlbum(
   input: {
-    albumId: string;
+    /** 不传则只入库，不 attach 到相册（图库上传）。 */
+    albumId?: string;
     filename: string;
     mime: string;
     body: Blob;
@@ -249,6 +250,10 @@ export async function uploadPhotoToAlbum(
   }
   const completed = await readApi(completeResponse);
   if (!completed.ok) return completed;
+
+  if (!input.albumId) {
+    return { ok: true, assetId: grant.assetId };
+  }
 
   input.onPhase?.("attach");
   let attachResponse: Response;

@@ -61,19 +61,28 @@ function newEntryId(): string {
   return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export type UploadPhotosTarget =
+  | { kind: "album"; albumId: string }
+  | { kind: "library" };
+
 export function UploadPhotos({
-  albumId,
+  target,
   theme,
   assets,
   albumEmpty,
   onUploaded,
+  embedded,
 }: {
-  albumId: string;
+  target: UploadPhotosTarget;
   theme: ThemeSkin;
   assets: AlbumAssetView[];
   albumEmpty: boolean;
   onUploaded: () => void;
+  /** 图库抽屉内嵌时隐藏二级标题，保留拖放区与队列。 */
+  embedded?: boolean;
 }) {
+  const albumId = target.kind === "album" ? target.albumId : undefined;
+  const libraryMode = target.kind === "library";
   const formId = useId();
   const inputId = `${formId}-file`;
   const liveId = `${formId}-live`;
@@ -157,14 +166,15 @@ export function UploadPhotos({
     const processing = current.filter((e) => e.status === "processing").length;
     const active = current.filter((e) => e.status === "uploading" || e.status === "waiting").length;
     if (active > 0) return;
+    const place = libraryMode ? "图库" : "相册";
     if (failed > 0 && done === 0) {
-      setSummaryMessage("有照片未能加入相册，可重试或移除后继续。", "error");
+      setSummaryMessage(`有照片未能加入${place}，可重试或移除后继续。`, "error");
     } else if (failed > 0) {
       setSummaryMessage(`已完成 ${done} 张，${failed} 张失败，${processing} 张仍在生成预览。`, "error");
     } else if (processing > 0) {
-      setSummaryMessage(done > 0 ? `${done} 张已上传，预览生成中…` : "照片已加入相册，预览生成中…", "success");
+      setSummaryMessage(done > 0 ? `${done} 张已上传，预览生成中…` : `照片已加入${place}，预览生成中…`, "success");
     } else if (done > 0) {
-      setSummaryMessage(done === 1 ? "照片已加入相册。" : `${done} 张照片已加入相册。`, "success");
+      setSummaryMessage(done === 1 ? `照片已加入${place}。` : `${done} 张照片已加入${place}。`, "success");
     }
   }
 
@@ -175,7 +185,7 @@ export function UploadPhotos({
       const file = entry.file;
       let putRatio = 0;
       const result = await uploadPhotoToAlbum({
-        albumId,
+        albumId: albumId ?? undefined,
         filename: file.name,
         mime: file.type,
         body: file,
@@ -208,13 +218,13 @@ export function UploadPhotos({
       }
       patchEntry(entry.id, {
         status: "processing",
-        detail: "已加入相册，正在生成预览…",
+        detail: libraryMode ? "已上传，正在生成预览…" : "已加入相册，正在生成预览…",
         progress: 100,
         assetId: result.assetId,
       });
       onUploaded();
     },
-    [albumId, onUploaded, patchEntry],
+    [albumId, libraryMode, onUploaded, patchEntry],
   );
 
   const drainQueue = useCallback(async () => {
@@ -294,11 +304,21 @@ export function UploadPhotos({
       className="album-upload-shell"
       data-theme={theme.id}
       style={shareThemeStyle(theme)}
-      aria-labelledby={`${formId}-heading`}
+      aria-label={embedded ? "上传照片" : undefined}
+      aria-labelledby={embedded ? undefined : `${formId}-heading`}
     >
-      <h2 id={`${formId}-heading`}>上传照片</h2>
-      <p className="album-upload-lede">
-        照片会先进入你的私有空间，确认后再加入这本相册。相册与分享页只展示预览，不展示原图。
+      {embedded ? null : (
+        <>
+          <h2 id={`${formId}-heading`}>上传照片</h2>
+          <p className="album-upload-lede">
+            {libraryMode
+              ? "照片会先进入你的私有空间，按拍摄时间排进图库。分享前只展示预览，不展示原图。"
+              : "照片会先进入你的私有空间，确认后再加入这本相册。相册与分享页只展示预览，不展示原图。"}
+          </p>
+        </>
+      )}
+      <p className="album-upload-privacy">
+        仅你可见。我们只在你的空间里生成预览图，分享前不会公开任何照片。
       </p>
 
       <div

@@ -81,6 +81,8 @@ export interface AssetRepository {
   markFailed(id: string, error: string): Promise<void>;
   saveExif(id: string, exif: ExifSummary): Promise<void>;
   noteExifFailure(id: string, error: string): Promise<void>;
+  /** 只返回该用户的素材，按上传时间新到旧。limit 在仓库内夹到 1–500。 */
+  listByUser(userId: string, limit: number): Promise<AssetRecord[]>;
   close(): Promise<void>;
 }
 
@@ -103,6 +105,11 @@ export interface AssetRow {
 
 function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function clampLibraryLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return 1;
+  return Math.min(500, Math.max(1, Math.trunc(limit)));
 }
 
 export function mapAssetRow(row: AssetRow): AssetRecord {
@@ -401,6 +408,17 @@ export function createAssetRepository(options: {
          WHERE id = $1`,
         [id, JSON.stringify({ hasGps: false, error: error.slice(0, 500) })],
       );
+    },
+    async listByUser(userId, limit) {
+      const size = clampLibraryLimit(limit);
+      const result = await query<AssetRow>(
+        `SELECT * FROM assets
+         WHERE user_id = $1
+         ORDER BY created_at DESC, id DESC
+         LIMIT $2`,
+        [userId, size],
+      );
+      return result.rows.map((row) => mapAssetRow(row));
     },
     async close() {
       await pool.end();

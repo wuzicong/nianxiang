@@ -145,7 +145,7 @@ export default function AlbumDetailPage() {
           />
           <div id="album-upload">
             <UploadPhotos
-              albumId={album.albumId}
+              target={{ kind: "album", albumId: album.albumId }}
               theme={skin}
               assets={assets}
               albumEmpty={assets.length === 0}

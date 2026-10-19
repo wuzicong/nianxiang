@@ -59,6 +59,8 @@ export default function AlbumsPage() {
       <p style={{ marginBottom: "0.5rem" }}>
         <Link href="/">念册 · Memora</Link>
         {" · "}
+        <Link href="/library">照片库</Link>
+        {" · "}
         <Link href="/login">登录</Link>
       </p>
       <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>相册</h1>
