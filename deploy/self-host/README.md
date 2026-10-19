@@ -463,7 +463,55 @@ docker compose -f compose.prod.yml logs --tail 100 api
 docker compose -f compose.prod.yml logs --tail 100 web api worker postgres redis minio caddy ml minio-init
 ```
 
-三条都是 `000` 时先看 `caddy`。只有 `/health` 失败先看 `api`，再看 `postgres`、`redis`、`minio` 和 `minio-init`。只有 `/login` 失败看 `web`。只有 `/ready` 失败看 `caddy`。Caddy 写在卷里的 `memora-system.log` 见「TLS 证书续期」。
+三条都是 `000` 时先看 `caddy`。只有 `/health` 失败先看 `api`，再看 `postgres`、`redis`、`minio` 和 `minio-init`。只有 `/login` 失败看 `web`。只有 `/ready` 失败看 `caddy`。Caddy 写在卷里的 `memora-system.log` 见「TLS 证书续期」。证书续期、磁盘、429 和备份目录见「常见故障速查」。
+
+### 常见故障速查
+
+服务不是 healthy，或 `/health`、`/login`、`/ready` 不是 200，先做上一节。这里只收那一节盖不住的四件事：现象、检查、处理。长步骤留在专章。
+
+#### 证书续期失败
+
+现象：浏览器报证书过期或不被信任，HTTPS 起不来。
+
+检查：证书和 ACME 账号在卷 `caddy_data`，容器里是 `/data`。续期失败看进程日志 `/var/log/caddy/memora-system.log`。在仓库根目录：
+
+```bash
+docker compose -f compose.prod.yml exec -T caddy cat /var/log/caddy/memora-system.log
+docker compose -f compose.prod.yml exec -T caddy ls -la /data/caddy
+```
+
+处理：DNS 指到这台机器，防火墙放行 80 和 443。日志里 `/data` 是 permission denied，就是卷不可写；不要用 root 拥有的宿主机目录盖住 `/data` 却不改属主。其余原因和重签见「TLS 证书续期」。不要删整个 `caddy_data`。
+
+#### 磁盘满
+
+现象：「监控告警」用 `df`，使用率达到 85%（`MEMORA_DISK_PERCENT`）就记一笔。默认看 `/`。备份目录在另一块盘、并且那一块也到 85% 时，再单独记一笔。
+
+检查：项目 `memora-prod` 的 Compose 卷在 Docker 数据盘上：`memora_pg_data`、`memora_redis_data`、`memora_minio_data`、`caddy_data`、`caddy_config`、`caddy_logs`。`MEMORA_BACKUP_DIR` 默认 `/var/backups/memora`，按「备份与恢复」放在另一块盘，不要和这些卷同一块盘。
+
+处理：数据盘满时，库和对象写不进去，上传失败，Caddy 也写不进 `caddy_logs` 里的 `memora-access.log` 和 `memora-system.log`。备份盘满时，`backup.sh` 写不出 dump 和 `manifest-*.txt`，站点仍可能是 200。先腾出对应那块盘的空间，再按「做一次备份」补一份。不要用 `docker compose down -v` 腾空间。
+
+#### 429 误判
+
+现象：响应是 429，正文 `rate_limited`，「请稍后再试」。`/health`、`/login`、`/ready` 仍是 200 时，这是额度用完，不是宕机。零星 429 按预期限流处理，不要当成故障。「监控告警」要一轮解锁 429 达到 30 次、登录 429 达到 20 次才外发。
+
+检查：解锁有两层，见「解锁限流」。边缘是 Caddy zone `memora_share_unlock`（`proxy/Caddyfile.ratelimit` 的 `events`，默认每分钟 6 次，第 7 次 429），进程日志有 `zone=memora_share_unlock`。应用层是 `SHARE_UNLOCK_LIMIT`（默认 6）。经 Caddy 时边缘先拦；直连 api 的应用 429 不写这个 zone。登录和注册共用 zone `memora_auth`，每分钟 5 次，第 6 次 429。登出和 `GET /api/v1/auth/me` 不在这档，见「登录限流」。
+
+处理：等这一分钟过去再试。出口 IP 很多人共用时，按那两节把次数调高。不要为了消掉 429 关掉限流。
+
+#### 备份目录权限
+
+现象：跑 `deploy/self-host/backup.sh` 时 `mkdir` 或 `chmod` 报 permission denied，目录里没有新的 `manifest-*.txt`。
+
+检查：`MEMORA_BACKUP_DIR` 默认 `/var/backups/memora`，和「做一次备份」里的 `BACKUP_DIR` 是同一条路径。目录 `700`，dump `600`。脚本 `umask 077`，并自己 `chmod`。父目录不可写，或目录属主不是当前用户时，这一步会失败。
+
+处理：见「备份与恢复」。由跑备份的用户建好目录，属主留在这个用户上：
+
+```bash
+mkdir -p /var/backups/memora
+chmod 700 /var/backups/memora
+```
+
+不要把目录改成所有人可写。
 
 ### 监控告警
 
