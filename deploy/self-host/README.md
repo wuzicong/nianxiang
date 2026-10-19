@@ -214,6 +214,8 @@ Nginx、Traefik 的档位见上面「公网反代」。出口 IP 很多人共用
 
 目录里有 `.crt`、`.key` 和元数据，私钥在这里。进程用户是镜像里的 `caddy`（非 root）。构建时 `/data`、`/config`、`/var/log/caddy` 交给这个用户，日志目录权限是 `750`。不要把卷改成所有人可读，也不要用 root 拥有的宿主机目录盖住 `/data` 却不改属主。`docker compose down -v` 会连证书一起删掉。升级不要加 `-v`。
 
+域名留空时不会出现 `certificates`。Caddy 自己写下的 `instance.uuid` 和 `last_clean.json` 是 `600`，`locks` 是 `700`。证书签发后私钥仍在这棵树里，不要拷到别的目录再改成所有人可读。`caddy validate` 和 `caddy reload` 都带 `--config /etc/caddy/Caddyfile --adapter caddyfile`。reload 不会在明文模式下变出一张证书。
+
 通知邮箱写在 `proxy/Caddyfile` 的全局块：`email you@example.com`。改完执行：
 
 ```bash
@@ -222,7 +224,7 @@ docker compose -f compose.prod.yml up -d --force-recreate caddy
 
 没有邮箱也能签发。Let's Encrypt 只是不会发过期邮件。
 
-查看配置、版本和存储（不会打印私钥内容时，不要把 `cat` 出来的 `.key` 贴到工单）：
+查看配置、版本和存储。不要把 `.key` 的内容贴到工单：
 
 ```bash
 docker compose -f compose.prod.yml exec -T caddy caddy version
@@ -314,7 +316,7 @@ COMPOSE_ENV_FILES=/tmp/memora-prod.env docker compose -f compose.prod.yml up -d 
 下面的邮箱、口令和 Cookie 都是占位，换成一次性值。输出里打掉口令和 `memora_session`。注册和登录 POST 共用每分钟 5 次，先做完业务步骤，再做限流短测。
 
 1. 健康。上一节的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
-2. 端口。`docker compose -f compose.prod.yml ps` 只发布 `80` 和 `443`。不要出现 5432、6379、9000、9001、3000、3001、3002。
+2. 端口。`docker compose -f compose.prod.yml ps` 只发布 `80` 和 `443`。不要出现 5432、6379、9000、9001、3000、3001、3002。`docker ps` 里如果看到 `443/udp` 或 `2019/tcp`，但前面没有 `0.0.0.0:`，那是镜像暴露的端口，没有映射到宿主机。管理端口 2019 只在容器内。
 3. 注册或登录：
 
 ```bash
