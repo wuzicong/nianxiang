@@ -14,6 +14,13 @@ export function libraryGridGap(containerWidth: number): number {
   return 2;
 }
 
+/** 日组块间距（library-grid-gaps.md §3.2）；须与 library.css `.lib-day-block` 一致。 */
+export function libraryDayGroupSpacing(containerWidth: number): number {
+  if (containerWidth >= 1280) return 24;
+  if (containerWidth >= 768) return 20;
+  return 16;
+}
+
 export interface LibraryGridLayout {
   containerWidth: number;
   columns: number;
@@ -23,6 +30,7 @@ export interface LibraryGridLayout {
   yearHeader: number;
   monthHeader: number;
   dayHeader: number;
+  dayGroupSpacing: number;
 }
 
 export function libraryGridLayout(containerWidth: number, mobile = false): LibraryGridLayout {
@@ -38,6 +46,7 @@ export function libraryGridLayout(containerWidth: number, mobile = false): Libra
     yearHeader: mobile ? 0 : 44,
     monthHeader: 32,
     dayHeader: 40,
+    dayGroupSpacing: libraryDayGroupSpacing(containerWidth),
   };
 }
 
@@ -222,7 +231,7 @@ export function segmentBlockHeight(
   const headerPx = layout.dayHeader;
   const rows = Math.max(1, Math.ceil(segment.photos.length / layout.columns));
   const grid = rows * layout.tileSize + Math.max(0, rows - 1) * layout.gap;
-  return headerPx + grid;
+  return headerPx + grid + layout.dayGroupSpacing;
 }
 
 function findSegmentAt(segments: readonly DaySegment[], offset: number): number {

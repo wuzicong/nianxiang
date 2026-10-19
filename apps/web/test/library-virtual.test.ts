@@ -4,6 +4,7 @@ import { groupPhotosByTime } from "../src/lib/library";
 import { generateMockLibraryPhotos } from "../src/lib/library-mock";
 import {
   buildDaySegments,
+  libraryDayGroupSpacing,
   libraryGridLayout,
   maxRenderedTiles,
   segmentBlockHeight,
@@ -34,6 +35,20 @@ test("segment offsets are monotonic and cover total height", () => {
     const current = segments[index]!;
     assert.equal(current.offset, prev.offset + prev.height);
   }
+});
+
+test("day segment height includes inter-day group spacing", () => {
+  const layout375 = libraryGridLayout(375, true);
+  const layout1280 = libraryGridLayout(1280, false);
+  assert.equal(libraryDayGroupSpacing(375), 16);
+  assert.equal(libraryDayGroupSpacing(900), 20);
+  assert.equal(libraryDayGroupSpacing(1280), 24);
+  const photos = generateMockLibraryPhotos(6);
+  const base = segmentBlockHeight({ photos, undated: false }, layout375);
+  const withoutSpacing = layout375.dayHeader + layout375.tileSize * 2 + layout375.gap;
+  assert.equal(base, withoutSpacing + layout375.dayGroupSpacing);
+  const tall = segmentBlockHeight({ photos, undated: false }, layout1280);
+  assert.ok(tall > layout1280.dayHeader + layout1280.dayGroupSpacing);
 });
 
 test("day segment height ignores year/month headers", () => {
