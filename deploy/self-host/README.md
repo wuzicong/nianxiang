@@ -463,7 +463,7 @@ docker compose -f compose.prod.yml logs --tail 100 api
 docker compose -f compose.prod.yml logs --tail 100 web api worker postgres redis minio caddy ml minio-init
 ```
 
-`/health` 失败先看 `api`，再看 `postgres`、`redis`、`minio` 和 `minio-init`。`/login` 失败看 `web`。`/ready` 失败看 `caddy`。Caddy 写在卷里的 `memora-system.log` 见「TLS 证书续期」。
+三条都是 `000` 时先看 `caddy`。只有 `/health` 失败先看 `api`，再看 `postgres`、`redis`、`minio` 和 `minio-init`。只有 `/login` 失败看 `web`。只有 `/ready` 失败看 `caddy`。Caddy 写在卷里的 `memora-system.log` 见「TLS 证书续期」。
 
 ### 监控告警
 
