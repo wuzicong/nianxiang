@@ -125,7 +125,9 @@ export function AlbumStage({
               <>
                 <Link href="/albums">相册</Link>
                 <span aria-hidden="true"> / </span>
-                <Link href={`/albums/${encodeURIComponent(source.albumId)}`}>返回这本</Link>
+                <Link className="owned-toolbar-back" href={`/albums/${encodeURIComponent(source.albumId)}`}>
+                  返回这本
+                </Link>
               </>
             ) : (
               <Link href="/preview">样张</Link>

@@ -68,7 +68,7 @@ function OwnedPreviewChrome({
           </Link>
         ) : null}
         <Link
-          className={showShareCta || showLoginCta ? "preview-owned-secondary" : "preview-owned-primary"}
+          className={showShareCta || showLoginCta ? "preview-owned-back" : "preview-owned-primary"}
           href={`/albums/${encodeURIComponent(albumId)}`}
         >
           返回这本
@@ -187,6 +187,7 @@ export function OwnedAlbumStage({
         <span className="preview-owned-spinner" aria-hidden="true" />
         正在读取相册和预览图…
       </p>,
+      { showShareCta: false },
     );
   }
 
@@ -214,6 +215,7 @@ export function OwnedAlbumStage({
         </p>
         <p className="preview-owned-lead">可以先回到相册继续上传，或稍后再打开本页。</p>
       </>,
+      { showShareCta: false },
     );
   }
 
@@ -226,12 +228,11 @@ export function OwnedAlbumStage({
           这本相册里还没有可排进册子的预览图。上传照片后，系统会生成预览图（不是原图），才能在这里成册浏览。
         </p>
         {extra ? <p className="preview-owned-lead">{extra}</p> : null}
-        <p className="preview-owned-inline-cta">
-          <Link className="preview-owned-secondary" href={`/albums/${encodeURIComponent(albumId)}`}>
-            去相册上传照片
-          </Link>
+        <p className="preview-owned-inline-cta layout-note">
+          <Link href={`/albums/${encodeURIComponent(albumId)}`}>去相册上传照片</Link>
         </p>
       </>,
+      { showShareCta: false },
     );
   }
 

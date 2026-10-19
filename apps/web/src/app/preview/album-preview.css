@@ -149,9 +149,9 @@
   font: inherit;
   font-weight: 600;
   text-decoration: none;
-  color: var(--share-ink);
-  background: var(--share-brand);
-  border: 1px solid transparent;
+  color: var(--share-bg);
+  background: var(--share-text);
+  border: 1px solid var(--share-text);
   border-radius: var(--share-radius-button);
 }
 
@@ -162,9 +162,6 @@
 .album-shell[data-theme="magazine-heirloom"] .owned-share-cta {
   border-radius: 2px;
   letter-spacing: 0.08em;
-  color: var(--share-bg);
-  background: var(--share-text);
-  border-color: var(--share-text);
 }
 
 .owned-share-cta:focus-visible {
@@ -178,6 +175,20 @@
 
 .album-shell[data-album-source="owned"] .owned-sample-link {
   flex: 1 1 auto;
+  font-weight: 400;
+}
+
+.album-shell[data-album-source="owned"] .owned-sample-link a {
+  font-weight: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.album-shell[data-album-source="owned"] .owned-toolbar-back {
+  color: var(--share-muted);
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .album-shell[data-album-source="owned"] .toolbar-row-layout,
@@ -1200,9 +1211,33 @@ figcaption.slot-empty {
   font: inherit;
   font-weight: 600;
   text-decoration: none;
-  color: var(--share-ink);
-  background: var(--share-brand);
+  color: var(--share-bg);
+  background: var(--share-text);
+  border: 1px solid var(--share-text);
   border-radius: var(--share-radius-button);
+}
+
+.share-shell.preview-owned-shell[data-theme="cotton-candy"] .preview-owned-primary {
+  border-radius: var(--share-radius-pill);
+}
+
+.share-shell.preview-owned-shell[data-theme="magazine-heirloom"] .preview-owned-primary {
+  border-radius: 2px;
+  letter-spacing: 0.08em;
+}
+
+.preview-owned-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.15rem;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  color: var(--share-muted);
+  background: transparent;
+  border: 0;
 }
 
 .preview-owned-secondary {
@@ -1221,7 +1256,8 @@ figcaption.slot-empty {
 }
 
 .preview-owned-primary:focus-visible,
-.preview-owned-secondary:focus-visible {
+.preview-owned-secondary:focus-visible,
+.preview-owned-back:focus-visible {
   outline: 2px solid var(--share-accent);
   outline-offset: 3px;
 }
@@ -1430,7 +1466,7 @@ figcaption.slot-empty {
 
   .album-shell[data-album-source="owned"] .owned-sample-link {
     margin: 0;
-    width: 100%;
+    width: auto;
   }
 
   .album-shell[data-album-source="owned"] .toolbar-row-layout {
