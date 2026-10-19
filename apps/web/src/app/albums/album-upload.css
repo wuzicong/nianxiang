@@ -117,12 +117,13 @@
   color: var(--share-muted);
 }
 
+/* TODO: align upload success/error tone after moodboard */
 .album-upload-summary[data-kind="error"] {
-  color: #b91c1c;
+  color: color-mix(in srgb, var(--share-accent) 72%, var(--share-text));
 }
 
 .album-upload-summary[data-kind="success"] {
-  color: #166534;
+  color: color-mix(in srgb, var(--share-brand) 65%, var(--share-text));
 }
 
 .album-upload-queue {
@@ -138,6 +139,10 @@
   border-radius: var(--share-radius-button);
   padding: 0.7rem 0.85rem;
   background: var(--share-surface);
+}
+
+.album-upload-queue-item[data-upload-state="failed"] {
+  border-left: 3px solid color-mix(in srgb, var(--share-accent) 78%, var(--share-brand));
 }
 
 .album-upload-queue-head {
@@ -163,7 +168,7 @@
 }
 
 .album-upload-queue-status[data-state="failed"] {
-  color: #b91c1c;
+  color: color-mix(in srgb, var(--share-accent) 72%, var(--share-text));
 }
 
 .album-upload-queue-tools {

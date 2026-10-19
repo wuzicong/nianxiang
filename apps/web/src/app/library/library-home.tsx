@@ -498,7 +498,10 @@ export function LibraryHome({
               <button type="button" className="lib-primary" disabled={offline} onClick={() => setUploadOpen(true)}>
                 上传第一批照片
               </button>
-              <p><Link href="/preview">看看主题样张</Link></p>
+              {/* TODO: align empty-library secondary CTA after moodboard */}
+              <p>
+                <Link className="lib-quiet lib-empty-secondary" href="/preview">看看主题样张</Link>
+              </p>
             </section>
           ) : null}
 
