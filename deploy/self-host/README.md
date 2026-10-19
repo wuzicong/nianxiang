@@ -67,7 +67,7 @@ MEMORA_MONITOR_ENV=/etc/memora/monitor.env deploy/self-host/monitoring/check.sh 
 - [ ] 域名。DNS 指到这台机器，防火墙放行 80 和 443。`MEMORA_DOMAIN`、`WEB_ORIGINS` 见「生产部署」的「环境」。域名留空只适合本机明文，不要放到公网。
 - [ ] 证书。见「TLS 证书续期」。`MEMORA_DOMAIN` 写成纯域名后，Caddy 申请证书并在后台续期。
 - [ ] 备份目录。另一块盘或另一台机器，目录 `700`。见「备份与恢复」的「做一次备份」。
-- [ ] 首次 restore drill。先 `deploy/self-host/restore-drill.sh --dry-run`（成功最后一行是 `[memora] drill dry-run ok`），再按「演练」做隔离演练。通过与否看「验收清单」。
+- [ ] 首次 restore drill。先 `deploy/self-host/restore-drill.sh --dry-run`（退出码 0，最后一行是 `[memora] drill dry-run ok`），再按「演练」跑 `restore-drill.sh`，或按顺序贴同一节的空目录演练、校验、回滚。通过与否看「验收清单」。
 
 ## 服务
 
@@ -505,7 +505,7 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 
 5. 上传探针。`POST /api/v1/assets/upload-url`，正文带 `filename`、`mime`、`size`，可以带上一步的 `albumId`。返回的 `url` 指向内部的 `minio:9000`，宿主机解析不了，也不要打印这个 URL。把响应存进权限 `600` 的临时文件，在 api 容器里按返回的 `headers` 做 PUT，再 `POST /api/v1/assets/<assetId>/complete`。浏览器里的拖拽上传标「需运维人工」。
 6. 备份。按「做一次备份」执行 `backup.sh --compose`。目录里要有 `manifest-<时间>.txt`，目录权限 `700`，dump 权限 `600`。标准输出里没有口令。
-7. 恢复命令。`restore.sh --dry-run --stamp <时间>` 只核对文件，不改库。隔离的完整路径用「演练」里的 `restore-drill.sh`（先 `--dry-run`，再不带参数）。不要对 `memora-prod` 加 `--yes` 做演练。
+7. 恢复命令。`restore.sh --dry-run --stamp <时间>` 只核对文件，不改库。隔离的完整路径用「演练」里的 `restore-drill.sh`（先 `--dry-run`，再不带参数），或按顺序贴同一节的空目录演练、校验、回滚。不要对 `memora-prod` 加 `--yes` 做演练。
 8. 解锁限流。按「解锁限流」对一个 43 位假令牌连续 POST `.../unlock`。经 Caddy：前 6 次是 401「无法打开分享」，第 7 次多为边缘 429「请稍后再试」（`rate_limited`，带 `Retry-After`；Caddy 先拦）。api 容器内绕过 Caddy、直连 `127.0.0.1:3001`：前 6 次仍是 401，第 7 次是应用 429，正文同为 `rate_limited`（`SHARE_UNLOCK_LIMIT` 默认 6）。可选的公开 GET 见那一节，和这次解锁隔开一分钟。
 9. 访问日志。用上一节的请求看 `/var/log/caddy/memora-access.log`。路径是 `/api/v1/public/shares/***/unlock`，`Referer` 里的 `/s/` 令牌也是 `***`。没有 Cookie 值、Authorization、查询串口令或 JSON 正文。经 Caddy 超额的那几行进程日志是 `zone=memora_share_unlock`，字段里没有请求路径。直连 api 的应用 429 不在这份日志里。登录密码同样只在 JSON 正文里，访问日志不记正文。
 10. 登录限流。同一来源连续 POST `/api/v1/auth/login`，第 6 次是 429，正文含 `请稍后再试`。测完等一分钟再给真人登录。登录和注册单独一档，按来源 IP。测完给真人用之前留出这一分钟。
@@ -520,7 +520,7 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 - [ ] 建册成功
 - [ ] 上传探针已完成，或注明需运维人工并留下 curl
 - [ ] `backup.sh --compose` 写出 manifest，权限正确，输出无口令
-- [ ] `restore.sh --dry-run --stamp` 成功；`restore-drill.sh` 按「演练」通过，没有动 `memora` / `memora-prod`
+- [ ] `restore.sh --dry-run --stamp` 成功；`restore-drill.sh` 或空目录三段按「演练」通过，没有动 `memora` / `memora-prod`
 - [ ] 假令牌解锁：经 Caddy 前 6 次 401「无法打开分享」，第 7 次多为边缘 429「请稍后再试」；直连 api 第 7 次为应用 429（同一 `rate_limited` 正文）
 - [ ] 访问日志路径为 `***`，无 Cookie、Authorization 和口令
 - [ ] 登录第 6 次 429
@@ -690,15 +690,15 @@ docker compose -f compose.prod.yml start api worker
 deploy/self-host/restore-drill.sh --dry-run
 ```
 
-成功时最后一行是 `[memora] drill dry-run ok`。
+成功时退出码是 0，最后一行是 `[memora] drill dry-run ok`。没有 Docker、也没有生产栈时，这一条仍然可以做。它只证明脚本自检通过。
 
-完整冒烟需要 Docker，以及和 `compose.prod.yml` 相同的镜像标签（本机已有镜像时不会强行重新拉取）：
+完整冒烟需要 Docker，以及和 `compose.prod.yml` 相同的镜像标签（本机已有镜像时不会强行重新拉取）。这一条自己建空备份目录、写探针、`down -v` 换新卷、再 `restore.sh --fresh`。成功或失败都会拆掉演练容器和卷；成功时删掉临时目录，失败时日志留下 `leftover backup dir`。
 
 ```bash
 deploy/self-host/restore-drill.sh
 ```
 
-步骤：起临时 Postgres 和 MinIO → 写入探针行和对象 → `backup.sh --compose` → `down -v` 换新卷 → 确认探针已经消失 → `restore.sh --fresh` → 确认探针回来。成功时最后一行是：
+成功时最后一行是：
 
 ```text
 [memora] drill ok: postgres probe=memora-backup-probe object probe=memora-backup-probe dump_mode=600 backup_dir_mode=700
@@ -712,14 +712,206 @@ deploy/self-host/restore-drill.sh
 4. 备份目录权限 `700`，dump 权限 `600`
 5. 演练输出里没有 Postgres / MinIO 口令
 
-机器拉不动镜像时，在一套**专用**的空 Compose 上手动做同样五步，用上面的判定。不要对着生产库演练删除。
+要分步看空目录、校验和回滚，在仓库根目录的**同一个 bash** 里按顺序贴下面三段。`restore-drill.sh` 和这三段是同一条路径：`backup.sh --compose`，然后 `down -v`，再 `restore.sh --compose --fresh --no-pause-writers --yes`。镜像已在本机时，`compose.drill.yml` 的 `pull_policy: missing` 用本地标签。拉取失败就停，不要改去 `memora` 或 `memora-prod`。
+
+三段只动项目 `memora-backup-drill` 和 `mktemp` 出来的空目录。`DRILL_BACKUP_DIR` 不要指到 `/var/backups/memora`。演练 Compose 没有 api / worker，所以恢复带 `--no-pause-writers`，和 `restore-drill.sh` 相同。生产恢复不要加这个参数，也不要 `down -v`。生产库回滚用上面「恢复」里的覆盖命令，stamp 用升级前那一份。`minio-init` 可能先打 CORS 未实现，再打 `warning: bucket CORS was not applied`，退出码仍是 0，桶已经是 private。见「存储」。
+
+中途失败也贴「回滚」。口令只 export，不 echo，不写进仓库。
+
+##### 空目录演练
+
+`drill` 与 `deploy/self-host/lib/common.sh` 的 `compose` 一样，带上 `-f`、`--project-directory`、`--project-name`。`backup.sh` / `restore.sh` 会继承已经 export 的 `COMPOSE_FILE`、`COMPOSE_PROJECT_NAME`、`S3_BUCKET` 和两份演练口令。
+
+```bash
+set -euo pipefail
+umask 077
+unset COMPOSE_ENV_FILES BACKUP_AGE_RECIPIENT BACKUP_AGE_IDENTITY
+cd "$(git rev-parse --show-toplevel)"
+export COMPOSE_FILE="$PWD/deploy/self-host/compose.drill.yml"
+export COMPOSE_PROJECT_NAME=memora-backup-drill
+export S3_BUCKET=memora-local
+export POSTGRES_USER=memora
+export POSTGRES_DB=memora
+[[ "$COMPOSE_PROJECT_NAME" == "memora-backup-drill" ]]
+[[ -f "$COMPOSE_FILE" ]]
+grep -q '^name: memora-backup-drill$' "$COMPOSE_FILE"
+DRILL_POSTGRES_PASSWORD=$(od -An -N 16 -tx1 /dev/urandom | tr -d ' \n')
+DRILL_MINIO_ROOT_PASSWORD=$(od -An -N 16 -tx1 /dev/urandom | tr -d ' \n')
+export DRILL_POSTGRES_PASSWORD
+export DRILL_MINIO_ROOT_PASSWORD
+DRILL_BACKUP_DIR=$(mktemp -d)
+chmod 700 "$DRILL_BACKUP_DIR"
+export DRILL_BACKUP_DIR
+printf '[memora] drill backup dir=%s\n' "$DRILL_BACKUP_DIR"
+
+drill() {
+  docker compose \
+    -f "$COMPOSE_FILE" \
+    --project-directory "$(dirname "$COMPOSE_FILE")" \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    "$@"
+}
+
+mc_drill() {
+  drill run --rm --no-deps -T --entrypoint /bin/sh \
+    -e "S3_BUCKET=${S3_BUCKET}" \
+    -v "$(dirname "$COMPOSE_FILE")/lib/mc-inside.sh:/mc-inside.sh:ro" \
+    minio-init /mc-inside.sh "$@"
+}
+
+wait_drill_healthy() {
+  local attempt=0 pg_health="" minio_health=""
+  while [[ "$attempt" -lt 60 ]]; do
+    attempt=$((attempt + 1))
+    pg_health=$(drill ps postgres --format '{{.Health}}' 2>/dev/null || true)
+    minio_health=$(drill ps minio --format '{{.Health}}' 2>/dev/null || true)
+    if [[ "$pg_health" == "healthy" && "$minio_health" == "healthy" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+  printf '[memora] postgres or minio did not become healthy (last postgres=%s minio=%s)\n' \
+    "${pg_health:-unknown}" "${minio_health:-unknown}" >&2
+  return 1
+}
+
+start_drill_stack() {
+  drill up -d --quiet-pull postgres minio
+  wait_drill_healthy
+  drill run --rm --no-deps minio-init
+  local cname
+  cname=$(drill ps postgres --format '{{.Name}}')
+  [[ "$cname" == memora-backup-drill-* ]]
+}
+
+drill down -v --remove-orphans
+start_drill_stack
+
+drill exec -T postgres psql -v ON_ERROR_STOP=1 -U memora -d memora <<'SQL'
+CREATE TABLE backup_probe (
+  id text PRIMARY KEY,
+  note text NOT NULL
+);
+INSERT INTO backup_probe (id, note) VALUES ('probe-1', 'memora-backup-probe');
+SQL
+printf '%s' 'memora-backup-probe' | mc_drill put 'probe/marker.txt'
+
+[[ "$COMPOSE_FILE" == "$PWD/deploy/self-host/compose.drill.yml" ]]
+[[ "$COMPOSE_PROJECT_NAME" == "memora-backup-drill" ]]
+backup_log=$(mktemp)
+chmod 600 "$backup_log"
+BACKUP_DIR="$DRILL_BACKUP_DIR" deploy/self-host/backup.sh --compose | tee "$backup_log"
+stamp=$(sed -n 's/^\[memora\] backup written under .* stamp=//p' "$backup_log" | head -n 1)
+rm -f "$backup_log"
+[[ "$stamp" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
+export stamp
+
+drill down -v --remove-orphans
+start_drill_stack
+before=$(drill exec -T postgres psql -v ON_ERROR_STOP=1 -tA -U memora -d memora \
+  -c "SELECT to_regclass('public.backup_probe');" | tr -d '[:space:]')
+[[ -z "$before" ]]
+set +e
+mc_drill stat 'probe/marker.txt' >/dev/null 2>&1
+stat_status=$?
+set -e
+[[ "$stat_status" -ne 0 ]]
+
+BACKUP_DIR="$DRILL_BACKUP_DIR" \
+  deploy/self-host/restore.sh --compose --fresh --no-pause-writers --yes --stamp "$stamp"
+```
+
+`backup.sh` 成功时最后一行是 `[memora] backup written under <目录> stamp=<时间>`。`restore.sh` 成功时有一行 `[memora] restore finished stamp=<时间>`，最后一行是 `[memora] Redis 队列没有恢复，保持空队列，不要把旧的 AOF 拷回来`。退出码都是 0。这段会 `unset BACKUP_AGE_RECIPIENT`，产物是明文 dump。加密往返由装了 age 的 `--dry-run` 另做。
+
+##### 校验
+
+栈还在、空目录还在时贴。某一项对不上就停，先留着目录。
+
+```bash
+set -euo pipefail
+[[ "${COMPOSE_PROJECT_NAME:-}" == "memora-backup-drill" ]]
+[[ -n "${stamp:-}" && -n "${DRILL_BACKUP_DIR:-}" ]]
+declare -F drill >/dev/null
+declare -F mc_drill >/dev/null
+[[ "$(stat -c '%a' "$DRILL_BACKUP_DIR")" == "700" ]]
+[[ "$(stat -c '%a' "$DRILL_BACKUP_DIR/memora-${stamp}.dump")" == "600" ]]
+[[ "$(stat -c '%a' "$DRILL_BACKUP_DIR/manifest-${stamp}.txt")" == "600" ]]
+[[ "$(stat -c '%a' "$DRILL_BACKUP_DIR/objects-${stamp}.sha256")" == "600" ]]
+[[ "$(stat -c '%a' "$DRILL_BACKUP_DIR/objects-${stamp}/probe/marker.txt")" == "600" ]]
+[[ "$(head -c 5 "$DRILL_BACKUP_DIR/memora-${stamp}.dump")" == "PGDMP" ]]
+manifest="$DRILL_BACKUP_DIR/manifest-${stamp}.txt"
+[[ "$(awk -F= '$1=="stamp"{print $2}' "$manifest")" == "$stamp" ]]
+[[ "$(awk -F= '$1=="s3_bucket"{print $2}' "$manifest")" == "$S3_BUCKET" ]]
+[[ "$(awk -F= '$1=="postgres_dump"{print $2}' "$manifest")" == "memora-${stamp}.dump" ]]
+[[ "$(awk -F= '$1=="age_encrypted"{print $2}' "$manifest")" == "no" ]]
+dump_sha=$(awk -F= '$1=="postgres_dump_sha256"{print $2}' "$manifest")
+actual=$(sha256sum "$DRILL_BACKUP_DIR/memora-${stamp}.dump" | awk '{print $1}')
+[[ -n "$dump_sha" && "$actual" == "$dump_sha" ]]
+objects_now="$DRILL_BACKUP_DIR/objects.now.sha256"
+(
+  cd "$DRILL_BACKUP_DIR/objects-${stamp}"
+  LC_ALL=C find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+) >"$objects_now"
+diff -q "$DRILL_BACKUP_DIR/objects-${stamp}.sha256" "$objects_now"
+rm -f "$objects_now"
+files=$(awk -F= '$1=="objects_files"{print $2}' "$manifest")
+lines=$(wc -l < "$DRILL_BACKUP_DIR/objects-${stamp}.sha256" | tr -d ' ')
+[[ "$files" == "$lines" ]]
+BACKUP_DIR="$DRILL_BACKUP_DIR" S3_BUCKET="$S3_BUCKET" \
+  deploy/self-host/restore.sh --dry-run --stamp "$stamp"
+drill exec -T postgres pg_restore -l < "$DRILL_BACKUP_DIR/memora-${stamp}.dump" >/dev/null
+note=$(drill exec -T postgres psql -v ON_ERROR_STOP=1 -tA -U memora -d memora \
+  -c "SELECT note FROM backup_probe WHERE id = 'probe-1';" | tr -d '[:space:]')
+[[ "$note" == "memora-backup-probe" ]]
+body=$(mc_drill cat 'probe/marker.txt' | tr -d '[:space:]')
+[[ "$body" == "memora-backup-probe" ]]
+printf '[memora] empty-dir verify ok stamp=%s\n' "$stamp"
+```
+
+权限、魔数 `PGDMP`、manifest 字段和 sha256 与 `restore.sh` 改库前的检查相同。对象树的算法与 `lib/common.sh` 的 `hash_tree` 相同。`--dry-run --stamp` 只确认 manifest 文件在，不改库；成功时最后两行是 `[memora] manifest=ok` 和 `[memora] dry-run: 不会覆盖数据`。`pg_restore -l` 在演练的 Postgres 容器里读这份 dump，退出码 0。宿主机没有 `pg_restore` 时不要改到生产容器里做。这段自己的最后一行是 `[memora] empty-dir verify ok stamp=<时间>`。
+
+##### 回滚
+
+校验通过后拆演练栈，并删掉这次 `mktemp` 的空目录。项目名和 compose 文件写死，避免跟着别的 `COMPOSE_FILE` 走到生产。
+
+```bash
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+drill_file="$PWD/deploy/self-host/compose.drill.yml"
+grep -q '^name: memora-backup-drill$' "$drill_file"
+docker compose \
+  -f "$drill_file" \
+  --project-directory "$PWD/deploy/self-host" \
+  --project-name memora-backup-drill \
+  down -v --remove-orphans
+if [[ -n "${DRILL_BACKUP_DIR:-}" ]]; then
+  case "$DRILL_BACKUP_DIR" in
+    /var/backups/memora|/var/backups/memora/*)
+      printf '[memora] refusing to delete %s\n' "$DRILL_BACKUP_DIR" >&2
+      exit 1
+      ;;
+  esac
+  case "$(basename "$DRILL_BACKUP_DIR")" in
+    tmp.*)
+      rm -rf "$DRILL_BACKUP_DIR"
+      ;;
+    *)
+      printf '[memora] leaving drill backup dir %s\n' "$DRILL_BACKUP_DIR" >&2
+      ;;
+  esac
+fi
+unset DRILL_POSTGRES_PASSWORD DRILL_MINIO_ROOT_PASSWORD DRILL_BACKUP_DIR stamp
+printf '[memora] drill rollback ok project=memora-backup-drill\n'
+```
+
+成功时退出码是 0，最后一行是 `[memora] drill rollback ok project=memora-backup-drill`。shell 断了、变量没了时，仍可单独贴上面的 `docker compose ... down -v`。空目录按演练时打印的 `drill backup dir=` 那一行手工删，只删 `tmp.*`。`memora` 和 `memora-prod` 的卷不要动。
 
 #### 验收清单
 
 把这份清单抄到变更单里勾选。有一项做不到，这次演练不算通过。
 
 - [ ] `deploy/self-host/restore-drill.sh --dry-run` 退出码是 0，输出里没有口令
-- [ ] 隔离演练（脚本或手动五步）在新卷上恢复后，探针行和探针对象都还在；恢复前它们不在
+- [ ] 隔离演练（`restore-drill.sh`，或上面的空目录三段）在新卷上恢复后，探针行和探针对象都还在；恢复前它们不在。回滚后 `memora-backup-drill` 已 `down -v`
 - [ ] 备份目录权限是 `700`，dump、校验文件和密钥副本是 `600`
 - [ ] 备份不在数据库和 MinIO 的同一块盘上
 - [ ] 标准输出和标准错误里没有 Postgres、MinIO、`.env` 的口令；`~/.mc` 没有新增这份口令
