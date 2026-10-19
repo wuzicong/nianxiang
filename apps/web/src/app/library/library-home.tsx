@@ -9,12 +9,13 @@
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from "@memora/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { assetNeedsRefresh, safeUserMessage, type AlbumAssetView } from "../../lib/album-assets";
 import { createThemedAlbum, listLibrary } from "../../lib/library-api";
 import {
   applyPhotoSelection,
   chronologicalAssetIds,
+  composeCoverPhoto,
   flattenGroupIds,
   groupPhotosByTime,
   LIBRARY_SELECTION_LIMIT,
@@ -65,6 +66,22 @@ const SHELLS: Record<Exclude<Tab, "time">, { title: string; body: string; decor:
 
 const shellSkin = themeSkin(DEFAULT_THEME_ID);
 
+const DESKTOP_SELECTION_MQ = "(min-width: 1280px)";
+
+function subscribeDesktopSelection(onStoreChange: () => void) {
+  const mq = window.matchMedia(DESKTOP_SELECTION_MQ);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getDesktopSelection() {
+  return window.matchMedia(DESKTOP_SELECTION_MQ).matches;
+}
+
+function getDesktopSelectionServer() {
+  return false;
+}
+
 export function LibraryHome({
   decorations,
 }: {
@@ -72,6 +89,12 @@ export function LibraryHome({
 }) {
   const router = useRouter();
   const uploadTriggerRef = useRef<HTMLButtonElement>(null);
+  const composeTriggerRef = useRef<HTMLButtonElement>(null);
+  const desktopSelectionBar = useSyncExternalStore(
+    subscribeDesktopSelection,
+    getDesktopSelection,
+    getDesktopSelectionServer,
+  );
   const uploadQueueRef = useRef<UploadQueueSnapshot>({
     waiting: 0,
     uploading: 0,
@@ -376,12 +399,79 @@ export function LibraryHome({
   const processing = photos.some((photo) => assetNeedsRefresh(photo.status));
   const showSelectionBar = selecting || selected.length > 0;
   const shell = tab === "time" ? null : SHELLS[tab];
-  const coverPhoto = photos.find((p) => selected.includes(p.assetId)) ?? photos[0] ?? null;
+  const coverPhoto = useMemo(
+    () => composeCoverPhoto(photos, draftIds ?? selected, timeZone),
+    [photos, draftIds, selected, timeZone],
+  );
   const live = capped
     ? "一次最多 200 张，先挑最想放进去的"
     : selected.length > 0
       ? `已选 ${selected.length} 张`
-      : toast ?? "";
+      : selecting
+        ? "已选 0 张"
+        : toast ?? "";
+
+  const selectionBarInner = (
+    <>
+      <button type="button" className="lib-quiet" onClick={clearSelection}>✕ 取消</button>
+      <strong aria-live="polite">{live}</strong>
+      <button
+        ref={composeTriggerRef}
+        type="button"
+        className="lib-primary"
+        disabled={selected.length < 1 || pending || offline || capped}
+        onClick={openComposer}
+      >
+        做成主题相册
+      </button>
+    </>
+  );
+
+  const selectionBar = showSelectionBar ? (
+    desktopSelectionBar ? (
+      <header className="lib-selection-bar lib-selection-bar-top" role="region" aria-label="已选照片">
+        {selectionBarInner}
+      </header>
+    ) : (
+      <div className="lib-selection-bar lib-selection-bar-bottom" role="region" aria-label="已选照片">
+        {selectionBarInner}
+      </div>
+    )
+  ) : null;
+
+  const defaultTopHeader = (
+    <header className="lib-top">
+      <div className="lib-wrap lib-top-inner">
+        <Link className="lib-mark" href="/">念册 · Memora</Link>
+        <span className="lib-privacy-badge" title="仅你可见">🔒 仅你可见</span>
+        <div className="lib-top-actions">
+          <button
+            ref={uploadTriggerRef}
+            type="button"
+            className="lib-primary"
+            disabled={offline || phase !== "ready"}
+            onClick={openUploadWorkbench}
+          >
+            上传
+          </button>
+          {email ? (
+            <button type="button" className="lib-quiet" onClick={() => void fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" }).then(() => router.push("/login"))}>
+              退出
+            </button>
+          ) : (
+            <Link href="/login">登录</Link>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+
+  const topChrome =
+    showSelectionBar && desktopSelectionBar
+      ? selectionBar
+      : !showSelectionBar
+        ? defaultTopHeader
+        : null;
 
   return (
     <div
@@ -412,45 +502,7 @@ export function LibraryHome({
 
       <a className="lib-skip" href="#library-main">跳到内容</a>
 
-      {showSelectionBar ? (
-        <header className="lib-selection-bar lib-selection-bar-top" role="region" aria-label="已选照片">
-          <button type="button" className="lib-quiet" onClick={clearSelection}>✕ 取消</button>
-          <strong aria-live="polite">{live}</strong>
-          <button
-            type="button"
-            className="lib-primary"
-            disabled={selected.length < 1 || pending || offline || capped}
-            onClick={openComposer}
-          >
-            做成主题相册
-          </button>
-        </header>
-      ) : (
-        <header className="lib-top">
-          <div className="lib-wrap lib-top-inner">
-            <Link className="lib-mark" href="/">念册 · Memora</Link>
-            <span className="lib-privacy-badge" title="仅你可见">🔒 仅你可见</span>
-            <div className="lib-top-actions">
-              <button
-                ref={uploadTriggerRef}
-                type="button"
-                className="lib-primary"
-                disabled={offline || phase !== "ready"}
-                onClick={openUploadWorkbench}
-              >
-                上传
-              </button>
-              {email ? (
-                <button type="button" className="lib-quiet" onClick={() => void fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" }).then(() => router.push("/login"))}>
-                  退出
-                </button>
-              ) : (
-                <Link href="/login">登录</Link>
-              )}
-            </div>
-          </div>
-        </header>
-      )}
+      {topChrome}
 
       <div className="lib-tabs-wrap">
         <div role="tablist" aria-label="分组" className="lib-tabs" onKeyDown={onTabKey}>
@@ -561,20 +613,7 @@ export function LibraryHome({
         </div>
       </main>
 
-      {showSelectionBar ? (
-        <div className="lib-selection-bar lib-selection-bar-bottom" role="region" aria-label="已选照片">
-          <button type="button" className="lib-quiet" onClick={clearSelection}>✕ 取消</button>
-          <strong aria-live="polite">{live}</strong>
-          <button
-            type="button"
-            className="lib-primary"
-            disabled={selected.length < 1 || pending || offline || capped}
-            onClick={openComposer}
-          >
-            做成主题相册
-          </button>
-        </div>
-      ) : null}
+      {!desktopSelectionBar ? selectionBar : null}
 
       <LibraryUploadWorkbench
         open={uploadWorkbenchOpen}
@@ -617,7 +656,10 @@ export function LibraryHome({
         count={(draftIds ?? selected).length}
         error={createError}
         albumHref={draftAlbumId ? `/albums/${encodeURIComponent(draftAlbumId)}` : null}
-        onClose={() => setComposerOpen(false)}
+        onClose={() => {
+          setComposerOpen(false);
+          window.requestAnimationFrame(() => composeTriggerRef.current?.focus());
+        }}
         onStep={setComposeStep}
         onTitle={(value) => {
           setTitleDirty(true);

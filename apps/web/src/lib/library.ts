@@ -284,6 +284,20 @@ export function chronologicalAssetIds(
     .map((entry) => entry.photo.assetId);
 }
 
+/** 建册主题卡封面：选择集内时间正序第一张有 preview 的图。 */
+export function composeCoverPhoto(
+  photos: readonly LibraryPhoto[],
+  selected: readonly string[],
+  timeZone = "UTC",
+): LibraryPhoto | null {
+  const byId = new Map(photos.map((photo) => [photo.assetId, photo]));
+  for (const id of chronologicalAssetIds(photos, selected, timeZone)) {
+    const photo = byId.get(id);
+    if (photo && previewUrl(photo.previews)) return photo;
+  }
+  return null;
+}
+
 export function applyPhotoSelection(input: {
   selected: readonly string[];
   orderedIds: readonly string[];
