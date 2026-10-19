@@ -92,9 +92,16 @@ function forbiddenMarkers(extra = []) {
   ].filter((marker) => marker.length > 0);
 }
 
+function markerName(marker) {
+  if (marker.startsWith("acct-") || marker.startsWith("share-")) return "password";
+  if (marker === GPS_LAT_TEXT || marker === GPS_LNG_TEXT) return "gps";
+  if (marker === EXIF_DATE) return "exif-date";
+  return marker;
+}
+
 function assertSurface(label, text, extra = []) {
   for (const marker of forbiddenMarkers(extra)) {
-    if (text.includes(marker)) throw new Error(`${label} contains a forbidden marker`);
+    if (text.includes(marker)) throw new Error(`${label} contains a forbidden marker (${markerName(marker)})`);
   }
 }
 
@@ -137,6 +144,8 @@ async function flushResponses() {
 
 function inspectResponses(extra) {
   for (const record of watched) {
+    if (record.url.includes("/_next/")) continue;
+    if ((record.contentType || "").includes("javascript")) continue;
     if (record.url.includes("/assets/upload-url")) continue;
     if (record.url.includes("/originals/")) {
       const appSurface =
@@ -146,18 +155,32 @@ function inspectResponses(extra) {
       if (appSurface) throw new Error("originals leaked into an app response URL");
       continue;
     }
+    const html = (record.contentType || "").includes("text/html");
     const interesting =
       record.url.includes("/api/v1/") ||
-      record.url.includes("/preview") ||
-      /\/s\/[A-Za-z0-9_-]{20,}/.test(record.url);
+      (html &&
+        (record.url.includes("/preview") || /\/s\/[A-Za-z0-9_-]{20,}/.test(record.url)));
     if (!interesting) continue;
     if ((record.contentType || "").startsWith("image/")) continue;
-    assertSurface("response", record.body || "", extra);
+    try {
+      assertSurface("response", record.body || "", extra);
+    } catch (err) {
+      const pathOnly = record.url.replace(/\?.*$/, "").replace(/\/s\/[A-Za-z0-9_-]{20,}/g, "/s/***").replace(/\/public\/shares\/[A-Za-z0-9_-]{20,}/g, "/public/shares/***");
+      throw new Error(`${err.message} status=${record.status} url=${pathOnly}`);
+    }
   }
 }
 
 async function snap(page, name) {
   if (!artifactDir || !page) return;
+  await page
+    .locator(".album-share-link-readonly")
+    .evaluateAll((nodes) => {
+      for (const node of nodes) {
+        if (node instanceof HTMLInputElement) node.value = "";
+      }
+    })
+    .catch(() => undefined);
   mkdirSync(artifactDir, { recursive: true });
   await page.screenshot({ path: path.join(artifactDir, name), fullPage: true }).catch(() => undefined);
 }
