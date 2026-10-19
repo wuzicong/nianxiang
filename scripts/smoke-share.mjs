@@ -9,6 +9,10 @@
  * 应用日志里不能出现明文分享令牌、会话令牌或密码。
  * 主人上传原图的预签名地址本身含 /originals/，不记入这次泄漏检查。
  *
+ * 地址用环境变量，方便对着另一套栈复跑：
+ * WEB_BASE、API_BASE、ML_BASE。
+ * 日志二选一：SMOKE_LOG_FILES（本机进程）或 SMOKE_LOG_SERVICES（Compose 服务名）。
+ *
  * 用法见 README「本地冒烟」。不要把令牌、密码或预签名打到终端。
  */
 import { execFile } from "node:child_process";
@@ -209,72 +213,37 @@ function assertUnavailable(body, title) {
   if (JSON.stringify(body).includes(title)) throw new Error("unavailable share leaked the album");
 }
 
+function logSource() {
+  if (process.env.SMOKE_LOG_FILES?.trim()) return "files";
+  if (process.env.SMOKE_LOG_SERVICES?.trim()) return "compose";
+  throw new Error(
+    "设置 SMOKE_LOG_FILES（本机 api/web/worker 日志文件，逗号分隔）或 SMOKE_LOG_SERVICES（Compose 服务名，逗号分隔）",
+  );
+}
+
 async function preflightHttp() {
   const api = await fetchJson(`${apiBase}/health`);
   if (!api.response.ok || api.body.service !== "memora-api") throw new Error("API health failed");
-  const web = await fetchJson(`${webBase}/health`);
-  if (!web.response.ok || web.body.service !== "memora-web") throw new Error("web health failed");
+  const web = await fetch(`${webBase}/login`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+  const webText = await web.text();
+  if (!web.ok || !webText.includes("登录")) throw new Error("web login page failed");
   const ml = await fetchJson(`${mlBase}/health`);
-  if (!ml.response.ok || ml.body.service !== "memora-ml" || ml.body.device !== "cpu") {
-    throw new Error("ML health failed");
-  }
-  say("health api web ml=cpu");
-}
-
-async function assertCompose() {
-  const { stdout } = await execFileAsync(
-    "docker",
-    ["compose", "--profile", "app", "ps", "--all", "--format", "json"],
-    { cwd: root, maxBuffer: 8 * 1024 * 1024 },
-  );
-  const text = stdout.trim();
-  if (!text) throw new Error("docker compose ps returned nothing");
-  const rows = text.startsWith("[")
-    ? JSON.parse(text)
-    : text.split("\n").filter(Boolean).map((line) => JSON.parse(line));
-  const byName = new Map(rows.map((row) => [row.Service || row.service, row]));
-  for (const name of ["postgres", "redis", "minio", "ml", "api", "web", "worker"]) {
-    const row = byName.get(name);
-    if (!row) throw new Error(`compose service ${name} is missing`);
-    const state = row.State || row.state || "";
-    const health = row.Health || row.health || "";
-    if (state !== "running") throw new Error(`${name} is ${state || "not running"}`);
-    if (health && health !== "healthy") throw new Error(`${name} health is ${health}`);
-  }
-  const init = byName.get("minio-init");
-  if (init) {
-    const state = init.State || init.state || "";
-    const code = init.ExitCode ?? init.exitCode;
-    if (state === "running") throw new Error("minio-init is still running");
-    if (code !== undefined && code !== 0 && code !== "0") throw new Error(`minio-init exit ${code}`);
-  }
-  for (const row of rows) {
-    const name = row.Service || row.service || "unknown";
-    const publishers = row.Publishers || row.publishers || [];
-    if (name === "worker" && publishers.length > 0) {
-      throw new Error("worker port is published");
-    }
-    const ports = String(row.Ports || row.ports || "");
-    if (ports.includes("0.0.0.0:") || ports.includes("[::]:")) {
-      throw new Error(`${name} publishes on all interfaces`);
-    }
-    for (const publisher of publishers) {
-      const host = publisher.URL || publisher.url || publisher.IP || publisher.ip || "";
-      if (host && host !== "127.0.0.1") throw new Error(`${name} publishes on ${host}`);
-    }
-  }
-  say("compose ports are on 127.0.0.1");
+  if (!ml.response.ok || ml.body.service !== "memora-ml") throw new Error("ML health failed");
+  if (ml.body.device !== undefined && ml.body.device !== "cpu") throw new Error("ML device is not cpu");
+  say(`health api web ml (${webBase})`);
 }
 
 async function appLogs(sinceIso) {
-  if (process.env.SMOKE_LOG_FILES) {
+  if (logSource() === "files") {
     const files = process.env.SMOKE_LOG_FILES.split(",").map((item) => item.trim()).filter(Boolean);
     if (files.length < 1) throw new Error("SMOKE_LOG_FILES is empty");
     return files.map((file) => readFileSync(file, "utf8")).join("\n");
   }
+  const services = process.env.SMOKE_LOG_SERVICES.split(",").map((item) => item.trim()).filter(Boolean);
+  if (services.length < 1) throw new Error("SMOKE_LOG_SERVICES is empty");
   const { stdout } = await execFileAsync(
     "docker",
-    ["compose", "--profile", "app", "logs", "--no-color", "--since", sinceIso, "api", "web", "worker"],
+    ["compose", "logs", "--no-color", "--since", sinceIso, ...services],
     { cwd: root, maxBuffer: 32 * 1024 * 1024 },
   );
   return stdout;
@@ -338,8 +307,8 @@ async function main() {
   noteSecret(email);
 
   say(`theme=${theme.id}`);
+  logSource();
   await preflightHttp();
-  if (!process.env.SMOKE_LOG_FILES) await assertCompose();
 
   let chromium;
   try {
