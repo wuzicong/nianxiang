@@ -195,14 +195,25 @@ export function createApp(deps: AppDeps): Express {
       await deps.assets.ready();
       const assetId = randomUUID();
       const key = originalObjectKey(user.id, assetId);
-      await deps.assets.insertPending({
-        id: assetId,
-        userId: user.id,
-        storageKey: key,
-        filename: validated.filename,
-        contentType: validated.contentType,
-        sizeBytes: validated.sizeBytes,
-      });
+      const reserved = await deps.assets.reservePendingUpload(
+        {
+          id: assetId,
+          userId: user.id,
+          storageKey: key,
+          filename: validated.filename,
+          contentType: validated.contentType,
+          sizeBytes: validated.sizeBytes,
+        },
+        deps.config.maxPendingUploadsPerUser,
+      );
+      if (reserved === "limit") {
+        console.log(`[memora-api] upload-url limited user=${user.id}`);
+        throw new HttpError(
+          429,
+          "too_many_pending_uploads",
+          "未完成的上传太多，请稍后再试",
+        );
+      }
       try {
         const signed = await deps.objects.presignPut({
           key,

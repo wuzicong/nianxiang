@@ -237,3 +237,49 @@ test("misconfigured bucket refuses to presign", async () => {
     assert.equal(objects.presigns.length, 0);
   });
 });
+
+test("upload-url returns 429 when one user already has too many pending uploads", async () => {
+  const assets = memoryAssets();
+  const objects = fakeObjects();
+  const logs: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const { app } = createTestApp({
+      env: { ...ENV, MAX_PENDING_UPLOADS_PER_USER: "1" },
+      assets,
+      objects,
+      jobs: fakeJobs(),
+    });
+    await withServer(app, async (base) => {
+      const owner = await registerSession(base, "pending-limit@memora.test");
+      const other = await registerSession(base, "pending-other@memora.test");
+      assets.rows.set(
+        "ready-old",
+        record({ id: "ready-old", userId: owner.user.id, status: "ready" }),
+      );
+      const body = { filename: "trip.jpg", mime: "image/jpeg", size: 100 };
+      const first = await postJson(base, "/api/v1/assets/upload-url", body, owner.cookie);
+      assert.equal(first.status, 201);
+      const limited = await postJson(base, "/api/v1/assets/upload-url", body, owner.cookie);
+      assert.equal(limited.status, 429);
+      assert.equal((limited.body as { error: string }).error, "too_many_pending_uploads");
+      assert.equal("url" in ((limited.body as object) ?? {}), false);
+      const pending = [...assets.rows.values()].filter(
+        (row) => row.userId === owner.user.id && row.status === "pending_upload",
+      );
+      assert.equal(pending.length, 1);
+      assert.equal(objects.presigns.length, 1);
+      const otherUpload = await postJson(base, "/api/v1/assets/upload-url", body, other.cookie);
+      assert.equal(otherUpload.status, 201);
+      const joined = logs.join("\n");
+      assert.equal(joined.includes("X-Amz-Signature"), false);
+      assert.equal(joined.includes("supersecret"), false);
+      assert.equal(joined.includes("trip.jpg"), false);
+    });
+  } finally {
+    console.log = original;
+  }
+});

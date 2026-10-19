@@ -26,6 +26,7 @@ export {
 } from "./enqueue.js";
 export {
   createObjectStore,
+  isMissingObjectError,
   objectStoreConfigFromRuntime,
   type HeadResult,
   type ObjectStore,
@@ -35,6 +36,13 @@ export {
   type PresignPutResult,
   type PutObjectInput,
 } from "./object-store.js";
+export {
+  cleanupStalePendingUploads,
+  pendingUploadObjectKeys,
+  type PendingUploadCleaner,
+  type PendingUploadCleanupCounts,
+  type StalePendingClaim,
+} from "./pending-upload.js";
 export { redactSecrets, safeErrorMessage } from "./redact.js";
 export {
   bucketMatchesContract,

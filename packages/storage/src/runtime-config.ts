@@ -1,7 +1,11 @@
 import {
   bucketName,
   clampPresignTtlMinutes,
+  resolveMaxPendingUploadsPerUser,
   resolveMaxUploadBytes,
+  resolvePendingUploadCleanupBatch,
+  resolvePendingUploadCleanupIntervalMinutes,
+  resolvePendingUploadTtlMinutes,
   type DeployMode,
   type MemoraEnv,
   type StorageBackend,
@@ -43,6 +47,14 @@ export interface RuntimeConfig {
   redisUrl: string;
   maxUploadBytes: number;
   presignTtlMinutes: number;
+  /** 超过这个分钟数的 pending_upload 可以由 Worker 清理。 */
+  pendingUploadTtlMinutes: number;
+  /** 同一用户未完成上传的数量上限。超过后 upload-url 返回 429。 */
+  maxPendingUploadsPerUser: number;
+  /** 每一轮清理最多处理多少行。 */
+  pendingUploadCleanupBatch: number;
+  /** 清理任务的重复间隔。 */
+  pendingUploadCleanupIntervalMinutes: number;
   s3: {
     endpoint: string;
     region: string;
@@ -54,8 +66,28 @@ export interface RuntimeConfig {
   };
 }
 
+/**
+ * 非法配置只说回落后的数字，不回显原值。
+ * 环境变量里偶尔会被贴入口令，清理相关日志也不携带这些字符串。
+ */
+function noted(
+  key: string,
+  raw: string | undefined,
+  resolve: (raw: string | undefined) => number,
+): number {
+  const resolved = resolve(raw);
+  if (raw === undefined || raw.trim() === "") return resolved;
+  if (!/^\d+$/.test(raw.trim()) || Number(raw.trim()) !== resolved) {
+    console.warn(`[memora] ${key} 无效，回落 ${resolved}`);
+  }
+  return resolved;
+}
+
 export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const kms = env.AWS_KMS_KEY_ID?.trim();
+  const presignTtlMinutes = clampPresignTtlMinutes(
+    Number(envOptional(env, "PRESIGN_TTL_MINUTES", "10")),
+  );
   return {
     deployMode: parseDeployMode(envOptional(env, "DEPLOY_MODE", "selfhost")),
     memoraEnv: parseMemoraEnv(envOptional(env, "MEMORA_ENV", "local")),
@@ -67,8 +99,24 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     ),
     redisUrl: envOptional(env, "REDIS_URL", "redis://127.0.0.1:6379"),
     maxUploadBytes: resolveMaxUploadBytes(env.MAX_UPLOAD_BYTES),
-    presignTtlMinutes: clampPresignTtlMinutes(
-      Number(envOptional(env, "PRESIGN_TTL_MINUTES", "10")),
+    presignTtlMinutes,
+    pendingUploadTtlMinutes: noted("PENDING_UPLOAD_TTL_MINUTES", env.PENDING_UPLOAD_TTL_MINUTES, (raw) =>
+      resolvePendingUploadTtlMinutes(raw, presignTtlMinutes),
+    ),
+    maxPendingUploadsPerUser: noted(
+      "MAX_PENDING_UPLOADS_PER_USER",
+      env.MAX_PENDING_UPLOADS_PER_USER,
+      resolveMaxPendingUploadsPerUser,
+    ),
+    pendingUploadCleanupBatch: noted(
+      "PENDING_UPLOAD_CLEANUP_BATCH",
+      env.PENDING_UPLOAD_CLEANUP_BATCH,
+      resolvePendingUploadCleanupBatch,
+    ),
+    pendingUploadCleanupIntervalMinutes: noted(
+      "PENDING_UPLOAD_CLEANUP_INTERVAL_MINUTES",
+      env.PENDING_UPLOAD_CLEANUP_INTERVAL_MINUTES,
+      resolvePendingUploadCleanupIntervalMinutes,
     ),
     s3: {
       endpoint: envOptional(env, "S3_ENDPOINT", "http://127.0.0.1:9000"),

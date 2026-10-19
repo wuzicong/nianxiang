@@ -3,6 +3,30 @@ import test from "node:test";
 import { createConfig } from "./config.js";
 import { ENV } from "./test-app.js";
 
+test("pending upload limits fall back when the environment value is invalid", () => {
+  const config = createConfig(ENV);
+  assert.equal(config.pendingUploadTtlMinutes, 60);
+  assert.equal(config.maxPendingUploadsPerUser, 50);
+  assert.equal(config.pendingUploadCleanupBatch, 50);
+  assert.equal(config.pendingUploadCleanupIntervalMinutes, 10);
+  assert.equal(
+    createConfig({ ...ENV, PENDING_UPLOAD_TTL_MINUTES: "180" }).pendingUploadTtlMinutes,
+    180,
+  );
+  assert.equal(
+    createConfig({ ...ENV, PENDING_UPLOAD_TTL_MINUTES: "15" }).pendingUploadTtlMinutes,
+    60,
+  );
+  assert.equal(
+    createConfig({ ...ENV, MAX_PENDING_UPLOADS_PER_USER: "2" }).maxPendingUploadsPerUser,
+    2,
+  );
+  assert.equal(
+    createConfig({ ...ENV, MAX_PENDING_UPLOADS_PER_USER: "nope" }).maxPendingUploadsPerUser,
+    50,
+  );
+});
+
 test("local selfhost leaves the session cookie insecure and registration open", () => {
   const config = createConfig(ENV);
   assert.equal(config.cookieSecure, false);

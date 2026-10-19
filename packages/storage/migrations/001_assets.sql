@@ -22,3 +22,8 @@ CREATE TABLE IF NOT EXISTS assets (
 );
 
 CREATE INDEX IF NOT EXISTS assets_user_id_idx ON assets (user_id);
+
+-- 清理任务按「仍在等待上传、且创建时间早于阈值」扫描。部分索引把已完成的行排除在外。
+CREATE INDEX IF NOT EXISTS assets_pending_upload_created_idx
+  ON assets (created_at)
+  WHERE status = 'pending_upload';
