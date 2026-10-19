@@ -46,7 +46,7 @@ export function MemoraShell({
 
   return (
     <div
-      className={`memora-shell share-shell${variant === "auth" ? " memora-shell--auth" : ""}`}
+      className={`share-shell memora-shell${variant === "auth" ? " memora-shell--auth" : ""}`}
       data-theme={skin.id}
       style={style}
     >

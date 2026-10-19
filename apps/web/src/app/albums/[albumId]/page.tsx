@@ -122,6 +122,12 @@ export default function AlbumDetailPage() {
       userEmail={sessionEmail}
       privacyBadge="相册默认私密"
     >
+      {album ? (
+        <p className="shell-muted shell-back">
+          <Link className="lib-quiet" href="/albums">返回相册列表</Link>
+        </p>
+      ) : null}
+
       {album && skin ? (
         <p className="shell-preview-link">
           <Link className="lib-quiet" href={`/albums/${album.albumId}/preview`}>按主题看这本相册</Link>
@@ -129,7 +135,7 @@ export default function AlbumDetailPage() {
       ) : null}
 
       {album && processing ? (
-        <p className="shell-muted">有照片正在生成预览。完成后会显示缩略图；已经打开的分享页需要刷新。</p>
+        <p className="shell-muted">有照片正在生成预览…</p>
       ) : null}
 
       {album && assets.length > 0 ? (

@@ -23,11 +23,9 @@
   margin: 0.45rem 0 0;
 }
 
-.album-assets-empty a {
-  color: var(--share-text);
+.album-assets-empty .shell-upload-anchor {
   font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
+  color: var(--share-text);
   text-decoration-color: color-mix(in srgb, var(--share-accent) 45%, var(--share-border));
 }
 

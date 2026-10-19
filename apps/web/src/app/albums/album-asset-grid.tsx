@@ -21,7 +21,7 @@ export function AlbumAssetGrid({
           {uploadAnchorId ? (
             <>
               {" "}
-              <a href={`#${uploadAnchorId}`}>前往上传</a>
+              <a className="lib-quiet shell-upload-anchor" href={`#${uploadAnchorId}`}>前往上传</a>
             </>
           ) : null}
         </p>

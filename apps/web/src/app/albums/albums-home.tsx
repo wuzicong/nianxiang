@@ -63,8 +63,7 @@ export function AlbumsHome({ decorations }: { decorations: Record<string, string
   const lede = (
     <>
       在这里管理相册与分享。相册默认只有你能看到。也可从照片库选片做成主题册。想先看版式，打开{" "}
-      <Link href="/preview">主题样张</Link>
-      。想从照片里做成册，去照片库多选后点「做成主题相册」。
+      <Link href="/preview">主题样张</Link>。
     </>
   );
 

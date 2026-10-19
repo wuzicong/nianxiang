@@ -54,7 +54,7 @@ const SHELLS: Record<Exclude<Tab, "time">, { title: string; body: string; decor:
     },
     scene: {
       title: "场景识别还在路上",
-      body: "之后会按夜景、海边、美食这类场景自动归类。现在还没有分析任何照片。",
+      body: "之后会按「夜景」「海边」「美食」这类场景自动归类。现在还没有分析任何照片。",
       decor: "sparkle",
     },
     people: {

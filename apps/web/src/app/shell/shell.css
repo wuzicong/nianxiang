@@ -1,6 +1,6 @@
 @import "../s/share-theme.css";
 
-.memora-shell.share-shell {
+.share-shell.memora-shell {
   --shell-duration-1: 80ms;
   --shell-duration-2: 120ms;
   --shell-duration-3: 180ms;
@@ -66,7 +66,13 @@
   align-items: center;
   gap: 0.45rem 0.85rem;
   min-height: 3.25rem;
-  max-height: 3.5rem;
+  max-height: 3.25rem;
+}
+
+@media (min-width: 768px) {
+  .shell-top-inner {
+    max-height: 3.5rem;
+  }
 }
 
 .shell-top-trail {
@@ -216,6 +222,12 @@
   font: inherit;
 }
 
+.shell-field input:disabled,
+.shell-field select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .shell-field input::placeholder {
   color: var(--share-muted);
 }
@@ -249,6 +261,18 @@
   color: var(--share-muted);
   font-size: 0.92rem;
   line-height: 1.65;
+}
+
+.shell-back {
+  margin-top: 0;
+}
+
+.shell-upload-anchor {
+  display: inline;
+  padding: 0;
+  min-height: auto;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .shell-album-list {
