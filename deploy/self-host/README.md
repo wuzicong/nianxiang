@@ -200,16 +200,18 @@ Nginx、Traefik 的档位见上面「公网反代」。出口 IP 很多人共用
 
 ### 解锁限流
 
-`POST /api/v1/public/shares/<43 位令牌>/unlock` 按来源 IP 限制。次数在 `proxy/Caddyfile.ratelimit` 的 `memora_share_unlock` `events`，默认 6。假令牌同样计数，限流键看不出分享是否存在。令牌必须刚好 43 位（`secrets.token_urlsafe(32)`）。更短的一段应用直接 404「分享不存在」，访问日志也不会把它打成 `***`。
+`POST /api/v1/public/shares/<43 位令牌>/unlock` 有两层额度，默认都是每分钟 6 次，第 7 次 429。边缘按来源 IP，次数在 `proxy/Caddyfile.ratelimit` 的 `memora_share_unlock` `events`。应用层是 API 的 `SHARE_UNLOCK_LIMIT`（默认 6），固定窗口，按客户端计数，键不是令牌：上一跳在内网或本机时用 `X-Forwarded-For` 最右边的地址，否则用 socket 地址。假令牌同样计数，限流键看不出分享是否存在。令牌必须刚好 43 位（`secrets.token_urlsafe(32)`）。更短的一段应用直接 404「分享不存在」，访问日志也不会把它打成 `***`。
 
-同一来源连续 POST，窗口是空的时候：
+经 Caddy 时反代在前，第 7 次多为边缘 429。同一来源连续 POST，窗口是空的时候：
 
 | 次序 | 谁返回 | 状态 | 正文 |
 |------|--------|------|------|
 | 1–6 | 应用 | 401 | `share_unavailable`，「无法打开分享」 |
-| 7 起 | Caddy | 429 | `rate_limited`，「请稍后再试」，并带 `Retry-After` |
+| 7 起 | Caddy（边缘） | 429 | `rate_limited`，「请稍后再试」，并带 `Retry-After` |
 
-429 在反代生成，用的是片段里的 `memora_rate_limited`。应用不按 IP 计数。在 api 容器里对 `http://127.0.0.1:3001` 打同一条路径，连续 8 次仍是 401 `share_unavailable`。
+边缘 429 用片段里的 `memora_rate_limited`。进程日志有 `zone=memora_share_unlock`。
+
+直连 api、绕过 Caddy（容器内 `http://127.0.0.1:3001`）时，同一客户端连续 POST，窗口是空的时候：1–6 仍是 401 `share_unavailable`「无法打开分享」，第 7 次是应用自己的 429，正文同样是 `rate_limited`「请稍后再试」，并带 `Retry-After`。`SHARE_UNLOCK_LIMIT` 非法或写成 0 时回落 6。这一层不写 Caddy 的 zone。
 
 这条 POST 同时计入公开分享前缀 `memora_public_shares`（每分钟 60 次）。和下面的 GET 抽查隔开至少一分钟，否则公开前缀会先吃掉额度。
 
@@ -238,9 +240,9 @@ done
 rm -f /tmp/memora-unlock.body
 ```
 
-期望：1 到 6 打印 `401 share_unavailable 无法打开分享`；7 和 8 打印 `429 rate_limited 请稍后再试`。第 7 次的 `Retry-After` 在刚打满窗口时是 `60`，之后随这一分钟里剩余的时间减小。
+期望：1 到 6 打印 `401 share_unavailable 无法打开分享`；7 和 8 打印 `429 rate_limited 请稍后再试`。第 7 次多为边缘 429（Caddy 先拦）。第 7 次的 `Retry-After` 在刚打满窗口时是 `60`，之后随这一分钟里剩余的时间减小。
 
-绕过 Caddy，看应用自己的状态码：
+绕过 Caddy，看应用自己的 429：
 
 ```bash
 docker compose -f compose.prod.yml exec -T -e TOKEN="$token" api \
@@ -258,7 +260,7 @@ for (let n = 1; n <= 8; n += 1) {
 '
 ```
 
-期望：8 行都是 `401 share_unavailable 无法打开分享`。
+期望：1 到 6 打印 `401 share_unavailable 无法打开分享`；7 和 8 打印 `429 rate_limited 请稍后再试`。这是应用 429（`SHARE_UNLOCK_LIMIT` 默认 6），不是边缘。进程日志里没有 `zone=memora_share_unlock`。
 
 然后看日志。访问日志在 `/var/log/caddy/memora-access.log`，进程日志在同目录的 `memora-system.log`：
 
@@ -267,7 +269,7 @@ docker compose -f compose.prod.yml exec -T caddy cat /var/log/caddy/memora-acces
 docker compose -f compose.prod.yml exec -T caddy cat /var/log/caddy/memora-system.log
 ```
 
-访问日志里这条 URI 是 `/api/v1/public/shares/***/unlock`。没有 43 位令牌，没有 `Cookie`、`Authorization`，也没有 JSON 正文里的口令。查询串里的 `password` 和 `token` 写成 `***`。`Referer` 里的 `/s/<令牌>` 同样是 `***`。进程日志在超额时有 `msg` 为 `rate limit exceeded`、`zone` 为 `memora_share_unlock`，字段里没有请求路径。
+访问日志里这条 URI 是 `/api/v1/public/shares/***/unlock`。没有 43 位令牌，没有 `Cookie`、`Authorization`，也没有 JSON 正文里的口令。查询串里的 `password` 和 `token` 写成 `***`。`Referer` 里的 `/s/<令牌>` 同样是 `***`。经 Caddy 超额时，进程日志有 `msg` 为 `rate limit exceeded`、`zone` 为 `memora_share_unlock`，字段里没有请求路径。直连 api 的应用 429 不出现在这份日志里。
 
 可选：公开分享 GET。先等上一分钟的解锁计数过期，再用同一个 43 位假令牌。前 60 次是应用的 404 `share_not_found`「分享不存在」，第 61 次是 Caddy 的 429 `rate_limited`「请稍后再试」。进程日志的 `zone` 是 `memora_public_shares`。日志里的路径是 `/api/v1/public/shares/***`。
 
@@ -460,8 +462,8 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 5. 上传探针。`POST /api/v1/assets/upload-url`，正文带 `filename`、`mime`、`size`，可以带上一步的 `albumId`。返回的 `url` 指向内部的 `minio:9000`，宿主机解析不了，也不要打印这个 URL。把响应存进权限 `600` 的临时文件，在 api 容器里按返回的 `headers` 做 PUT，再 `POST /api/v1/assets/<assetId>/complete`。浏览器里的拖拽上传标「需运维人工」。
 6. 备份。按「做一次备份」执行 `backup.sh --compose`。目录里要有 `manifest-<时间>.txt`，目录权限 `700`，dump 权限 `600`。标准输出里没有口令。
 7. 恢复命令。`restore.sh --dry-run --stamp <时间>` 只核对文件，不改库。隔离的完整路径用「演练」里的 `restore-drill.sh`（先 `--dry-run`，再不带参数）。不要对 `memora-prod` 加 `--yes` 做演练。
-8. 解锁限流。按「解锁限流」对一个 43 位假令牌连续 POST `.../unlock`。前 6 次是 401「无法打开分享」，第 7 次是 429「请稍后再试」（`rate_limited`，带 `Retry-After`）。api 容器内绕过 Caddy 的同一条路径连续 8 次仍是 401。可选的公开 GET 见那一节，和这次解锁隔开一分钟。
-9. 访问日志。用上一节的请求看 `/var/log/caddy/memora-access.log`。路径是 `/api/v1/public/shares/***/unlock`，`Referer` 里的 `/s/` 令牌也是 `***`。没有 Cookie 值、Authorization、查询串口令或 JSON 正文。超额那几行进程日志是 `zone=memora_share_unlock`，字段里没有请求路径。登录密码同样只在 JSON 正文里，访问日志不记正文。
+8. 解锁限流。按「解锁限流」对一个 43 位假令牌连续 POST `.../unlock`。经 Caddy：前 6 次是 401「无法打开分享」，第 7 次多为边缘 429「请稍后再试」（`rate_limited`，带 `Retry-After`；Caddy 先拦）。api 容器内绕过 Caddy、直连 `127.0.0.1:3001`：前 6 次仍是 401，第 7 次是应用 429，正文同为 `rate_limited`（`SHARE_UNLOCK_LIMIT` 默认 6）。可选的公开 GET 见那一节，和这次解锁隔开一分钟。
+9. 访问日志。用上一节的请求看 `/var/log/caddy/memora-access.log`。路径是 `/api/v1/public/shares/***/unlock`，`Referer` 里的 `/s/` 令牌也是 `***`。没有 Cookie 值、Authorization、查询串口令或 JSON 正文。经 Caddy 超额的那几行进程日志是 `zone=memora_share_unlock`，字段里没有请求路径。直连 api 的应用 429 不在这份日志里。登录密码同样只在 JSON 正文里，访问日志不记正文。
 10. 登录限流。同一来源连续 POST `/api/v1/auth/login`，第 6 次是 429，正文含 `请稍后再试`。测完等一分钟再给真人登录。登录和注册单独一档，按来源 IP。测完给真人用之前留出这一分钟。
 11. 页面点击（打开登录页、进入相册、拖拽上传）标「需运维人工」。第 3 到 5 步的 curl 是替代。
 
@@ -475,7 +477,7 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 - [ ] 上传探针已完成，或注明需运维人工并留下 curl
 - [ ] `backup.sh --compose` 写出 manifest，权限正确，输出无口令
 - [ ] `restore.sh --dry-run --stamp` 成功；`restore-drill.sh` 按「演练」通过，没有动 `memora` / `memora-prod`
-- [ ] 假令牌解锁前 6 次 401「无法打开分享」，第 7 次经 Caddy 429「请稍后再试」
+- [ ] 假令牌解锁：经 Caddy 前 6 次 401「无法打开分享」，第 7 次多为边缘 429「请稍后再试」；直连 api 第 7 次为应用 429（同一 `rate_limited` 正文）
 - [ ] 访问日志路径为 `***`，无 Cookie、Authorization 和口令
 - [ ] 登录第 6 次 429
 - [ ] 浏览器点击已由运维人工过，或明确留下未做
