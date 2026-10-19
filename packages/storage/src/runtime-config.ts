@@ -15,6 +15,11 @@ function envOptional(env: NodeJS.ProcessEnv, key: string, fallback: string): str
   return value === undefined || value === "" ? fallback : value;
 }
 
+function envBlankToUndefined(env: NodeJS.ProcessEnv, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value ? value : undefined;
+}
+
 function parseDeployMode(raw: string): DeployMode {
   if (raw === "selfhost" || raw === "cloud") return raw;
   console.warn(`[memora] DEPLOY_MODE=${raw} 无效，回落 selfhost`);
@@ -45,6 +50,8 @@ export interface RuntimeConfig {
   presignTtlMinutes: number;
   s3: {
     endpoint: string;
+    /** 浏览器可见的对象存储 origin。空则预签名使用 endpoint。 */
+    publicEndpoint?: string;
     region: string;
     bucket: string;
     accessKeyId: string;
@@ -72,6 +79,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     ),
     s3: {
       endpoint: envOptional(env, "S3_ENDPOINT", "http://127.0.0.1:9000"),
+      publicEndpoint: envBlankToUndefined(env, "S3_PUBLIC_ENDPOINT"),
       region: envOptional(env, "S3_REGION", "us-east-1"),
       bucket: envOptional(env, "S3_BUCKET", "memora-local"),
       accessKeyId: envOptional(env, "S3_ACCESS_KEY_ID", "memora"),
