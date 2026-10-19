@@ -1,5 +1,6 @@
 # 示意，不会被本仓库自动套用。
-# 可执行骨架见 deploy/cloud/terraform/。本文件只留阅读用摘要。
+# 可执行骨架见 deploy/cloud/terraform/。那是草稿，禁止 terraform apply。
+# 本文件只留阅读用摘要。
 
 block_public_acls       = true
 block_public_policy     = true

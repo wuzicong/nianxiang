@@ -45,7 +45,7 @@ API 第一次访问会建 `users` / `sessions` 表。第一次使用相册或分
 - 防火墙只开放 80 和 443（80 用来签证书并跳到 HTTPS；SSH 按你自己的跳板策略）。不要把 5432、6379、9000、9001 暴露出去
 - 密钥放 `.env` 或 Docker secrets，禁止提交
 - 做好系统更新、磁盘告警；单盘有坏盘和停电风险，备份请放到另一块盘或另一台机器
-- 备份：`deploy/self-host/backup.sh` 读取环境变量做 `pg_dump` 和 `mc mirror`，不把口令写进日志。需要本机有 `pg_dump` 和 `mc`。
+- 备份与恢复见下面的专章。脚本不把口令写进日志。演练用 `deploy/self-host/restore-drill.sh`
 
 ## 公网反代
 
@@ -198,7 +198,7 @@ Nginx、Traefik 的档位见上面「公网反代」。出口 IP 很多人共用
 
 ### 升级
 
-先做下面的备份。然后：
+先做下面的「备份与恢复」，至少留下一份带 `manifest-*.txt` 的备份。然后：
 
 ```bash
 git pull
@@ -207,19 +207,200 @@ docker compose -f compose.prod.yml up -d --build
 
 不要加 `-v`。`-v` 会删掉数据库、对象和证书卷。
 
-### 备份
+### 备份与恢复
 
-数据库没有映射到宿主机。升级前把 dump 放到另一块盘或另一台机器：
+逻辑备份，不拍 Docker 卷。Postgres 用 `pg_dump` 自定义格式，对象桶用 `mc mirror`。Redis 只放 BullMQ 队列，**不备份**。恢复后让 Redis 空着，不要把旧 AOF 拷回来，否则过期任务会重放。
+
+脚本在 `deploy/self-host/`：
+
+| 文件 | 作用 |
+|------|------|
+| `backup.sh` | `pg_dump`，然后 `mc mirror`。写出 `manifest-<时间>.txt` |
+| `restore.sh` | 按 manifest 校验后恢复。没有 `--yes` 不会改数据 |
+| `backup-config.sh` | 复制 `.env`、`compose.prod.override.yml`、`deploy/self-host/secrets`。不打印内容 |
+| `restore-drill.sh` | 隔离演练，或 `--dry-run` 做不连库的自检 |
+| `compose.drill.yml` | 演练专用项目 `memora-backup-drill`。不映射端口，不动 `memora` / `memora-prod` 的卷 |
+
+在仓库根目录执行。`BACKUP_DIR` 放到另一块盘或另一台机器，不要和数据库、MinIO 卷同一块盘。
+
+#### 目标与节奏
+
+| 项 | 建议 |
+|----|------|
+| RPO | 24 小时：每天一份成功备份。升级前再加一份。照片更新很勤时改成每 6 小时。RPO 就是距离最近一份**完整** manifest 的时间 |
+| RTO | 小库（几十 GB 以内）按 2 小时准备到「库和桶都能读」。这是目标，不是保证。演练要记下真实体积和耗时，再改这个数 |
+| 演练 | 上线前至少一次。之后每季度一次。改了备份脚本、换盘或改了卷，再加一次 |
+
+空库演练只证明步骤是通的，不能代替全量照片的计时。
+
+#### 停写，还是不停库
+
+`pg_dump` 走 MVCC，得到一份一致的库快照，**不用停 Postgres**，也不会为了备份长时间锁表。MinIO 没有和这次快照绑在一起。
+
+顺序固定为先 dump、再镜像桶。不停写时，镜像比快照更新，窗口里的新上传多半只是桶里多一个没有库记录的对象。反过来先镜像再 dump，容易出现「库里有键、桶里没有」。窗口里的删除仍可能留下悬空键。
+
+| 做法 | Postgres / MinIO | api / worker | 何时 |
+|------|------------------|--------------|------|
+| 不停写 | 都继续跑 | 继续服务 | 每天例行 |
+| 停写 | 都不停。停了就没法 dump 和 mirror | 备份前停下，结束再启动 | 升级前，以及每月一次对齐 |
+
+停写交给脚本：`--pause-writers` 只停止**当时正在跑**的 api / worker，失败也会尽量拉起来。不要在备份脚本外面再 `stop postgres` 或 `stop minio`。
+
+#### 做一次备份
+
+每天，不停写：
 
 ```bash
-mkdir -p backups
-chmod 700 backups
-docker compose -f compose.prod.yml exec -T postgres \
-  sh -c 'pg_dump --format=custom -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  > "backups/memora-$(date -u +%Y%m%dT%H%M%SZ).dump"
+mkdir -p /var/backups/memora
+chmod 700 /var/backups/memora
+BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/backup.sh --compose
 ```
 
-对象桶同样没有公开端口。要拷对象时，在能访问 `minio:9000` 的网络里跑 `deploy/self-host/backup.sh`，口令只从环境读。备份不要和库放在同一块盘。
+升级前，停写并对齐：
+
+```bash
+BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/backup.sh --compose --pause-writers
+```
+
+用了 `compose.prod.override.yml` 时，把两个文件用冒号拼起来（路径里不要再写冒号）：
+
+```bash
+COMPOSE_FILE=compose.prod.yml:compose.prod.override.yml \
+  BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/backup.sh --compose --pause-writers
+```
+
+Compose 模式在容器里跑 `pg_dump` 和 `mc`，走内部网络的 `minio:9000`。口令留在容器环境或 Docker secret 里，不出现在宿主机参数上，也不写入 `~/.mc`。成功后目录里有：
+
+```text
+manifest-<UTC时间>.txt
+memora-<UTC时间>.dump
+objects-<UTC时间>/
+objects-<UTC时间>.sha256
+```
+
+没有 manifest 的目录不要拿去恢复。dump 权限是 `600`，目录是 `700`。
+
+宿主机上已经有 `pg_dump` 和 `mc`、并且能连上库和桶时，可以不带 `--compose`，改用 `DATABASE_URL`、`S3_ENDPOINT`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`。`S3_ENDPOINT` 不要把口令写进 URL。生产 Compose 没有把 5432 和 9000 映射出来，所以生产用 `--compose`。
+
+只看参数、不连库：
+
+```bash
+deploy/self-host/backup.sh --dry-run
+deploy/self-host/backup.sh --compose --dry-run
+```
+
+#### 密钥与配置
+
+`.env` 和 `deploy/self-host/secrets/` 不进 git。数据备份默认也不抄它们，避免口令混进照片备份。单独复制，且不要把输出贴到工单里：
+
+```bash
+BACKUP_DIR=/var/backups/memora deploy/self-host/backup-config.sh --yes
+```
+
+脚本只复制已经存在的 `.env`、`compose.prod.override.yml`、`deploy/self-host/secrets/`。文件落到 `config-<时间>/`，权限 `600`（目录 `700`）。想改路径时用冒号分隔的 `BACKUP_CONFIG_SOURCES`，不要在路径里再写冒号。
+
+Docker secret 的口令文件在仓库外或 `secrets/`（已 gitignore）。override 示例见上面「环境」。恢复配置是手动把这些文件放回原处，脚本不会自动覆盖正在使用的 `.env`。
+
+`--dry-run` 只打印每个候选文件在不在，不读内容。
+
+#### 加密、权限、口令
+
+- 备份目录 `700`，dump 和密钥副本 `600`。脚本用 `umask 077`
+- 备份盘最好是另一块已加密的磁盘（例如 LUKS）。和数据库同一块盘不算备份
+- 可选：安装 [age](https://github.com/FiloSottile/age)，设置公钥 `BACKUP_AGE_RECIPIENT`（形如 `age1...`）。脚本会加密 dump 和对象包，并删掉明文。没有 age 时直接失败，不会假装已经加密
+- 私钥文件权限 `400` 或 `600`，用 `BACKUP_AGE_IDENTITY` 指向它。私钥不要进仓库
+- 没有 age 时可以手动 `gpg --encrypt`，加密后删除明文。`shred` 在 SSD 上也不等于彻底擦掉，加密盘更重要
+- 脚本不 `set -x`，失败信息里的 URL 账号和已知口令会打成 `***`
+
+恢复不会改应用用户的口令哈希。对外服务前：
+
+1. 先别启动 api / worker，抽查相册
+2. 备份离开过这台机器时，轮换 Postgres、MinIO 和 `.env` 里的口令，并改掉对应的 Docker secret
+3. 备份介质可能被别人接触过时，在库里执行 `TRUNCATE sessions;`，让旧会话失效
+4. Redis 保持空的
+
+#### 恢复
+
+先停写。`--compose` 时脚本会停下正在跑的 api / worker，**恢复完不自动拉起**。
+
+覆盖现有库（升级回滚）：
+
+```bash
+BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/restore.sh --compose --stamp 20260101T000000Z --yes
+```
+
+新卷、空库（演练或换盘）加 `--fresh`，这样不会对空库做 `--clean`：
+
+```bash
+BACKUP_DIR=/var/backups/memora S3_BUCKET=memora-prod \
+  deploy/self-host/restore.sh --compose --fresh --stamp 20260101T000000Z --yes
+```
+
+恢复前会核对 manifest 里的 sha256。对不上就停，不改库。对象默认只覆盖同名键，不删除备份之后新上传的对象。确定要把桶收成和备份完全一致时才加 `--exact-objects`（`mc mirror --remove`），这会删掉窗口之后的新照片。
+
+确认抽查通过后再：
+
+```bash
+docker compose -f compose.prod.yml start api worker
+```
+
+没有 `--yes` 时脚本直接退出。`--dry-run` 不连接数据库。
+
+#### 演练
+
+不碰开发项目 `memora`，也不碰生产项目 `memora-prod`。演练项目名是 `memora-backup-drill`，不映射宿主机端口。口令由脚本临时生成，不写进仓库，也不打印。
+
+不需要 Docker 的自检（脚本语法、拒绝打印口令、配置副本权限、非法时间戳）：
+
+```bash
+deploy/self-host/restore-drill.sh --dry-run
+```
+
+成功时最后一行是 `[memora] drill dry-run ok`。
+
+完整冒烟需要 Docker，以及和 `compose.prod.yml` 相同的镜像标签（本机已有镜像时不会强行重新拉取）：
+
+```bash
+deploy/self-host/restore-drill.sh
+```
+
+步骤：起临时 Postgres 和 MinIO → 写入探针行和对象 → `backup.sh --compose` → `down -v` 换新卷 → 确认探针已经消失 → `restore.sh --fresh` → 确认探针回来。成功时最后一行是：
+
+```text
+[memora] drill ok: postgres probe=memora-backup-probe object probe=memora-backup-probe dump_mode=600 backup_dir_mode=700
+```
+
+成功判定（必须同时满足）：
+
+1. 新卷在恢复前没有表 `backup_probe`，也没有对象 `probe/marker.txt`
+2. 恢复后 `SELECT note FROM backup_probe WHERE id = 'probe-1'` 得到 `memora-backup-probe`
+3. 对象 `probe/marker.txt` 的内容是 `memora-backup-probe`
+4. 备份目录权限 `700`，dump 权限 `600`
+5. 演练输出里没有 Postgres / MinIO 口令
+
+机器拉不动镜像时，在一套**专用**的空 Compose 上手动做同样五步，用上面的判定。不要对着生产库演练删除。
+
+#### 验收清单
+
+把这份清单抄到变更单里勾选。有一项做不到，这次演练不算通过。
+
+- [ ] `deploy/self-host/restore-drill.sh --dry-run` 退出码是 0，输出里没有口令
+- [ ] 隔离演练（脚本或手动五步）在新卷上恢复后，探针行和探针对象都还在；恢复前它们不在
+- [ ] 备份目录权限是 `700`，dump、校验文件和密钥副本是 `600`
+- [ ] 备份不在数据库和 MinIO 的同一块盘上
+- [ ] 标准输出和标准错误里没有 Postgres、MinIO、`.env` 的口令；`~/.mc` 没有新增这份口令
+- [ ] `pg_restore -l` 能列出 dump。加密的先解密到权限 `600` 的临时文件，用完删除
+- [ ] manifest 存在，dump 和对象的 sha256 与 manifest 一致
+- [ ] `.env` 和 Docker secret 另有一份加密副本，且不在 git 里
+- [ ] 恢复步骤先停 api / worker；确认后再启动
+- [ ] 备份若离开过本机：已计划轮换 Postgres / MinIO / `.env` 口令
+- [ ] 备份介质可能被他人接触时：已计划 `TRUNCATE sessions`
+- [ ] Redis 保持空队列，没有恢复旧 AOF
+- [ ] 记下演练日期、耗时、备份时间点、数据体积和结果
 
 ## 存储
 

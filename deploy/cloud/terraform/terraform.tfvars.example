@@ -1,0 +1,20 @@
+# 复制为 terraform.tfvars 后本地使用。*.tfvars 已被 gitignore，不要提交。
+# 下面的值都是占位。不要填真实口令、真实账号或真实密钥 ARN。
+
+allow_apply             = false
+aws_region              = "ap-southeast-1"
+environment             = "prod"
+bucket_name             = "memora-prod"
+kms_key_arn             = ""
+enable_managed_postgres = false
+enable_managed_redis    = false
+enable_https_ingress    = false
+
+# 主人自己的网络就绪后再打开对应开关，并在未提交的 tfvars 或 TF_VAR_* 里提供：
+# vpc_id                 = "vpc-00000000000000000"
+# private_subnet_ids     = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"]
+# public_subnet_ids      = ["subnet-cccccccc", "subnet-dddddddd"]
+# app_security_group_ids = ["sg-00000000000000000"]
+# public_domain          = "photos.example.com"
+# db_password            用 TF_VAR_db_password，不要写在这里
+# redis_auth_token       用 TF_VAR_redis_auth_token，不要写在这里
