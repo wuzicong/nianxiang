@@ -1205,7 +1205,8 @@ figcaption.slot-empty {
   border-radius: var(--share-radius-button);
 }
 
-.preview-owned-secondary {
+.preview-owned-secondary,
+button.preview-owned-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1218,6 +1219,11 @@ figcaption.slot-empty {
   background: color-mix(in srgb, var(--share-bg) 45%, var(--share-surface));
   border: 1px solid var(--share-border);
   border-radius: var(--share-radius-button);
+  cursor: pointer;
+}
+
+button.preview-owned-secondary {
+  appearance: none;
 }
 
 .preview-owned-primary:focus-visible,

@@ -738,7 +738,8 @@ a.lib-primary {
 
 .lib-alert {
   margin: 0.8rem 0 0;
-  color: var(--share-text);
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--share-accent) 55%, var(--share-text));
 }
 
 .lib :focus-visible {

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { safeUserMessage } from "../../lib/album-assets";
 
 type PublicUser = { id: string; email: string };
 
@@ -55,7 +56,7 @@ export default function LoginPage() {
         router.push("/library");
         return;
       }
-      setMessage(result.body.message ?? "请求失败");
+      setMessage(safeUserMessage(result.body.message, "登录或注册没成功，请检查邮箱和密码后再试。"));
     } catch {
       setMessage("API 暂时不可达");
     }

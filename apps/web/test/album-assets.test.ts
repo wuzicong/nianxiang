@@ -6,6 +6,7 @@ import {
   parseAlbumAssets,
   lightboxUrl,
   previewUrl,
+  safeUserMessage,
   PROCESSING_POLL_MS,
   PREVIEW_REFRESH_MS,
 } from "../src/lib/album-assets";
@@ -13,6 +14,16 @@ import { imageMime, presignPutHeaders, readUploadGrant, uploadPhotoToAlbum } fro
 
 const signedThumb =
   "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/thumb.webp?X-Amz-Signature=supersecret";
+
+test("safeUserMessage hides stacks and long english exceptions", () => {
+  assert.equal(safeUserMessage("网络好像断了", "照片暂时没加载出来。"), "网络好像断了。");
+  assert.equal(safeUserMessage("Error: ECONNREFUSED", "照片暂时没加载出来。"), "照片暂时没加载出来。");
+  assert.equal(
+    safeUserMessage("a".repeat(80), "上传失败，请稍后重试。"),
+    "上传失败，请稍后重试。",
+  );
+  assert.equal(safeUserMessage("密码不正确", "无法打开分享。"), "密码不正确。");
+});
 
 test("album assets keep derivative previews and drop original material", () => {
   const assets = parseAlbumAssets([

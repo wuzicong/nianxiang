@@ -1,4 +1,4 @@
-import { parseAlbumAssets, visibleMessage, type AlbumAssetView } from "./album-assets";
+import { parseAlbumAssets, safeUserMessage, visibleMessage, type AlbumAssetView } from "./album-assets";
 import { apiMessage, parseJsonResponse, type ApiErrorBody } from "./api-client";
 import { LIBRARY_SELECTION_LIMIT } from "./library";
 
@@ -7,7 +7,7 @@ export const ALBUM_ASSET_UNAVAILABLE = "部分照片无法使用，请刷新图�
 
 export function albumAssetClientMessage(status: number, body: ApiErrorBody | null, fallback = "请求失败"): string {
   if (status === 404) return ALBUM_ASSET_UNAVAILABLE;
-  return visibleMessage(apiMessage(body), fallback);
+  return safeUserMessage(apiMessage(body), fallback);
 }
 
 export interface AlbumSummary {
@@ -176,7 +176,8 @@ export async function getAlbum(
     `/api/v1/albums/${encodeURIComponent(albumId)}`,
   );
   if (!result.ok) {
-    return { ok: false, status: result.status, message: apiMessage(result.body) };
+    const fallback = result.status === 401 ? "请先登录" : "打不开这本相册";
+    return { ok: false, status: result.status, message: albumAssetClientMessage(result.status, result.body, fallback) };
   }
   if (!result.data.album) {
     return { ok: false, status: 500, message: "响应不完整" };

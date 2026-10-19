@@ -12,6 +12,8 @@ import {
   type ShareSummary,
 } from "../../../lib/albums-api";
 import { themeSkin } from "../../../lib/themes";
+import { shareThemeStyle } from "../../s/share-chrome";
+import "../album-share.css";
 import { AlbumAssetGrid } from "../album-asset-grid";
 import { AlbumShareList } from "../album-share-list";
 import { CreateShareForm } from "../create-share-form";
@@ -98,6 +100,8 @@ export default function AlbumDetailPage() {
   const processing = assets.some(
     (asset) => asset.status === "pending_upload" || asset.status === "uploaded" || asset.status === "processing",
   );
+  const busy = message === "正在加载…" || message === "正在撤销…";
+  const showRetry = !album && !busy && message !== "请先登录。" && message.length > 0;
 
   return (
     <main style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1.5rem" }}>
@@ -133,7 +137,12 @@ export default function AlbumDetailPage() {
           请先<Link href="/login">登录</Link>。
         </p>
       ) : message ? (
-        <p style={{ lineHeight: 1.6, color: "#555" }}>{message}</p>
+        <p style={{ lineHeight: 1.6, color: "#555" }} role={showRetry ? "alert" : undefined}>{message}</p>
+      ) : null}
+      {showRetry ? (
+        <p style={{ marginTop: "0.75rem" }}>
+          <button type="button" onClick={() => void refresh("initial")}>重试</button>
+        </p>
       ) : null}
 
       {album && skin ? (
@@ -155,7 +164,13 @@ export default function AlbumDetailPage() {
           <div id="album-create-share">
             <CreateShareForm albumId={album.albumId} theme={skin} onCreated={() => void refreshShares()} />
           </div>
-          <AlbumShareList shares={shares} revokingId={revokingId} onRevoke={(shareId) => void revoke(shareId)} />
+          <div
+            className="share-shell album-share-list-shell"
+            data-theme={skin.id}
+            style={shareThemeStyle(skin)}
+          >
+            <AlbumShareList shares={shares} revokingId={revokingId} onRevoke={(shareId) => void revoke(shareId)} />
+          </div>
         </>
       ) : null}
     </main>
