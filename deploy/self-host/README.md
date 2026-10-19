@@ -23,7 +23,51 @@ S3_BUCKET=memora-local
 
 `DATABASE_URL` 的口令要和 `POSTGRES_PASSWORD` 相同；`S3_SECRET_ACCESS_KEY` 要和 `MINIO_ROOT_PASSWORD` 相同。模板里的 `memora-dev-change-me` 只给本机用。
 
-要在一台机器上把 web / api / worker 和 Caddy 一起跑起来，用下面的「生产部署」，不要把这条开发命令暴露到公网。
+要在一台机器上把 web / api / worker 和 Caddy 一起跑起来，用下面的「生产部署」，不要把这条开发命令暴露到公网。公网新机器先勾「从零装机」。
+
+## 监控最短路径
+
+默认关闭。`MEMORA_ALERT_ENABLE` 默认 `0`（`deploy/self-host/monitoring/env.monitor.example` 和 `check.sh` 内置都是这个值）。不进 `compose.prod.yml`，也不要装 cron。阈值从仓库外的 env 读，调用时用 `MEMORA_MONITOR_ENV` 指向它。没设这个变量时，下表这几项用脚本内置默认，和示例文件相同。渠道、状态目录和可选 cron 在「监控告警」。
+
+在仓库根目录：
+
+- [ ] `--self-test`：只用临时文件自检，不访问 Docker，不外发。成功时最后一行是 `[memora] monitor self-test ok`。
+
+```bash
+deploy/self-host/monitoring/check.sh --self-test
+```
+
+- [ ] `--dry-run`：按仓库外的 env 检查一轮。不写状态，不外发。退出码 0 表示这一轮没有要外发的问题，退出码 1 表示有。输出里不应出现口令、Webhook URL 或邮箱。
+
+```bash
+umask 077
+sudo mkdir -p /etc/memora
+sudo cp deploy/self-host/monitoring/env.monitor.example /etc/memora/monitor.env
+sudo chmod 600 /etc/memora/monitor.env
+MEMORA_MONITOR_ENV=/etc/memora/monitor.env deploy/self-host/monitoring/check.sh --dry-run
+```
+
+`env.monitor.example` 里的默认项：
+
+| 变量 | 默认 | 含义 |
+|------|------|------|
+| `MEMORA_ALERT_ENABLE` | `0` | `1` 才外发 |
+| `MEMORA_HTTP_FAILS` | `3` | `GET /health`、`GET /login`、`GET /ready` 连续失败多少次才记成要外发 |
+| `MEMORA_DISK_PERCENT` | `85` | `df` 使用率。路径 `MEMORA_DISK_PATH` 默认 `/` |
+| `MEMORA_BACKUP_MAX_AGE_HOURS` | `26` | 最新 `manifest-*.txt` 的年龄上限。目录 `MEMORA_BACKUP_DIR` 默认 `/var/backups/memora`。不读正文 |
+| `MEMORA_UNLOCK_429_ALERT` | `30` | 一轮新增的解锁 429，日志 zone 是 `memora_share_unlock` |
+| `MEMORA_AUTH_429_ALERT` | `20` | 一轮新增的登录/注册 429，日志 zone 是 `memora_auth` |
+
+公开分享 429（zone `memora_public_shares`）只打印次数，示例里没有单独阈值。
+
+## 从零装机
+
+新机器勾这四项。步骤在后面的专章。
+
+- [ ] 域名。DNS 指到这台机器，防火墙放行 80 和 443。`MEMORA_DOMAIN`、`WEB_ORIGINS` 见「生产部署」的「环境」。域名留空只适合本机明文，不要放到公网。
+- [ ] 证书。见「TLS 证书续期」。`MEMORA_DOMAIN` 写成纯域名后，Caddy 申请证书并在后台续期。
+- [ ] 备份目录。另一块盘或另一台机器，目录 `700`。见「备份与恢复」的「做一次备份」。
+- [ ] 首次 restore drill。先 `deploy/self-host/restore-drill.sh --dry-run`（成功最后一行是 `[memora] drill dry-run ok`），再按「演练」做隔离演练。通过与否看「验收清单」。
 
 ## 服务
 
@@ -386,7 +430,7 @@ docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127
 
 ### 监控告警
 
-默认关闭。`compose.prod.yml` 不启动监控容器，仓库里没有已启用的 cron。不跑下面的脚本，生产栈和现在一样。
+默认关闭。`compose.prod.yml` 不启动监控容器，仓库里没有已启用的 cron。不跑下面的脚本，生产栈和现在一样。本机照抄的命令和默认阈值在上面「监控最短路径」。
 
 建议看这些信号。可选脚本是 `deploy/self-host/monitoring/check.sh`，变量表在同目录的 README。
 
