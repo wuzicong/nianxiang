@@ -105,8 +105,8 @@ test("library list is owner-only and never returns originals or GPS", async () =
           assetId: string;
           filename: string;
           status: string;
-          capturedAt: string | null;
-          createdAt: string;
+          takenAt: string | null;
+          uploadedAt: string;
           key?: string;
           userId?: string;
           exif?: unknown;
@@ -120,7 +120,7 @@ test("library list is owner-only and never returns originals or GPS", async () =
         body.assets.map((asset) => asset.assetId),
         [readyId, "older-photo"],
       );
-      assert.equal(body.assets[0]?.capturedAt, "2020-01-02T03:04:05");
+      assert.equal(body.assets[0]?.takenAt, "2020-01-02T03:04:05");
       assert.equal(body.assets[0]?.status, "ready");
       assert.match(body.assets[0]?.previews.thumb?.url ?? "", /\/derivatives\//);
       assert.match(body.assets[0]?.previews.preview?.url ?? "", /\/derivatives\//);

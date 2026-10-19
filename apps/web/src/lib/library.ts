@@ -32,8 +32,8 @@ export interface LibraryPhoto {
   width: number | null;
   height: number | null;
   error: string | null;
-  capturedAt: string | null;
-  createdAt: string;
+  takenAt: string | null;
+  uploadedAt: string;
   previews: AlbumAssetView["previews"];
 }
 
@@ -102,20 +102,25 @@ export function parseLibraryPayload(value: unknown): { photos: LibraryPhoto[]; h
   const body =
     value && typeof value === "object" ? (value as { assets?: unknown; hasMore?: unknown }) : {};
   const views = parseAlbumAssets(body.assets);
-  const dates = new Map<string, { capturedAt: string | null; createdAt: string }>();
+  const dates = new Map<string, { takenAt: string | null; uploadedAt: string }>();
   if (Array.isArray(body.assets)) {
     for (const item of body.assets) {
       if (!item || typeof item !== "object") continue;
       const row = item as {
         assetId?: unknown;
+        takenAt?: unknown;
+        uploadedAt?: unknown;
         capturedAt?: unknown;
         createdAt?: unknown;
         exif?: unknown;
       };
       if (typeof row.assetId !== "string") continue;
       dates.set(row.assetId, {
-        capturedAt: normalizeCapturedAt(row.capturedAt) ?? normalizeCapturedAt(readExifCaptured(row.exif)),
-        createdAt: readCreatedAt(row.createdAt),
+        takenAt:
+          normalizeCapturedAt(row.takenAt) ??
+          normalizeCapturedAt(row.capturedAt) ??
+          normalizeCapturedAt(readExifCaptured(row.exif)),
+        uploadedAt: readCreatedAt(row.uploadedAt) ?? readCreatedAt(row.createdAt),
       });
     }
   }
@@ -129,8 +134,8 @@ export function parseLibraryPayload(value: unknown): { photos: LibraryPhoto[]; h
         width: view.width,
         height: view.height,
         error: view.error,
-        capturedAt: extra?.capturedAt ?? null,
-        createdAt: extra?.createdAt ?? "",
+        takenAt: extra?.takenAt ?? null,
+        uploadedAt: extra?.uploadedAt ?? "",
         previews: view.previews,
       };
     }),
@@ -139,10 +144,10 @@ export function parseLibraryPayload(value: unknown): { photos: LibraryPhoto[]; h
 }
 
 export function photoCalendar(
-  photo: Pick<LibraryPhoto, "capturedAt" | "createdAt">,
+  photo: Pick<LibraryPhoto, "takenAt" | "uploadedAt">,
   timeZone = "UTC",
 ): PhotoCalendar | null {
-  const captured = normalizeCapturedAt(photo.capturedAt);
+  const captured = normalizeCapturedAt(photo.takenAt);
   if (captured && LITERAL_STAMP.test(captured)) {
     const match = LITERAL_STAMP.exec(captured);
     if (match) {
@@ -166,7 +171,7 @@ export function photoCalendar(
     const zoned = zonedParts(captured, timeZone);
     if (zoned) return { ...zoned, source: "capture" };
   }
-  const uploaded = zonedParts(photo.createdAt, timeZone);
+  const uploaded = zonedParts(photo.uploadedAt, timeZone);
   if (!uploaded) return null;
   return { ...uploaded, source: "upload" };
 }
@@ -300,19 +305,28 @@ export function applyPhotoSelection(input: {
     const start = input.orderedIds.indexOf(input.anchor);
     const end = input.orderedIds.indexOf(input.id);
     const range = input.orderedIds.slice(Math.min(start, end), Math.max(start, end) + 1);
-    const next = [...input.selected];
-    const have = new Set(input.selected);
-    let capped = false;
-    for (const item of range) {
-      if (have.has(item)) continue;
-      if (next.length >= max) {
-        capped = true;
-        break;
+    const anchorSelected = input.selected.includes(input.anchor);
+    if (anchorSelected) {
+      const next = [...input.selected];
+      const have = new Set(input.selected);
+      let capped = false;
+      for (const item of range) {
+        if (have.has(item)) continue;
+        if (next.length >= max) {
+          capped = true;
+          break;
+        }
+        have.add(item);
+        next.push(item);
       }
-      have.add(item);
-      next.push(item);
+      return { selected: next, anchor: input.anchor, capped };
     }
-    return { selected: next, anchor: input.anchor, capped };
+    const remove = new Set(range);
+    return {
+      selected: input.selected.filter((item) => !remove.has(item)),
+      anchor: input.anchor,
+      capped: false,
+    };
   }
   if (gesture === "add") {
     if (input.selected.includes(input.id)) {
@@ -470,7 +484,13 @@ export function safeAlbumId(value: unknown): string | null {
 
 function readExifCaptured(exif: unknown): unknown {
   if (!exif || typeof exif !== "object") return null;
-  return (exif as { capturedAt?: unknown }).capturedAt;
+  const row = exif as { capturedAt?: unknown; takenAt?: unknown };
+  return row.capturedAt ?? row.takenAt ?? null;
+}
+
+/** 处理失败的照片不能选入建册。 */
+export function libraryPhotoSelectable(photo: Pick<LibraryPhoto, "status">): boolean {
+  return photo.status !== "failed";
 }
 
 function readCreatedAt(value: unknown): string {

@@ -16,16 +16,16 @@ export interface LibraryAssetView {
   width: number | null;
   height: number | null;
   error: string | null;
-  /** 无时区的相机时间，或带时区的 ISO。不是坐标。 */
-  capturedAt: string | null;
-  createdAt: string;
+  /** 拍摄时间（EXIF），无时区字面量或 ISO。不是坐标。 */
+  takenAt: string | null;
+  uploadedAt: string;
   previews: Partial<Record<"thumb" | "preview" | "hero", SignedDerivative>>;
 }
 
 /**
  * 照片库列表给浏览器的形状。
  * 只签衍生图；库存里写成原图键的尺寸会被 signStoredDerivatives 丢掉。
- * capturedAt 只接受日期形状。不要把 exif.lat / lng / hasGps 抄进响应。
+ * takenAt 只接受日期形状。不要把 exif.lat / lng / hasGps 抄进响应。
  * 地点、场景、人物还没有字段。以后若要加地名，只能加地理编码写回的名字，不能加坐标。
  */
 export async function presentLibraryAssets(
@@ -41,8 +41,8 @@ export async function presentLibraryAssets(
       width: asset.width,
       height: asset.height,
       error: publicFailure(asset.error),
-      capturedAt: libraryCapturedAt(asset.exif),
-      createdAt: asset.createdAt,
+      takenAt: libraryTakenAt(asset.exif),
+      uploadedAt: asset.createdAt,
       previews: await signStoredDerivatives(objects, asset.userId, asset.id, asset.derivatives),
     });
   }
@@ -62,7 +62,7 @@ export function parseLibraryLimit(value: unknown): number {
 }
 
 /** EXIF 的冒号日期保持相机上的年月日，不换算时区。带时区的 ISO 收成 UTC。 */
-export function libraryCapturedAt(exif: unknown): string | null {
+export function libraryTakenAt(exif: unknown): string | null {
   if (!exif || typeof exif !== "object") return null;
   const raw = (exif as { capturedAt?: unknown }).capturedAt;
   if (typeof raw !== "string") return null;

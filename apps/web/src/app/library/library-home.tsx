@@ -1,24 +1,16 @@
 "use client";
 
 /**
- * 照片库首页。后续接手先看这几条：
- * - 数据来自 GET /api/v1/assets。响应只有衍生图预览、拍摄时间和上传时间，没有原图键，也没有 GPS。
- * - 「时间」用 capturedAt 的日期；没有拍摄时间就用 createdAt。分组逻辑在 src/lib/library.ts，有测试。
- * - 「地点 / 场景 / 人物」是空态。仓库里没有地名、场景或人脸结果，不要填假数据。
- *   以后地点只能展示地理编码写回的名字，不能把坐标发到浏览器。
- * - 多选：点击切换，Shift 从锚点加选一段，触摸长按进入选择。上限 200，和相册容量一致。
- * - 生成相册复用 POST /api/v1/albums，再按 50 张一批 POST /api/v1/albums/:id/assets，然后去 /albums/:id/preview。
- *   放入照片失败时没有改相册或移除照片的接口，所以标题和主题会锁住，重试只继续放入刚才那一批。
- * - TODO(前端大神): 上传不要在这页重做。PR #14 的 UploadPhotos
- *   （apps/web/src/app/albums/upload-photos.tsx）仍然必须带 albumId，并会把照片加入那本相册。
- *   等它合并、且能脱离相册复用之后，再替换下面的「去相册上传」。
+ * 图库首页（/library）。工具页固定 cotton-candy 的 --share-* 皮肤；建册弹层里的主题卡各自包 share-shell。
+ * 数据：GET /api/v1/assets（takenAt / uploadedAt + 衍生图）。上传复用 UploadPhotos，target.kind = library。
+ * 建册：createAlbum({ title, themeId, assetIds })（见 albums-api.ts）。
  */
 
-import { THEME_IDS, type ThemeId } from "@memora/shared";
+import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from "@memora/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { assetNeedsRefresh } from "../../lib/album-assets";
+import { assetNeedsRefresh, type AlbumAssetView } from "../../lib/album-assets";
 import { createThemedAlbum, listLibrary } from "../../lib/library-api";
 import {
   applyPhotoSelection,
@@ -26,42 +18,59 @@ import {
   flattenGroupIds,
   groupPhotosByTime,
   LIBRARY_SELECTION_LIMIT,
+  libraryPhotoSelectable,
   libraryRefreshDelay,
-  suggestedAlbumTitle,
   type LibraryPhoto,
 } from "../../lib/library";
-import { LibraryCreateDialog } from "./library-create-dialog";
+import { LibraryDecor } from "../../lib/library-decor";
+import { themeSkin } from "../../lib/themes";
+import { UploadPhotos } from "../albums/upload-photos";
+import "../albums/album-upload.css";
+import { shareThemeStyle } from "../s/share-chrome";
+import { defaultComposeTitle, LibraryCreateDialog } from "./library-create-dialog";
 import { LibraryGrid } from "./library-grid";
 
 type Phase = "loading" | "guest" | "error" | "ready";
 type Tab = "time" | "place" | "scene" | "people";
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: string; soon?: boolean }[] = [
   { id: "time", label: "时间" },
-  { id: "place", label: "地点" },
-  { id: "scene", label: "场景" },
-  { id: "people", label: "人物" },
+  { id: "place", label: "地点", soon: true },
+  { id: "scene", label: "场景", soon: true },
+  { id: "people", label: "人物", soon: true },
 ];
 
-const SHELLS: Record<Exclude<Tab, "time">, { title: string; body: string }> = {
-  place: {
-    title: "地点还在路上",
-    body: "地名要等地理编码，跑在你自己的机器或自托管服务上。浏览器不会收到 GPS 坐标，所以这里没有地图，也没有占位城市。这不是「零张照片属于某地」，而是分组数据还不存在。",
-  },
-  scene: {
-    title: "场景还没被认出来",
-    body: "夜色、室内、海边这类分组要等自托管的场景模型。模型还没接上，这里不会编一组假场景。",
-  },
-  people: {
-    title: "人物还没出现",
-    body: "人脸会在设备上或自托管服务里聚类。这一阶段没有人物数据，也不会显示猜出来的面孔或名字。",
-  },
-};
+const SHELLS: Record<Exclude<Tab, "time">, { title: string; body: string; decor: "envelope" | "sparkle" | "soft-blob" }> =
+  {
+    place: {
+      title: "地点整理还在路上",
+      body: "我们会在你的设备或服务器上本地识别拍摄地点，不会把位置发给第三方。准备好之前，这里先空着。",
+      decor: "envelope",
+    },
+    scene: {
+      title: "场景识别还在路上",
+      body: "之后会按夜景、海边、美食这类场景自动归类。现在还没有分析任何照片。",
+      decor: "sparkle",
+    },
+    people: {
+      title: "人物识别还在路上",
+      body: "人脸识别默认关闭，开启前会单独问你。现在没有识别任何人。",
+      decor: "soft-blob",
+    },
+  };
 
-export function LibraryHome() {
+const shellSkin = themeSkin(DEFAULT_THEME_ID);
+
+export function LibraryHome({
+  decorations,
+}: {
+  decorations: Record<string, string>;
+}) {
   const router = useRouter();
+  const uploadTriggerRef = useRef<HTMLButtonElement>(null);
+  const uploadDialogRef = useRef<HTMLDialogElement>(null);
   const [phase, setPhase] = useState<Phase>("loading");
-  const [error, setError] = useState("照片库暂时打不开");
+  const [error, setError] = useState("照片暂时没加载出来");
   const [email, setEmail] = useState<string | null>(null);
   const [photos, setPhotos] = useState<LibraryPhoto[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -73,6 +82,7 @@ export function LibraryHome() {
   const [capped, setCapped] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composeStep, setComposeStep] = useState<"theme" | "title">("theme");
   const [title, setTitle] = useState("");
   const [titleDirty, setTitleDirty] = useState(false);
   const [themeId, setThemeId] = useState<ThemeId>(THEME_IDS[0]);
@@ -80,6 +90,10 @@ export function LibraryHome() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [draftAlbumId, setDraftAlbumId] = useState<string | null>(null);
   const [draftIds, setDraftIds] = useState<string[] | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [pageDrag, setPageDrag] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const brokenPreviews = useRef(new Set<string>());
 
   const load = useCallback(async (mode: "initial" | "silent") => {
@@ -96,8 +110,7 @@ export function LibraryHome() {
         setEmail(null);
       }
       if (!listed.ok && listed.status === 401) {
-        setPhotos([]);
-        setPhase("guest");
+        router.push("/login?next=/library");
         return;
       }
       if (!listed.ok) {
@@ -112,11 +125,11 @@ export function LibraryHome() {
       setPhase("ready");
     } catch {
       if (mode === "initial") {
-        setError("API 暂时不可达");
+        setError("网络好像断了");
         setPhase("error");
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -128,12 +141,17 @@ export function LibraryHome() {
   }, [load]);
 
   useEffect(() => {
+    const dialog = uploadDialogRef.current;
+    if (!dialog) return;
+    if (uploadOpen && !dialog.open) dialog.showModal();
+    if (!uploadOpen && dialog.open) dialog.close();
+  }, [uploadOpen]);
+
+  useEffect(() => {
     if (phase !== "ready") return;
     const delay = libraryRefreshDelay(photos);
     if (delay === null) return;
-    const timer = window.setTimeout(() => {
-      void load("silent");
-    }, delay);
+    const timer = window.setTimeout(() => void load("silent"), delay);
     return () => window.clearTimeout(timer);
   }, [phase, photos, load]);
 
@@ -143,7 +161,28 @@ export function LibraryHome() {
   }, [photos]);
 
   useEffect(() => {
+    const on = () => {
+      setOffline(false);
+      setToast("已重新连上");
+      window.setTimeout(() => setToast(null), 2000);
+    };
+    const off = () => setOffline(true);
+    setOffline(typeof navigator !== "undefined" ? !navigator.onLine : false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key === "u" || event.key === "U") {
+        event.preventDefault();
+        setUploadOpen(true);
+      }
       if (event.key !== "Escape" || composerOpen) return;
       if (!selecting && selected.length === 0) return;
       setSelecting(false);
@@ -156,11 +195,30 @@ export function LibraryHome() {
   }, [composerOpen, selecting, selected.length]);
 
   const orderedIds = useMemo(
-    () => flattenGroupIds(groupPhotosByTime(photos, timeZone)),
+    () => flattenGroupIds(groupPhotosByTime(photos, timeZone)).filter((id) => {
+      const photo = photos.find((p) => p.assetId === id);
+      return photo ? libraryPhotoSelectable(photo) : false;
+    }),
     [photos, timeZone],
   );
 
+  const uploadAssets: AlbumAssetView[] = useMemo(
+    () =>
+      photos.map((p) => ({
+        assetId: p.assetId,
+        filename: p.filename,
+        status: p.status,
+        width: p.width,
+        height: p.height,
+        error: p.error,
+        previews: p.previews,
+      })),
+    [photos],
+  );
+
   function selectPhoto(id: string, shift: boolean, gesture: "toggle" | "add") {
+    const photo = photos.find((p) => p.assetId === id);
+    if (!photo || !libraryPhotoSelectable(photo)) return;
     if (draftAlbumId) {
       setDraftAlbumId(null);
       setDraftIds(null);
@@ -174,6 +232,18 @@ export function LibraryHome() {
     if (next.selected.length === 0) setSelecting(false);
   }
 
+  function selectDay(ids: string[], select: boolean) {
+    if (select) {
+      const merged = [...new Set([...selected, ...ids])].slice(0, LIBRARY_SELECTION_LIMIT);
+      setSelected(merged);
+      setSelecting(true);
+      setCapped(merged.length >= LIBRARY_SELECTION_LIMIT);
+    } else {
+      const remove = new Set(ids);
+      setSelected(selected.filter((id) => !remove.has(id)));
+    }
+  }
+
   function clearSelection() {
     setSelecting(false);
     setSelected([]);
@@ -182,15 +252,15 @@ export function LibraryHome() {
   }
 
   function openComposer() {
+    setComposeStep("theme");
     if (!titleDirty && !draftAlbumId) {
-      const chosen = photos.filter((photo) => selected.includes(photo.assetId));
-      setTitle(suggestedAlbumTitle(chosen, timeZone));
+      setTitle(defaultComposeTitle(themeId));
     }
     setComposerOpen(true);
   }
 
   async function submitAlbum() {
-    if (pending) return;
+    if (pending || offline) return;
     const ids = draftIds ?? chronologicalAssetIds(photos, selected, timeZone);
     setPending(true);
     setCreateError(null);
@@ -202,190 +272,192 @@ export function LibraryHome() {
         albumId: draftAlbumId,
       });
       if (!result.ok) {
-        if (result.albumId) {
+        if (result.attachFailed && result.albumId) {
           setDraftAlbumId(result.albumId);
           setDraftIds(ids);
+          setCreateError("相册建好了，但照片没放进去。请重试放入。");
+        } else if (result.albumId) {
+          setDraftAlbumId(result.albumId);
+          setDraftIds(ids);
+          setCreateError(result.message);
+        } else {
+          setCreateError(result.status === 401 ? "登录已过期，请重新登录" : result.message);
         }
-        setCreateError(result.message);
         return;
       }
+      setComposerOpen(false);
+      clearSelection();
+      setToast(`已建好「${title.trim()}」，共 ${ids.length} 张`);
       router.push(`/albums/${result.albumId}/preview`);
     } catch {
-      setCreateError("API 暂时不可达");
+      setCreateError("网络好像断了，选择还在，连上后再点一次");
     } finally {
       setPending(false);
     }
   }
 
-  async function logout() {
-    await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" });
-    router.push("/login");
-  }
-
-  function onTabKey(event: React.KeyboardEvent) {
-    const index = TABS.findIndex((item) => item.id === tab);
-    let next = index;
-    if (event.key === "ArrowRight") next = (index + 1) % TABS.length;
-    else if (event.key === "ArrowLeft") next = (index - 1 + TABS.length) % TABS.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = TABS.length - 1;
-    else return;
-    event.preventDefault();
-    const id = TABS[next]?.id;
-    if (!id) return;
-    setTab(id);
-    document.getElementById(`tab-${id}`)?.focus();
-  }
-
   const processing = photos.some((photo) => assetNeedsRefresh(photo.status));
-  const showDock = selecting || selected.length > 0;
+  const showSelectionBar = selecting || selected.length > 0;
   const shell = tab === "time" ? null : SHELLS[tab];
+  const coverPhoto = photos.find((p) => selected.includes(p.assetId)) ?? photos[0] ?? null;
   const live = capped
-    ? `一次最多选择 ${LIBRARY_SELECTION_LIMIT} 张`
+    ? "一次最多 200 张，先挑最想放进去的"
     : selected.length > 0
       ? `已选 ${selected.length} 张`
-      : "";
+      : toast ?? "";
 
   return (
-    <div className="lib">
-      <div className="lib-bg" aria-hidden="true" />
-      <a className="lib-skip" href="#library-main">
-        跳到内容
-      </a>
-      <header className="lib-top">
-        <div className="lib-wrap lib-top-inner">
-          <Link className="lib-mark" href="/">
-            <span className="lib-mark-en">Memora</span>
-            <span className="lib-mark-zh">念册</span>
-          </Link>
-          <nav className="lib-nav" aria-label="主导航">
-            <Link href="/library" aria-current="page">
-              照片库
-            </Link>
-            <Link href="/albums">相册</Link>
-            {email ? (
-              <button type="button" onClick={() => void logout()} aria-label={`退出 ${email}`}>
-                {email} · 退出
-              </button>
-            ) : (
-              <Link href="/login">登录</Link>
-            )}
-          </nav>
-        </div>
-      </header>
-      <main className="lib-wrap lib-main" id="library-main">
-        <p className="lib-kicker">library</p>
-        <h1>照片库</h1>
-        <p className="lib-hand">把日子摊开</p>
-        <p className="lib-lede">
-          按拍摄日期排成一墙。选中几张，套上棉花糖、纸灯或杂志，去看这本册子。
+    <div
+      className="lib share-shell"
+      data-theme={shellSkin.id}
+      style={shareThemeStyle(shellSkin)}
+      onDragEnter={(event) => {
+        if (event.dataTransfer?.types.includes("Files")) setPageDrag(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget === event.target) setPageDrag(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setPageDrag(false);
+        setUploadOpen(true);
+      }}
+      onDragOver={(event) => event.preventDefault()}
+    >
+      {pageDrag ? (
+        <div className="lib-page-drop" role="status">松手上传到图库</div>
+      ) : null}
+      {offline ? (
+        <p className="lib-offline" role="status">
+          现在离线。能看已加载的照片，联网后再上传或建相册。
         </p>
-        <p className="lib-note">页面只显示预览。原图和坐标不会到浏览器里。</p>
+      ) : null}
 
-        <div className="lib-toolbar">
-          <div role="tablist" aria-label="分组" className="lib-tabs" onKeyDown={onTabKey}>
-            {TABS.map((item) => (
-              <button
-                key={item.id}
-                id={`tab-${item.id}`}
-                type="button"
-                role="tab"
-                className="lib-tab"
-                aria-selected={tab === item.id}
-                aria-controls={`panel-${item.id}`}
-                tabIndex={tab === item.id ? 0 : -1}
-                onClick={() => setTab(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+      <a className="lib-skip" href="#library-main">跳到内容</a>
+
+      {showSelectionBar ? (
+        <header className="lib-selection-bar lib-selection-bar-top" role="region" aria-label="已选照片">
+          <button type="button" className="lib-quiet" onClick={clearSelection}>✕ 取消</button>
+          <strong aria-live="polite">{live}</strong>
           <button
             type="button"
-            className="lib-select"
-            aria-pressed={selecting}
-            disabled={phase !== "ready" || photos.length === 0}
-            onClick={() => setSelecting((current) => !current)}
+            className="lib-primary"
+            disabled={selected.length < 1 || pending || offline || capped}
+            onClick={openComposer}
           >
-            {selecting ? "完成选择" : "选择"}
+            做成主题相册
           </button>
-        </div>
-        <p className="lib-hint" id="library-select-hint">
-          点选或按空格选择。按住 Shift 可连续加选。触摸时长按进入选择。
-        </p>
-        <p className="lib-sr" aria-live="polite">
-          {live}
-        </p>
+        </header>
+      ) : (
+        <header className="lib-top">
+          <div className="lib-wrap lib-top-inner">
+            <Link className="lib-mark" href="/">念册 · Memora</Link>
+            <span className="lib-privacy-badge" title="仅你可见">🔒 仅你可见</span>
+            <div className="lib-top-actions">
+              <button
+                ref={uploadTriggerRef}
+                type="button"
+                className="lib-primary"
+                disabled={offline || phase !== "ready"}
+                onClick={() => setUploadOpen(true)}
+              >
+                上传
+              </button>
+              {email ? (
+                <button type="button" className="lib-quiet" onClick={() => void fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" }).then(() => router.push("/login"))}>
+                  退出
+                </button>
+              ) : (
+                <Link href="/login">登录</Link>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
 
+      <div className="lib-tabs-wrap">
+        <div role="tablist" aria-label="分组" className="lib-tabs" onKeyDown={onTabKey}>
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              id={`tab-${item.id}`}
+              type="button"
+              role="tab"
+              className="lib-tab"
+              aria-selected={tab === item.id}
+              aria-controls={`panel-${item.id}`}
+              tabIndex={tab === item.id ? 0 : -1}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+              {item.soon ? <span className="lib-soon">即将</span> : null}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <main className="lib-wrap lib-main" id="library-main">
         <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} aria-busy={phase === "loading"}>
           {phase === "loading" ? (
             <>
               <div className="lib-skeletons" aria-hidden="true">
-                <span className="lib-skel" />
-                <span className="lib-skel" />
-                <span className="lib-skel" />
+                <span className="lib-skel lib-skel-bar" />
+                <span className="lib-skel lib-skel-bar short" />
+                <div className="lib-skel-grid">
+                  {Array.from({ length: 18 }).map((_, i) => (
+                    <span key={i} className="lib-skel" />
+                  ))}
+                </div>
               </div>
-              <p className="lib-status" role="status">
-                正在把照片按日期排开…
-              </p>
+              <p className="lib-sr" role="status">正在加载照片</p>
             </>
           ) : null}
 
           {phase === "guest" ? (
             <section className="lib-empty">
-              <h2>先登录，再翻你的册子</h2>
-              <p>照片只属于当前账号。登录之后，这里会按拍摄日期排开你的预览。</p>
-              <p>
-                <Link className="lib-primary lib-link" href="/login">
-                  登录
-                </Link>
-              </p>
+              <h2>先登录</h2>
+              <Link className="lib-primary lib-link" href="/login?next=/library">登录</Link>
             </section>
           ) : null}
 
           {phase === "error" ? (
             <section className="lib-empty">
-              <h2>这一页没有打开</h2>
-              <p role="alert">{error}</p>
-              <button type="button" className="lib-primary" onClick={() => void load("initial")}>
-                再试一次
-              </button>
+              <h2>{error}</h2>
+              <button type="button" className="lib-primary" onClick={() => void load("initial")}>重试</button>
             </section>
           ) : null}
 
           {phase === "ready" && shell ? (
-            <section className={`lib-shell lib-shell-${tab}`} aria-labelledby={`shell-${tab}`}>
-              <div className={`lib-shell-art lib-shell-art-${tab}`} aria-hidden="true" />
-              <p className="lib-shell-seal">尚未接入</p>
+            <section className="lib-shell" aria-labelledby={`shell-${tab}`}>
+              <div className="lib-shell-art">
+                <LibraryDecor svg={decorations[shell.decor] ?? null} className="lib-decor-main" />
+              </div>
               <h2 id={`shell-${tab}`}>{shell.title}</h2>
               <p>{shell.body}</p>
+              <button type="button" className="lib-primary" onClick={() => setTab("time")}>回到时间</button>
             </section>
           ) : null}
 
           {phase === "ready" && tab === "time" && photos.length === 0 ? (
-            <section className="lib-empty">
-              <h2>还是空白的一页</h2>
-              <p>到相册里上传之后，预览会回到这里。处理中的照片会先占一个位置。原图不会进这个页面。</p>
-              {/* TODO(前端大神): PR #14 合并后复用 UploadPhotos。它现在必须带 albumId。不要在照片库另写上传。 */}
-              <p>
-                <Link className="lib-primary lib-link" href="/albums">
-                  去相册上传
-                </Link>
-              </p>
+            <section className="lib-empty lib-empty-library">
+              <div className="lib-empty-art">
+                <LibraryDecor svg={decorations["soft-blob"] ?? null} className="lib-decor-bg" />
+                <LibraryDecor svg={decorations.envelope ?? null} className="lib-decor-fg" />
+              </div>
+              <h2>这里还空着</h2>
+              <p>把照片放进来，念册会按时间帮你排好。只有你能看到。</p>
+              <button type="button" className="lib-primary" disabled={offline} onClick={() => setUploadOpen(true)}>
+                上传第一批照片
+              </button>
+              <p><Link href="/preview">看看主题样张</Link></p>
             </section>
           ) : null}
 
           {phase === "ready" && tab === "time" && photos.length > 0 ? (
             <>
-              <p className="lib-count">
-                {photos.length} 张
-                {processing ? " · 有照片还在生成预览" : ""}
-                {hasMore ? " · 先显示最近上传的一部分，更早的还在库里" : ""}
-              </p>
+              {hasMore ? <p className="lib-more">先显示最近上传的一部分。</p> : null}
               {draftAlbumId ? (
-                <p className="lib-draft">
-                  有一本相册还没放完刚才选中的照片。改选择会另开一本，已经建立的那本目前不能在这里删除。
-                </p>
+                <p className="lib-draft">有一本相册还没放完照片，重试只会继续放入刚才那一批。</p>
               ) : null}
               <LibraryGrid
                 photos={photos}
@@ -396,6 +468,7 @@ export function LibraryHome() {
                 locked={pending}
                 onFocus={setFocusId}
                 onToggle={selectPhoto}
+                onSelectDay={selectDay}
                 onClear={clearSelection}
                 onPreviewError={(src) => {
                   if (brokenPreviews.current.has(src)) return;
@@ -408,46 +481,74 @@ export function LibraryHome() {
         </div>
       </main>
 
-      {showDock ? (
-        <div className="lib-dock" role="region" aria-label="已选照片">
-          <div className="lib-dock-inner">
-            <strong>{selected.length > 0 ? `已选 ${selected.length} 张` : "点一张照片"}</strong>
-            <div className="lib-dock-actions">
-              <button type="button" className="lib-quiet" onClick={clearSelection}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="lib-primary"
-                disabled={selected.length < 1 || pending}
-                onClick={openComposer}
-              >
-                生成相册
-              </button>
-            </div>
-          </div>
+      {showSelectionBar ? (
+        <div className="lib-selection-bar lib-selection-bar-bottom" role="region" aria-label="已选照片">
+          <button type="button" className="lib-quiet" onClick={clearSelection}>✕ 取消</button>
+          <strong aria-live="polite">{live}</strong>
+          <button
+            type="button"
+            className="lib-primary"
+            disabled={selected.length < 1 || pending || offline || capped}
+            onClick={openComposer}
+          >
+            做成主题相册
+          </button>
         </div>
       ) : null}
 
+      <dialog ref={uploadDialogRef} className="lib-drawer" onClose={() => setUploadOpen(false)}>
+        <div className="lib-drawer-panel">
+          <button type="button" className="lib-drawer-close" onClick={() => setUploadOpen(false)}>关闭</button>
+          <UploadPhotos
+            target={{ kind: "library" }}
+            theme={shellSkin}
+            assets={uploadAssets}
+            albumEmpty={photos.length === 0}
+            embedded
+            onUploaded={() => void load("silent")}
+          />
+        </div>
+      </dialog>
+
       <LibraryCreateDialog
         open={composerOpen}
+        step={composeStep}
         pending={pending}
         locked={Boolean(draftAlbumId)}
         title={title}
         themeId={themeId}
+        coverPhoto={coverPhoto}
         count={(draftIds ?? selected).length}
         error={createError}
-        albumHref={draftAlbumId ? `/albums/${draftAlbumId}` : null}
+        albumHref={draftAlbumId ? `/albums/${encodeURIComponent(draftAlbumId)}` : null}
+        onClose={() => setComposerOpen(false)}
+        onStep={setComposeStep}
         onTitle={(value) => {
           setTitleDirty(true);
           setTitle(value);
         }}
-        onTheme={setThemeId}
-        onClose={() => {
-          if (!pending) setComposerOpen(false);
+        onTheme={(id) => {
+          setThemeId(id);
+          if (!titleDirty) setTitle(defaultComposeTitle(id));
         }}
         onSubmit={() => void submitAlbum()}
       />
+
+      <p className="lib-sr" aria-live="polite">{toast}</p>
     </div>
   );
+}
+
+function onTabKey(event: React.KeyboardEvent) {
+  const tabs = TABS;
+  const current = document.activeElement?.id?.replace("tab-", "") as Tab | undefined;
+  const index = tabs.findIndex((item) => item.id === current);
+  let next = index;
+  if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+  else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+  else return;
+  event.preventDefault();
+  const id = tabs[next]?.id;
+  if (!id) return;
+  document.getElementById(`tab-${id}`)?.focus();
 }

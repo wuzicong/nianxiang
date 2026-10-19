@@ -725,3 +725,295 @@ a.lib-primary {
   from { background-position: 100% 0; }
   to { background-position: -100% 0; }
 }
+
+/* —— 规范 v1：share-shell 变量 + 方格网格 + 吸顶 + 选择栏 —— */
+.lib.share-shell {
+  --lib-sticky-top: 7.25rem;
+  color: var(--share-text, var(--lib-ink));
+  background: var(--share-bg, var(--lib-bg));
+  font-family: var(--share-font-body, var(--font-inter), system-ui, "PingFang SC", sans-serif);
+}
+
+.lib-top {
+  box-shadow: inset 0 3px 0 var(--share-brand, var(--lib-gold));
+  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 88%, transparent);
+}
+
+.lib-privacy-badge {
+  font-size: 0.82rem;
+  color: var(--share-muted, var(--lib-muted));
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--share-radius-pill, 999px);
+  border: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-top-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.lib-tabs-wrap {
+  position: sticky;
+  top: 3.6rem;
+  z-index: 29;
+  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 90%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-soon {
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+  color: var(--share-muted, var(--lib-muted));
+}
+
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+
+@media (min-width: 768px) {
+  .lib-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .lib-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+
+.lib-tile {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.lib-sticky-stack {
+  position: sticky;
+  top: var(--lib-sticky-top);
+  z-index: 5;
+}
+
+.lib-sticky-year,
+.lib-sticky-month,
+.lib-sticky-day {
+  background: color-mix(in srgb, var(--share-bg, var(--lib-bg)) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-sticky-year {
+  font-family: var(--share-font-title, var(--font-fraunces), serif);
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  padding: 0.35rem 0;
+}
+
+.lib-sticky-month-inline {
+  display: none;
+}
+
+.lib-sticky-month {
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.2rem 0;
+}
+
+.lib-sticky-day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--share-muted, var(--lib-muted));
+  padding: 0.25rem 0 0.45rem;
+}
+
+.lib-sticky-day h3 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--share-text, var(--lib-ink));
+}
+
+.lib-day-select {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .lib-sticky-month {
+    display: none;
+  }
+  .lib-sticky-month-inline {
+    display: inline;
+    margin-left: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  --lib-sticky-top: 6.5rem;
+}
+
+.lib-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 4rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--share-surface, var(--lib-surface)) 92%, transparent);
+  border-bottom: 1px solid var(--share-border, var(--lib-border));
+}
+
+.lib-selection-bar-bottom {
+  position: fixed;
+  z-index: 35;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--share-shadow, var(--lib-shadow));
+}
+
+.lib-selection-bar-top {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .lib-selection-bar-bottom {
+    display: none;
+  }
+  .lib-selection-bar-top {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .lib-top {
+    display: none;
+  }
+}
+
+.lib-shell-art,
+.lib-empty-art {
+  position: relative;
+  min-height: 6rem;
+  margin-bottom: 0.8rem;
+}
+
+.lib-decor-main svg,
+.lib-decor-bg svg,
+.lib-decor-fg svg {
+  width: 100%;
+  max-width: 12rem;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.lib-decor-fg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lib-page-drop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--share-text, #000) 35%, transparent);
+  color: var(--share-surface, #fff);
+  font-size: 1.4rem;
+}
+
+.lib-offline {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--share-muted, #888) 12%, var(--share-bg, #fff));
+  font-size: 0.9rem;
+}
+
+.lib-drawer {
+  border: 0;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+  background: transparent;
+}
+
+.lib-drawer::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.lib-drawer-panel {
+  width: min(420px, 100vw);
+  max-height: 100vh;
+  margin-left: auto;
+  padding: 1rem;
+  background: var(--share-bg, var(--lib-bg));
+  overflow: auto;
+}
+
+.lib-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-top: 0.8rem;
+}
+
+.lib-skel-bar {
+  height: 1.2rem;
+  border-radius: 8px;
+  margin-bottom: 0.4rem;
+}
+
+.lib-skel-bar.short {
+  width: 40%;
+}
+
+.lib-theme-cover {
+  display: block;
+  height: 4.5rem;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.lib-theme-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lib-theme-layouts {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.lib-tile[data-failed="true"] {
+  outline: 1px dashed var(--share-muted, var(--lib-muted));
+}
+
+.lib-no-taken {
+  position: absolute;
+  bottom: 0.2rem;
+  left: 0.25rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.lib :focus-visible {
+  outline: 2px solid var(--share-accent, var(--lib-accent));
+  outline-offset: 2px;
+}

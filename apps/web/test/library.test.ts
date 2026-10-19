@@ -27,8 +27,8 @@ function photo(partial: Partial<LibraryPhoto> & Pick<LibraryPhoto, "assetId">): 
     width: 400,
     height: 300,
     error: null,
-    capturedAt: null,
-    createdAt: "2024-01-02T00:00:00.000Z",
+    takenAt: null,
+    uploadedAt: "2024-01-02T00:00:00.000Z",
     previews: {},
     ...partial,
   };
@@ -46,9 +46,9 @@ test("library payload keeps derivative previews and drops originals, GPS, and ju
         height: 480,
         key: "users/owner/originals/asset1",
         userId: "owner",
-        exif: { lat: 12.3456, lng: 99.9, hasGps: true, capturedAt: "2020-01-02T03:04:05" },
-        capturedAt: "2020-01-02T03:04:05",
-        createdAt: "2024-03-02T00:00:00.000Z",
+        exif: { lat: 12.3456, lng: 99.9, hasGps: true, takenAt: "2020-01-02T03:04:05" },
+        takenAt: "2020-01-02T03:04:05",
+        uploadedAt: "2024-03-02T00:00:00.000Z",
         previews: {
           thumb: { url: signedThumb, expiresAt: "2026-01-01T00:10:00.000Z" },
           preview: {
@@ -61,19 +61,19 @@ test("library payload keeps derivative previews and drops originals, GPS, and ju
         assetId: "asset2",
         filename: "bad.jpg",
         status: "ready",
-        capturedAt: "12.3456,99.9",
-        createdAt: "not-a-date",
+        takenAt: "12.3456,99.9",
+        uploadedAt: "not-a-date",
         previews: {},
       },
     ],
   });
   assert.equal(parsed.hasMore, true);
   assert.equal(parsed.photos.length, 2);
-  assert.equal(parsed.photos[0]?.capturedAt, "2020-01-02T03:04:05");
+  assert.equal(parsed.photos[0]?.takenAt, "2020-01-02T03:04:05");
   assert.equal(parsed.photos[0]?.previews.thumb?.url, signedThumb);
   assert.equal(parsed.photos[0]?.previews.preview, undefined);
-  assert.equal(parsed.photos[1]?.capturedAt, null);
-  assert.equal(parsed.photos[1]?.createdAt, "");
+  assert.equal(parsed.photos[1]?.takenAt, null);
+  assert.equal(parsed.photos[1]?.uploadedAt, "");
   const json = JSON.stringify(parsed);
   assert.equal(json.includes("/originals/"), false);
   assert.equal(json.includes("12.3456"), false);
@@ -86,19 +86,19 @@ test("time groups prefer capture day and fall back to upload day", () => {
     [
       photo({
         assetId: "capture",
-        capturedAt: "2020-01-02T03:04:05",
-        createdAt: "2026-08-01T00:00:00.000Z",
+        takenAt: "2020-01-02T03:04:05",
+        uploadedAt: "2026-08-01T00:00:00.000Z",
       }),
       photo({
         assetId: "later",
-        capturedAt: "2020-01-02T18:00:00",
-        createdAt: "2026-08-01T00:00:00.000Z",
+        takenAt: "2020-01-02T18:00:00",
+        uploadedAt: "2026-08-01T00:00:00.000Z",
       }),
       photo({
         assetId: "zoned",
-        createdAt: "2024-01-01T16:30:00.000Z",
+        uploadedAt: "2024-01-01T16:30:00.000Z",
       }),
-      photo({ assetId: "unknown", capturedAt: null, createdAt: "" }),
+      photo({ assetId: "unknown", takenAt: null, uploadedAt: "" }),
     ],
     "UTC",
   );
@@ -120,13 +120,13 @@ test("time groups prefer capture day and fall back to upload day", () => {
   assert.equal(uploadDay?.key, "2024-01-01");
 
   const shanghai = photoCalendar(
-    photo({ assetId: "zoned", createdAt: "2024-01-01T16:30:00.000Z" }),
+    photo({ assetId: "zoned", uploadedAt: "2024-01-01T16:30:00.000Z" }),
     "Asia/Shanghai",
   );
   assert.equal(shanghai?.day, 2);
   assert.equal(shanghai?.source, "upload");
   const literal = photoCalendar(
-    photo({ assetId: "capture", capturedAt: "2020-01-02T03:04:05", createdAt: "2026-08-01T00:00:00.000Z" }),
+    photo({ assetId: "capture", takenAt: "2020-01-02T03:04:05", uploadedAt: "2026-08-01T00:00:00.000Z" }),
     "Asia/Shanghai",
   );
   assert.equal(literal?.day, 2);
@@ -167,12 +167,19 @@ test("selection toggles, shift-adds a range, and stops at 200", () => {
   assert.deepEqual(added.selected, ["a", "c", "b"]);
 
   const many = Array.from({ length: LIBRARY_SELECTION_LIMIT + 5 }, (_, index) => `p${index}`);
-  const capped = applyPhotoSelection({
+  const seeded = applyPhotoSelection({
     selected: [],
+    orderedIds: many,
+    id: many[0] ?? "p0",
+    shift: false,
+    anchor: null,
+  });
+  const capped = applyPhotoSelection({
+    selected: seeded.selected,
     orderedIds: many,
     id: many[many.length - 1] ?? "p0",
     shift: true,
-    anchor: many[0] ?? null,
+    anchor: seeded.anchor,
   });
   assert.equal(capped.selected.length, LIBRARY_SELECTION_LIMIT);
   assert.equal(capped.capped, true);
@@ -215,8 +222,8 @@ test("arrow keys move through justified rows", () => {
 
 test("album title and asset order follow the calendar", () => {
   const photos = [
-    photo({ assetId: "new", capturedAt: "2024-05-02T12:00:00" }),
-    photo({ assetId: "old", capturedAt: "2024-05-01T09:00:00" }),
+    photo({ assetId: "new", takenAt: "2024-05-02T12:00:00" }),
+    photo({ assetId: "old", takenAt: "2024-05-01T09:00:00" }),
   ];
   assert.equal(suggestedAlbumTitle(photos, "UTC"), "2024年5月1日 – 2024年5月2日");
   assert.deepEqual(chronologicalAssetIds(photos, ["new", "old"], "UTC"), ["old", "new"]);

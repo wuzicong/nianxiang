@@ -1,24 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { assetStatusLabel, previewUrl } from "../../lib/album-assets";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { previewUrl } from "../../lib/album-assets";
 import {
-  gridNeighbor,
+  flattenGroupIds,
   groupPhotosByTime,
-  justifyPhotoRows,
-  libraryLayoutMetrics,
-  photoAspect,
-  photoCalendar,
+  libraryPhotoSelectable,
   type LibraryPhoto,
 } from "../../lib/library";
 
-/**
- * 时间墙。每一天单独成行，不把两天的照片挤进同一条。
- * 鼠标点击切换选择；触摸在进入选择前忽略轻点，长按才选中。
- * 方向键在已测量的行之间移动焦点。
- */
-
-type Gesture = "toggle" | "add";
+const LONG_PRESS_MS = 450;
 
 export function LibraryGrid({
   photos,
@@ -29,281 +20,321 @@ export function LibraryGrid({
   locked,
   onFocus,
   onToggle,
+  onSelectDay,
   onClear,
   onPreviewError,
 }: {
-  photos: readonly LibraryPhoto[];
+  photos: LibraryPhoto[];
   timeZone: string;
-  selected: readonly string[];
+  selected: string[];
   selecting: boolean;
   focusId: string | null;
   locked: boolean;
   onFocus: (id: string) => void;
-  onToggle: (id: string, shift: boolean, gesture: Gesture) => void;
+  onToggle: (id: string, shift: boolean, gesture: "toggle" | "add") => void;
+  onSelectDay: (ids: string[], select: boolean) => void;
   onClear: () => void;
   onPreviewError: (src: string) => void;
 }) {
-  const frameRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
   const groups = useMemo(() => groupPhotosByTime(photos, timeZone), [photos, timeZone]);
-  const byId = useMemo(() => new Map(photos.map((photo) => [photo.assetId, photo])), [photos]);
-  const metrics = libraryLayoutMetrics(width);
-  const measured = width >= 64;
+  const orderedIds = useMemo(() => flattenGroupIds(groups), [groups]);
+  const firstId = orderedIds[0] ?? null;
+  const frameRef = useRef<HTMLDivElement>(null);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sections = useMemo(() => {
-    const blocks: {
-      key: string;
-      year?: string;
-      month?: string;
-      heading: string;
-      meta: string;
-      rows: { id: string; width: number; height: number }[][];
-    }[] = [];
-    const pushDay = (
-      key: string,
-      heading: string,
-      meta: string,
-      dayPhotos: readonly LibraryPhoto[],
-      labels: { year?: string; month?: string },
-    ) => {
-      const rows = measured
-        ? justifyPhotoRows(
-            dayPhotos.map((photo) => ({ id: photo.assetId, aspect: photoAspect(photo) })),
-            width,
-            metrics,
-          )
-        : dayPhotos.map((photo) => [{ id: photo.assetId, width: 0, height: 0 }]);
-      blocks.push({ key, heading, meta, rows, ...labels });
-    };
-    for (const year of groups.years) {
-      let yearShown = false;
-      for (const month of year.months) {
-        let monthShown = false;
-        for (const day of month.days) {
-          pushDay(
-            day.key,
-            day.label,
-            `${day.weekday} · ${day.photos.length} 张${day.uploadFallback ? " · 按上传日期" : ""}`,
-            day.photos,
-            {
-              year: yearShown ? undefined : year.label,
-              month: monthShown ? undefined : month.label,
-            },
-          );
-          yearShown = true;
-          monthShown = true;
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (locked) return;
+      const current = focusId ?? firstId;
+      if (!current) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClear();
+        return;
+      }
+      if (event.key === " " && current) {
+        event.preventDefault();
+        onToggle(current, false, selecting ? "toggle" : "toggle");
+        return;
+      }
+      const neighbor = neighborId(orderedIds, current, event.key);
+      if (neighbor) {
+        event.preventDefault();
+        if (event.shiftKey && selecting) {
+          onToggle(neighbor, true, "toggle");
+        } else {
+          onFocus(neighbor);
         }
       }
-    }
-    if (groups.undated.length > 0) {
-      pushDay("undated", "日期未知", `${groups.undated.length} 张`, groups.undated, {});
-    }
-    return blocks;
-  }, [groups, measured, metrics, width]);
-
-  const allRows = sections.flatMap((section) => section.rows);
+    },
+    [focusId, firstId, locked, onClear, onFocus, onToggle, orderedIds, selecting],
+  );
 
   useEffect(() => {
-    const node = frameRef.current;
-    if (!node) return;
-    const update = () => setWidth(node.clientWidth);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  function onKeyDown(event: React.KeyboardEvent) {
-    if (event.key === "Escape") {
-      onClear();
-      return;
-    }
-    if (
-      event.key !== "ArrowLeft" &&
-      event.key !== "ArrowRight" &&
-      event.key !== "ArrowUp" &&
-      event.key !== "ArrowDown" &&
-      event.key !== "Home" &&
-      event.key !== "End"
-    ) {
-      return;
-    }
-    event.preventDefault();
-    const next = gridNeighbor(allRows, focusId, event.key);
-    if (!next) return;
-    onFocus(next);
-    if (event.shiftKey && !locked) onToggle(next, true, "toggle");
-    const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(next) : next;
+    if (!focusId) return;
+    const escaped = CSS.escape(focusId);
     frameRef.current?.querySelector<HTMLButtonElement>(`[data-asset-id="${escaped}"]`)?.focus();
-  }
-
-  const firstId = allRows[0]?.[0]?.id ?? null;
+  }, [focusId]);
 
   return (
     <div
       ref={frameRef}
       className={selecting ? "lib-frame lib-selecting" : "lib-frame"}
+      role="grid"
+      aria-multiselectable={selecting}
       onKeyDown={onKeyDown}
     >
-      {sections.map((section) => (
-        <section key={section.key} aria-labelledby={`day-${section.key}`}>
-          {section.year ? <h2 className="lib-year">{section.year}</h2> : null}
-          {section.month ? <p className="lib-month">{section.month}</p> : null}
-          <div className="lib-day">
-            <h3 id={`day-${section.key}`}>{section.heading}</h3>
-            <p>{section.meta}</p>
-          </div>
-          <div className={measured ? "lib-rows" : "lib-fallback-row"} style={measured ? { gap: metrics.gap } : undefined}>
-            {(measured ? section.rows : [section.rows.flat()]).map((row, rowIndex) => (
-              <div
-                key={`${section.key}-${rowIndex}`}
-                className={measured ? "lib-row" : undefined}
-                style={measured ? { gap: metrics.gap } : undefined}
-              >
-                {row.map((tile) => {
-                  const item = byId.get(tile.id);
-                  if (!item) return null;
-                  return (
+      {groups.years.map((year) =>
+        year.months.map((month) =>
+          month.days.map((day) => {
+            const dayIds = day.photos.map((p) => p.assetId);
+            const selectableIds = day.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
+            const selectedInDay = selectableIds.filter((id) => selected.includes(id)).length;
+            const dayChecked =
+              selectableIds.length > 0 && selectedInDay === selectableIds.length
+                ? true
+                : selectedInDay > 0
+                  ? "mixed"
+                  : false;
+            return (
+              <section key={day.key} className="lib-day-block" aria-labelledby={`day-${day.key}`}>
+                <div className="lib-sticky-stack">
+                  <div className="lib-sticky-year" aria-hidden="true">
+                    <span className="lib-sticky-year-num">{year.year}</span>
+                    <span className="lib-sticky-month-inline">{month.month} 月</span>
+                  </div>
+                  <p className="lib-sticky-month" aria-hidden="true">{month.month} 月</p>
+                  <div className="lib-sticky-day">
+                    <h3 id={`day-${day.key}`}>
+                      {month.month} 月 {day.day} 日 · {day.weekday} · {day.photos.length} 张
+                      {day.uploadFallback ? " · 按上传日期" : ""}
+                    </h3>
+                    <label className="lib-day-select">
+                      <input
+                        type="checkbox"
+                        checked={dayChecked === true}
+                        aria-checked={dayChecked === "mixed" ? "mixed" : dayChecked}
+                        disabled={locked || selectableIds.length === 0}
+                        onChange={() => {
+                          onSelectDay(selectableIds, dayChecked !== true);
+                        }}
+                      />
+                      选这天
+                    </label>
+                  </div>
+                </div>
+                <div className="lib-grid" role="rowgroup">
+                  {day.photos.map((photo, index) => (
                     <LibraryTile
-                      key={tile.id}
-                      photo={item}
+                      key={photo.assetId}
+                      photo={photo}
+                      indexInDay={index + 1}
+                      totalInDay={day.photos.length}
                       timeZone={timeZone}
-                      selected={selected.includes(tile.id)}
+                      selected={selected.includes(photo.assetId)}
+                      selectable={libraryPhotoSelectable(photo)}
                       selecting={selecting}
-                      tabIndex={focusId ? (focusId === tile.id ? 0 : -1) : tile.id === firstId ? 0 : -1}
-                      width={measured ? tile.width : undefined}
-                      height={measured ? tile.height : undefined}
+                      tabIndex={focusId ? (focusId === photo.assetId ? 0 : -1) : photo.assetId === firstId ? 0 : -1}
                       locked={locked}
-                      onFocus={onFocus}
-                      onToggle={onToggle}
+                      pressTimer={pressTimer}
+                      onFocus={() => onFocus(photo.assetId)}
+                      onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
                       onPreviewError={onPreviewError}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              </section>
+            );
+          }),
+        ),
+      )}
+      {groups.undated.length > 0 ? (
+        <section className="lib-day-block">
+          <div className="lib-sticky-stack">
+            <div className="lib-sticky-day">
+              <h3>日期待定</h3>
+            </div>
+          </div>
+          <div className="lib-grid" role="rowgroup">
+            {groups.undated.map((photo, index) => (
+              <LibraryTile
+                key={photo.assetId}
+                photo={photo}
+                indexInDay={index + 1}
+                totalInDay={groups.undated.length}
+                timeZone={timeZone}
+                selected={selected.includes(photo.assetId)}
+                selectable={libraryPhotoSelectable(photo)}
+                selecting={selecting}
+                tabIndex={-1}
+                locked={locked}
+                pressTimer={pressTimer}
+                onFocus={() => onFocus(photo.assetId)}
+                onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
+                onPreviewError={onPreviewError}
+              />
             ))}
           </div>
         </section>
-      ))}
+      ) : null}
     </div>
   );
 }
 
 function LibraryTile({
   photo,
+  indexInDay,
+  totalInDay,
   timeZone,
   selected,
+  selectable,
   selecting,
   tabIndex,
-  width,
-  height,
   locked,
+  pressTimer,
   onFocus,
   onToggle,
   onPreviewError,
 }: {
   photo: LibraryPhoto;
+  indexInDay: number;
+  totalInDay: number;
   timeZone: string;
   selected: boolean;
+  selectable: boolean;
   selecting: boolean;
   tabIndex: number;
-  width?: number;
-  height?: number;
   locked: boolean;
-  onFocus: (id: string) => void;
-  onToggle: (id: string, shift: boolean, gesture: Gesture) => void;
+  pressTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  onFocus: () => void;
+  onToggle: (shift: boolean, gesture: "toggle" | "add") => void;
   onPreviewError: (src: string) => void;
 }) {
-  const timer = useRef<number | null>(null);
-  const origin = useRef<{ x: number; y: number } | null>(null);
-  const fired = useRef(false);
-  const pointerKind = useRef("mouse");
   const src = previewUrl(photo.previews);
-  const calendar = photoCalendar(photo, timeZone);
-  const when = calendar
-    ? `${calendar.year}年${calendar.month}月${calendar.day}日，${calendar.source === "capture" ? "拍摄日期" : "上传日期"}`
-    : "日期未知";
-  const status = photo.status === "ready" ? "" : `，${assetStatusLabel(photo.status)}`;
-  const label = `${photo.filename || "照片"}，${when}，${selected ? "已选" : "未选"}${status}`;
+  const processing = photo.status !== "ready" && photo.status !== "failed";
+  const failed = photo.status === "failed";
+  const label = tileAriaLabel(photo, indexInDay, totalInDay, timeZone, selected);
 
-  function clearTimer() {
-    if (timer.current !== null) window.clearTimeout(timer.current);
-    timer.current = null;
+  function clearPress() {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
   }
 
   return (
     <button
       type="button"
+      role="gridcell"
       className="lib-tile"
       data-asset-id={photo.assetId}
-      aria-pressed={selected}
+      data-failed={failed ? "true" : "false"}
+      aria-selected={selecting ? selected : undefined}
+      aria-pressed={selecting ? selected : undefined}
+      aria-disabled={!selectable || locked}
       aria-label={label}
       tabIndex={tabIndex}
       disabled={locked}
-      style={width && height ? { width, height, flex: "0 0 auto" } : undefined}
-      onFocus={() => onFocus(photo.assetId)}
-      onPointerDown={(event) => {
-        if (event.button !== 0 || locked) return;
-        pointerKind.current = event.pointerType;
-        fired.current = false;
-        origin.current = { x: event.clientX, y: event.clientY };
-        clearTimer();
-        timer.current = window.setTimeout(() => {
-          fired.current = true;
-          onToggle(photo.assetId, false, "add");
-        }, 520);
-      }}
-      onPointerMove={(event) => {
-        if (!origin.current) return;
-        const dx = event.clientX - origin.current.x;
-        const dy = event.clientY - origin.current.y;
-        if (dx * dx + dy * dy > 144) clearTimer();
-      }}
-      onPointerUp={clearTimer}
-      onPointerCancel={clearTimer}
-      onContextMenu={(event) => {
-        if (pointerKind.current === "touch") event.preventDefault();
-      }}
+      onFocus={onFocus}
       onClick={(event) => {
-        if (fired.current) {
-          fired.current = false;
-          event.preventDefault();
+        if (!selectable) return;
+        if (selecting) {
+          onToggle(event.shiftKey, "toggle");
           return;
         }
-        if (pointerKind.current === "touch" && !selecting) return;
-        onToggle(photo.assetId, event.shiftKey, "toggle");
+        if (event.metaKey || event.ctrlKey) {
+          onToggle(false, "toggle");
+          return;
+        }
       }}
+      onPointerDown={(event) => {
+        if (!selectable || locked || event.pointerType === "mouse") return;
+        clearPress();
+        pressTimer.current = setTimeout(() => {
+          pressTimer.current = null;
+          try {
+            navigator.vibrate?.(10);
+          } catch {
+            /* ignore */
+          }
+          onToggle(false, "add");
+        }, LONG_PRESS_MS);
+      }}
+      onPointerUp={clearPress}
+      onPointerCancel={clearPress}
+      onPointerLeave={clearPress}
     >
       {src ? (
         <img
           src={src}
           alt=""
-          draggable={false}
+          loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
           onError={() => onPreviewError(src)}
         />
       ) : (
         <span className="lib-placeholder">
-          {photo.status === "failed"
-            ? photo.error || "处理失败"
-            : photo.status === "ready"
-              ? "暂无预览"
-              : assetStatusLabel(photo.status)}
+          {failed ? "预览没生成" : processing ? "正在生成预览" : "…"}
         </span>
       )}
       <span className="lib-check" aria-hidden="true">
-        <svg viewBox="0 0 16 16">
-          <path
-            d="M3.5 8.2 6.4 11 12.5 4.8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+        <svg viewBox="0 0 12 12" fill="none">
+          <path d="M2 6.2 4.8 9 10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </span>
+      {!photo.takenAt ? <span className="lib-no-taken" title="无拍摄时间">·</span> : null}
     </button>
   );
+}
+
+function neighborId(
+  orderedIds: readonly string[],
+  focusId: string,
+  key: string,
+): string | null {
+  const index = orderedIds.indexOf(focusId);
+  if (index < 0) return null;
+  if (key === "Home") return orderedIds[0] ?? null;
+  if (key === "End") return orderedIds[orderedIds.length - 1] ?? null;
+  if (key === "ArrowLeft" || key === "ArrowUp") return orderedIds[index - 1] ?? focusId;
+  if (key === "ArrowRight" || key === "ArrowDown") return orderedIds[index + 1] ?? focusId;
+  return null;
+}
+
+function tileAriaLabel(
+  photo: LibraryPhoto,
+  indexInDay: number,
+  totalInDay: number,
+  timeZone: string,
+  selected: boolean,
+): string {
+  const stamp = photo.takenAt ?? photo.uploadedAt;
+  let when = "日期未知";
+  if (stamp) {
+    try {
+      const d = photo.takenAt && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(photo.takenAt)
+        ? new Date(
+            Number(photo.takenAt.slice(0, 4)),
+            Number(photo.takenAt.slice(5, 7)) - 1,
+            Number(photo.takenAt.slice(8, 10)),
+            Number(photo.takenAt.slice(11, 13)),
+            Number(photo.takenAt.slice(14, 16)),
+          )
+        : new Date(stamp);
+      when = new Intl.DateTimeFormat("zh-CN", {
+        timeZone,
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(d);
+    } catch {
+      when = "日期未知";
+    }
+  }
+  const base = `${when} 拍摄的照片，第 ${indexInDay} 张，共 ${totalInDay} 张`;
+  if (photo.status === "failed") return `${base}，预览未生成，不可选入相册`;
+  return selected ? `${base}，已选` : base;
 }

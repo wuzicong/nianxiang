@@ -1,5 +1,6 @@
-import { apiMessage, parseJsonResponse, type ApiErrorBody } from "./api-client";
 import { visibleMessage } from "./album-assets";
+import { apiMessage, parseJsonResponse, type ApiErrorBody } from "./api-client";
+import { createAlbum } from "./albums-api";
 import {
   batchIds,
   LIBRARY_ASSET_BATCH,
@@ -13,10 +14,6 @@ import {
 
 type FetchImpl = (input: string, init?: RequestInit) => Promise<Response>;
 
-/**
- * 生成相册复用现有接口：先 POST /api/v1/albums，再按 50 张一批 POST .../assets。
- * 没有单独的「从照片库建册」接口。跨用户仍由相册接口返回 404。
- */
 export async function listLibrary(
   deps: { fetchImpl?: FetchImpl } = {},
 ): Promise<
@@ -39,17 +36,24 @@ export async function listLibrary(
     return {
       ok: false,
       status: response.status,
-      message: visibleMessage(apiMessage(body), response.status === 401 ? "请先登录" : "照片库暂时打不开"),
+      message: visibleMessage(apiMessage(body), response.status === 401 ? "请先登录" : "照片暂时没加载出来"),
     };
   }
   const parsed = parseLibraryPayload(body);
   return { ok: true, photos: parsed.photos, hasMore: parsed.hasMore };
 }
 
+/**
+ * 图库建册：createAlbum({ title, themeId, assetIds })。
+ * 关联资产仍走 POST /api/v1/albums/:id/assets（见 albums-api.ts）。
+ */
 export async function createThemedAlbum(
   input: { title: string; themeId: string; assetIds: readonly string[]; albumId?: string | null },
   deps: { fetchImpl?: FetchImpl } = {},
-): Promise<{ ok: true; albumId: string } | { ok: false; status: number; message: string; albumId?: string }> {
+): Promise<
+  | { ok: true; albumId: string }
+  | { ok: false; status: number; message: string; albumId?: string; attachFailed?: boolean }
+> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const title = validAlbumTitle(input.title);
   const themeId = validThemeId(input.themeId);
@@ -63,19 +67,28 @@ export async function createThemedAlbum(
 
   let albumId = input.albumId ? safeAlbumId(input.albumId) : null;
   if (input.albumId && !albumId) return { ok: false, status: 400, message: "相册不存在" };
+
   if (!albumId) {
-    const created = await postJson(fetchImpl, "/api/v1/albums", { title, themeId });
-    if (!created.ok) return created;
-    const id = safeAlbumId((created.body as { album?: { albumId?: unknown } } | null)?.album?.albumId);
-    if (!id) return { ok: false, status: 500, message: "响应不完整" };
-    albumId = id;
+    const created = await createAlbum({ title, themeId, assetIds }, { fetchImpl });
+    if (!created.ok) {
+      return {
+        ok: false,
+        status: created.status,
+        message: created.message,
+        albumId: created.albumId,
+        attachFailed: created.attachFailed,
+      };
+    }
+    return { ok: true, albumId: created.album.albumId };
   }
 
   for (const chunk of batchIds(assetIds, LIBRARY_ASSET_BATCH)) {
     const added = await postJson(fetchImpl, `/api/v1/albums/${encodeURIComponent(albumId)}/assets`, {
       assetIds: chunk,
     });
-    if (!added.ok) return { ...added, albumId };
+    if (!added.ok) {
+      return { ok: false, status: added.status, message: added.message, albumId, attachFailed: true };
+    }
   }
   return { ok: true, albumId };
 }
