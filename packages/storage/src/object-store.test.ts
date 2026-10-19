@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createObjectStore, type ObjectStoreConfig } from "./object-store.js";
+import { createObjectStore, isMissingObjectError, type ObjectStoreConfig } from "./object-store.js";
 
 const SECRET = "test-secret-value";
 
@@ -78,4 +78,15 @@ test("presignGet signs a single derivative key for the same TTL", async () => {
 test("presign TTL outside 5–15 minutes is rejected", () => {
   assert.throws(() => createObjectStore(baseConfig({ presignTtlSeconds: 60 })));
   assert.throws(() => createObjectStore(baseConfig({ presignTtlSeconds: 3_600 })));
+});
+
+test("missing object errors are recognizable and other errors are not", () => {
+  assert.equal(isMissingObjectError(Object.assign(new Error("gone"), { name: "NoSuchKey" })), true);
+  assert.equal(isMissingObjectError(Object.assign(new Error("gone"), { name: "NotFound" })), true);
+  assert.equal(
+    isMissingObjectError(Object.assign(new Error("gone"), { $metadata: { httpStatusCode: 404 } })),
+    true,
+  );
+  assert.equal(isMissingObjectError(new Error("AccessDenied")), false);
+  assert.equal(isMissingObjectError(null), false);
 });

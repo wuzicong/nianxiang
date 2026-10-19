@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -56,6 +57,8 @@ export interface ObjectStore {
   head(key: string): Promise<HeadResult | null>;
   getBuffer(key: string): Promise<Buffer>;
   putObject(input: PutObjectInput): Promise<void>;
+  /** 对象不存在视为成功。其他错误抛出，调用方决定要不要保留数据库行。 */
+  deleteObject(key: string): Promise<void>;
 }
 
 export function objectStoreConfigFromRuntime(config: RuntimeConfig): ObjectStoreConfig {
@@ -71,14 +74,12 @@ export function objectStoreConfigFromRuntime(config: RuntimeConfig): ObjectStore
   };
 }
 
-function isNotFound(err: unknown): boolean {
+/** S3 / MinIO 把缺失对象报成 NotFound、NoSuchKey 或 HTTP 404。 */
+export function isMissingObjectError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
-  const named = err as { name?: string; $metadata?: { httpStatusCode?: number } };
-  return (
-    named.name === "NotFound" ||
-    named.name === "NoSuchKey" ||
-    named.$metadata?.httpStatusCode === 404
-  );
+  const named = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
+  const code = named.name ?? named.Code;
+  return code === "NotFound" || code === "NoSuchKey" || named.$metadata?.httpStatusCode === 404;
 }
 
 function encryptionFields(kmsKeyId: string | undefined): Pick<
@@ -179,7 +180,7 @@ export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
           contentType: out.ContentType,
         };
       } catch (err) {
-        if (isNotFound(err)) return null;
+        if (isMissingObjectError(err)) return null;
         throw err;
       }
     },
@@ -206,6 +207,15 @@ export function createObjectStore(cfg: ObjectStoreConfig): ObjectStore {
           ...encryption,
         }),
       );
+    },
+
+    async deleteObject(key) {
+      try {
+        await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
+      } catch (err) {
+        if (isMissingObjectError(err)) return;
+        throw err;
+      }
     },
   };
 }

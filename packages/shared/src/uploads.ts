@@ -1,3 +1,5 @@
+import { PRESIGN_TTL_DEFAULT_MINUTES } from "./storage.js";
+
 /** 上传允许的原图类型。不含 SVG（可携带脚本）。 */
 export const ALLOWED_UPLOAD_CONTENT_TYPES = [
   "image/jpeg",
@@ -44,6 +46,99 @@ export function resolveMaxUploadBytes(raw: string | undefined): number {
   const n = Number(raw);
   if (!Number.isSafeInteger(n) || n < 1) return DEFAULT_MAX_UPLOAD_BYTES;
   return Math.min(n, ABSOLUTE_MAX_UPLOAD_BYTES);
+}
+
+/**
+ * 未完成上传的最短保留时间。
+ * 预签名最长 15 分钟，两倍仍短于一小时，因此默认至少 60 分钟。
+ */
+export const PENDING_UPLOAD_MIN_TTL_MINUTES = 60;
+
+/** 显式 TTL 超过 7 天视为配错，回落默认，避免清理被关掉。 */
+export const PENDING_UPLOAD_TTL_MAX_MINUTES = 7 * 24 * 60;
+
+/** 每个用户同时处于 pending_upload 的资产上限。 */
+export const DEFAULT_MAX_PENDING_UPLOADS_PER_USER = 50;
+
+/** 上限配得过大视为配错，回落默认。 */
+export const MAX_PENDING_UPLOADS_PER_USER_CAP = 1_000;
+
+/** 每一轮清理最多处理的行数。 */
+export const DEFAULT_PENDING_UPLOAD_CLEANUP_BATCH = 50;
+
+export const MAX_PENDING_UPLOAD_CLEANUP_BATCH = 500;
+
+/** Worker 上清理任务的默认间隔。 */
+export const DEFAULT_PENDING_UPLOAD_CLEANUP_INTERVAL_MINUTES = 10;
+
+export const MAX_PENDING_UPLOAD_CLEANUP_INTERVAL_MINUTES = 24 * 60;
+
+/**
+ * 默认清理阈值：预签名 TTL 的两倍，并且不少于 1 小时。
+ * presignTtlMinutes 在运行配置里已经被夹到 5–15，这里仍按传入值计算，方便单测。
+ */
+export function pendingUploadTtlFloorMinutes(presignTtlMinutes: number): number {
+  const presign = Number.isFinite(presignTtlMinutes)
+    ? Math.trunc(presignTtlMinutes)
+    : PRESIGN_TTL_DEFAULT_MINUTES;
+  const safe = presign > 0 ? presign : PRESIGN_TTL_DEFAULT_MINUTES;
+  return Math.max(safe * 2, PENDING_UPLOAD_MIN_TTL_MINUTES);
+}
+
+/**
+ * 空值或非法值回落默认。
+ * 比下限更短、或超过 7 天，也回落默认，避免还在传的对象被清掉，或清理被放得过远。
+ */
+export function resolvePendingUploadTtlMinutes(
+  raw: string | undefined,
+  presignTtlMinutes: number,
+): number {
+  const fallback = pendingUploadTtlFloorMinutes(presignTtlMinutes);
+  const parsed = parsePositiveInt(raw);
+  if (parsed === null || parsed < fallback || parsed > PENDING_UPLOAD_TTL_MAX_MINUTES) {
+    return fallback;
+  }
+  return parsed;
+}
+
+export function resolveMaxPendingUploadsPerUser(raw: string | undefined): number {
+  return resolveBoundedInt(
+    raw,
+    DEFAULT_MAX_PENDING_UPLOADS_PER_USER,
+    MAX_PENDING_UPLOADS_PER_USER_CAP,
+  );
+}
+
+export function resolvePendingUploadCleanupBatch(raw: string | undefined): number {
+  return resolveBoundedInt(
+    raw,
+    DEFAULT_PENDING_UPLOAD_CLEANUP_BATCH,
+    MAX_PENDING_UPLOAD_CLEANUP_BATCH,
+  );
+}
+
+export function resolvePendingUploadCleanupIntervalMinutes(raw: string | undefined): number {
+  return resolveBoundedInt(
+    raw,
+    DEFAULT_PENDING_UPLOAD_CLEANUP_INTERVAL_MINUTES,
+    MAX_PENDING_UPLOAD_CLEANUP_INTERVAL_MINUTES,
+  );
+}
+
+function parsePositiveInt(raw: string | undefined): number | null {
+  if (raw === undefined || raw.trim() === "") return null;
+  if (!/^\d+$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  if (!Number.isSafeInteger(n) || n < 1) return null;
+  return n;
+}
+
+/** 空值用 fallback。非正整数或超过上限也回落 fallback，不夹紧。 */
+function resolveBoundedInt(raw: string | undefined, fallback: number, max: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = parsePositiveInt(raw);
+  if (parsed === null || parsed > max) return fallback;
+  return parsed;
 }
 
 /** 文件名只作元数据，不进入对象键。拒绝路径和控制字符。 */

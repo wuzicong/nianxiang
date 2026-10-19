@@ -69,6 +69,18 @@ export function record(
   };
 }
 
+function pendingRecord(asset: NewAsset): AssetRecord {
+  return record({
+    id: asset.id,
+    userId: asset.userId,
+    storageKey: asset.storageKey,
+    filename: asset.filename,
+    contentType: asset.contentType,
+    sizeBytes: asset.sizeBytes,
+    status: "pending_upload",
+  });
+}
+
 export function memoryAssets(
   seed: AssetRecord[] = [],
 ): AssetRepository & { rows: Map<string, AssetRecord> } {
@@ -77,18 +89,17 @@ export function memoryAssets(
     rows,
     async ready() {},
     async insertPending(asset: NewAsset) {
-      rows.set(
-        asset.id,
-        record({
-          id: asset.id,
-          userId: asset.userId,
-          storageKey: asset.storageKey,
-          filename: asset.filename,
-          contentType: asset.contentType,
-          sizeBytes: asset.sizeBytes,
-          status: "pending_upload",
-        }),
-      );
+      rows.set(asset.id, pendingRecord(asset));
+    },
+    async reservePendingUpload(asset: NewAsset, maxPending: number) {
+      if (!Number.isInteger(maxPending) || maxPending < 1) return "limit";
+      let pending = 0;
+      for (const row of rows.values()) {
+        if (row.userId === asset.userId && row.status === "pending_upload") pending += 1;
+      }
+      if (pending >= maxPending) return "limit";
+      rows.set(asset.id, pendingRecord(asset));
+      return "ok";
     },
     async deletePending(id) {
       const current = rows.get(id);
@@ -367,11 +378,17 @@ export function fakeObjects(options?: {
   head?: HeadResult | null;
   presignError?: Error;
   presignGetError?: Error;
-}): ObjectStore & { presigns: PresignPutInput[]; presignGets: string[]; heads: string[] } {
+}): ObjectStore & {
+  presigns: PresignPutInput[];
+  presignGets: string[];
+  heads: string[];
+  deletes: string[];
+} {
   return {
     presigns: [],
     presignGets: [],
     heads: [],
+    deletes: [],
     async presignPut(input) {
       this.presigns.push(input);
       if (options?.presignError) throw options.presignError;
@@ -402,6 +419,9 @@ export function fakeObjects(options?: {
       return Buffer.alloc(0);
     },
     async putObject() {},
+    async deleteObject(key: string) {
+      this.deletes.push(key);
+    },
   };
 }
 

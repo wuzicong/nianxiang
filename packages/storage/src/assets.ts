@@ -1,7 +1,18 @@
 import pg from "pg";
 import type { DerivativeSize } from "@memora/shared";
+import {
+  CLAIM_STALE_PENDING_UPLOAD_SQL,
+  DELETE_ALBUM_ASSET_LINKS_SQL,
+  DELETE_STALE_PENDING_UPLOAD_SQL,
+  pendingUploadObjectKeys,
+  type PendingUploadCleaner,
+  type StalePendingClaim,
+} from "./pending-upload.js";
 import { safeErrorMessage } from "./redact.js";
 import { ASSET_SCHEMA_SQL, SCHEMA_ADVISORY_LOCK } from "./schema.js";
+
+/** 与建表用的会话锁错开。同一用户的未完成上传名额串行申请。 */
+const PENDING_UPLOAD_ADVISORY_SEED = "9021081551";
 
 const { Pool } = pg;
 
@@ -53,6 +64,11 @@ export interface AssetRecord {
 export interface AssetRepository {
   ready(): Promise<void>;
   insertPending(asset: NewAsset): Promise<void>;
+  /**
+   * 同一用户的 pending_upload 达到 maxPending 时不插入。
+   * 计数和插入在同一个事务里，并用咨询锁挡住并发申请。
+   */
+  reservePendingUpload(asset: NewAsset, maxPending: number): Promise<"ok" | "limit">;
   deletePending(id: string): Promise<void>;
   get(id: string): Promise<AssetRecord | null>;
   markUploaded(id: string): Promise<AssetRecord | null>;
@@ -123,7 +139,7 @@ function sslFor(connectionString: string): pg.ConnectionConfig["ssl"] {
 export function createAssetRepository(options: {
   connectionString: string;
   applicationName?: string;
-}): AssetRepository {
+}): AssetRepository & PendingUploadCleaner {
   const pool = new Pool({
     connectionString: options.connectionString,
     max: 5,
@@ -170,22 +186,148 @@ export function createAssetRepository(options: {
     return pool.query<T>(text, values);
   }
 
+  async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+    await ready();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      try {
+        const result = await fn(client);
+        await client.query("COMMIT");
+        return result;
+      } catch (err) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackErr) {
+          console.error("[memora-storage] rollback failed", safeErrorMessage(rollbackErr));
+        }
+        throw err;
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  async function insertPendingRow(
+    queryable: { query: (text: string, values?: unknown[]) => Promise<pg.QueryResult> },
+    asset: NewAsset,
+  ): Promise<void> {
+    await queryable.query(
+      `INSERT INTO assets (
+         id, user_id, storage_key, filename, content_type, size_bytes, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, 'pending_upload')`,
+      [
+        asset.id,
+        asset.userId,
+        asset.storageKey,
+        asset.filename,
+        asset.contentType,
+        asset.sizeBytes,
+      ],
+    );
+  }
+
+  function openClaim(client: pg.PoolClient, row: AssetRow): StalePendingClaim {
+    let closed = false;
+    const objectKeys = pendingUploadObjectKeys(row.storage_key, row.derivatives);
+    async function finish(action: "COMMIT" | "ROLLBACK"): Promise<void> {
+      if (closed) return;
+      closed = true;
+      try {
+        await client.query(action);
+      } catch (err) {
+        if (action === "COMMIT") {
+          try {
+            await client.query("ROLLBACK");
+          } catch {
+            // 提交失败后再回滚一次，避免连接带着打开的事务回到池里。
+          }
+        }
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+    return {
+      id: row.id,
+      objectKeys,
+      async stillPending() {
+        if (closed) return false;
+        const current = await client.query<{ status: AssetStatus }>(
+          `SELECT status FROM assets WHERE id = $1`,
+          [row.id],
+        );
+        return current.rows[0]?.status === "pending_upload";
+      },
+      async stageDelete() {
+        if (closed) return false;
+        const present = await client.query<{ present: boolean }>(
+          `SELECT to_regclass('public.album_assets') IS NOT NULL AS present`,
+        );
+        if (present.rows[0]?.present) {
+          await client.query(DELETE_ALBUM_ASSET_LINKS_SQL, [row.id]);
+        }
+        const deleted = await client.query(DELETE_STALE_PENDING_UPLOAD_SQL, [row.id]);
+        return (deleted.rowCount ?? 0) > 0;
+      },
+      commit: () => finish("COMMIT"),
+      abort: () => finish("ROLLBACK"),
+    };
+  }
+
   return {
     ready,
     async insertPending(asset) {
-      await query(
-        `INSERT INTO assets (
-           id, user_id, storage_key, filename, content_type, size_bytes, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, 'pending_upload')`,
-        [
-          asset.id,
+      await ready();
+      await insertPendingRow(pool, asset);
+    },
+    async reservePendingUpload(asset, maxPending) {
+      if (!Number.isInteger(maxPending) || maxPending < 1) return "limit";
+      return withTransaction(async (client) => {
+        await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, $2::bigint))`, [
           asset.userId,
-          asset.storageKey,
-          asset.filename,
-          asset.contentType,
-          asset.sizeBytes,
-        ],
-      );
+          PENDING_UPLOAD_ADVISORY_SEED,
+        ]);
+        const count = await client.query<{ n: number }>(
+          `SELECT count(*)::int AS n
+           FROM assets
+           WHERE user_id = $1 AND status = 'pending_upload'`,
+          [asset.userId],
+        );
+        if (Number(count.rows[0]?.n ?? 0) >= maxPending) return "limit";
+        await insertPendingRow(client, asset);
+        return "ok";
+      });
+    },
+    async claimStalePendingUpload(ttlMinutes) {
+      if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1) return null;
+      await ready();
+      const client = await pool.connect();
+      let began = false;
+      try {
+        await client.query("BEGIN");
+        began = true;
+        const selected = await client.query<AssetRow>(CLAIM_STALE_PENDING_UPLOAD_SQL, [
+          ttlMinutes,
+        ]);
+        const row = selected.rows[0];
+        if (!row) {
+          await client.query("COMMIT");
+          client.release();
+          return null;
+        }
+        return openClaim(client, row);
+      } catch (err) {
+        if (began) {
+          try {
+            await client.query("ROLLBACK");
+          } catch {
+            // 回滚失败时仍然释放连接。
+          }
+        }
+        client.release();
+        throw err;
+      }
     },
     async deletePending(id) {
       await query(`DELETE FROM assets WHERE id = $1 AND status = 'pending_upload'`, [id]);

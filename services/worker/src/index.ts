@@ -1,4 +1,4 @@
-import { Worker, type Job } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import { Redis } from "ioredis";
 import {
   ALL_JOB_NAMES,
@@ -22,6 +22,12 @@ import { runMediaDerivative } from "./derivative.js";
 import { runMetaExif } from "./exif.js";
 import { onJobFailed } from "./failure.js";
 import { startHealthServer, workerHealthPort } from "./health.js";
+import {
+  PENDING_UPLOAD_QUEUE_NAME,
+  PENDING_UPLOAD_SCHEDULER_ID,
+  pendingUploadSchedule,
+  runPendingUploadSweep,
+} from "./pending-upload.js";
 
 const runtime = loadRuntimeConfig();
 const objects = createObjectStore(objectStoreConfigFromRuntime(runtime));
@@ -31,6 +37,9 @@ const assets = createAssetRepository({
 });
 const connections: Redis[] = [];
 const workers: Worker[] = [];
+const maintenanceQueue = new Queue(PENDING_UPLOAD_QUEUE_NAME, {
+  connection: workerConnection(),
+});
 
 function workerConnection(): Redis {
   const connection = new Redis(redisConnectionOptions(runtime.redisUrl));
@@ -128,8 +137,31 @@ exifWorker.on("failed", (job, err) => {
 });
 workers.push(exifWorker);
 
+const pendingUploadWorker = new Worker(
+  PENDING_UPLOAD_QUEUE_NAME,
+  async () =>
+    runPendingUploadSweep({
+      cleaner: assets,
+      deleteObject: (key) => objects.deleteObject(key),
+      ttlMinutes: runtime.pendingUploadTtlMinutes,
+      limit: runtime.pendingUploadCleanupBatch,
+    }),
+  { connection: workerConnection(), concurrency: 1, lockDuration: 120_000 },
+);
+pendingUploadWorker.on("failed", (_job, err) => {
+  console.error("[memora-worker] pending-upload cleanup failed", safeErrorMessage(err));
+});
+workers.push(pendingUploadWorker);
+
+const pendingSchedule = pendingUploadSchedule(runtime.pendingUploadCleanupIntervalMinutes);
+void maintenanceQueue
+  .upsertJobScheduler(PENDING_UPLOAD_SCHEDULER_ID, { every: pendingSchedule.every }, pendingSchedule.template)
+  .catch((err) => {
+    console.error("[memora-worker] pending-upload schedule failed", safeErrorMessage(err));
+  });
+
 console.log(
-  `[memora-worker] ready; derivative+exif live, stubs: ${ALL_JOB_NAMES.filter((name) => !implemented.has(name)).join(", ")}`,
+  `[memora-worker] ready; derivative+exif live, pending-upload every ${runtime.pendingUploadCleanupIntervalMinutes}m ttl=${runtime.pendingUploadTtlMinutes}m batch=${runtime.pendingUploadCleanupBatch}, stubs: ${ALL_JOB_NAMES.filter((name) => !implemented.has(name)).join(", ")}`,
 );
 
 const healthServer = startHealthServer(workerHealthPort(process.env.WORKER_HEALTH_PORT));
@@ -149,6 +181,7 @@ healthServer.on("listening", () => {
 async function shutdown(): Promise<void> {
   await new Promise<void>((resolve) => healthServer.close(() => resolve()));
   await Promise.all(workers.map((worker) => worker.close()));
+  await maintenanceQueue.close();
   await Promise.all(connections.map((connection) => connection.quit()));
   await assets.close();
   process.exit(0);
