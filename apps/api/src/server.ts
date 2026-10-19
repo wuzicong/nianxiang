@@ -35,7 +35,6 @@ import type { AppConfig } from "./config.js";
 import { createMemoryIncrCounter, createShareRateLimiter, type ShareRateLimiter } from "./shares/rate-limit.js";
 import { HttpError, asyncRoute } from "./http.js";
 import { parseLibraryLimit, presentLibraryAssets } from "./library/present.js";
-import { toPublicAsset } from "./present.js";
 import { asRecord, parseOptionalAlbumId, readTraceId, validateUploadRequest } from "./validate.js";
 
 export interface AppDeps {
@@ -349,7 +348,17 @@ export function createApp(deps: AppDeps): Express {
       const asset = await deps.assets.get(assetId);
       if (!asset) throw new HttpError(404, "asset_not_found", "素材不存在");
       assertAssetOwner(asset, user.id);
-      res.json(toPublicAsset(asset));
+      // 与照片库列表同一形状：只签衍生图，拍摄时间不含坐标，不返回原图键或 EXIF。
+      let views: Awaited<ReturnType<typeof presentLibraryAssets>>;
+      try {
+        views = await presentLibraryAssets([asset], deps.objects);
+      } catch (err) {
+        console.error("[memora-api] asset presign failed", safeErrorMessage(err));
+        throw new HttpError(502, "presign_failed", "签发读取地址失败");
+      }
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.json(views[0]);
     }),
   );
 
