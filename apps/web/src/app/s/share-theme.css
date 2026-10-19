@@ -623,6 +623,7 @@
 .share-gallery-card {
   background: var(--share-surface);
   color: var(--share-text);
+  border: 1px solid var(--share-border);
   border-radius: var(--share-radius-card);
   overflow: hidden;
 }

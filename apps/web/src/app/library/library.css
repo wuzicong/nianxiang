@@ -433,30 +433,6 @@
   max-width: 40rem;
 }
 
-.lib-shell-soon {
-  position: relative;
-  isolation: isolate;
-}
-
-.lib-shell-soon::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  border-radius: inherit;
-  opacity: 0.16;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='lg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23lg)' opacity='0.55'/%3E%3C/svg%3E");
-  background-size: 120px 120px;
-  mix-blend-mode: multiply;
-}
-
-.lib-shell-soon > * {
-  position: relative;
-  z-index: 1;
-}
-
-.lib-shell-seal,
 .lib-kicker-small {
   display: inline-flex;
   margin: 0;
@@ -472,37 +448,6 @@
 .lib-empty h2 {
   margin: 0.7rem 0 0;
   font-size: clamp(1.8rem, 3vw, 2.4rem);
-}
-
-.lib-shell-art {
-  width: 100%;
-  height: 7.5rem;
-  margin-bottom: 0.8rem;
-  border-radius: 18px;
-  border: 1px dashed color-mix(in srgb, var(--share-text) 25%, var(--share-border));
-}
-
-.lib-shell-art-place {
-  background:
-    linear-gradient(color-mix(in srgb, var(--share-accent) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(90deg, color-mix(in srgb, var(--share-accent) 55%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
-    color-mix(in srgb, var(--share-surface) 70%, var(--share-bg));
-}
-
-.lib-shell-art-scene {
-  background:
-    linear-gradient(var(--share-surface), var(--share-surface)) 12% 50% / 28% 70% no-repeat,
-    linear-gradient(var(--share-brand), var(--share-brand)) 50% 42% / 22% 58% no-repeat,
-    linear-gradient(var(--share-secondary), var(--share-secondary)) 76% 55% / 16% 46% no-repeat,
-    color-mix(in srgb, var(--share-bg) 70%, white);
-}
-
-.lib-shell-art-people {
-  background:
-    radial-gradient(circle at 32% 48%, transparent 0 18px, color-mix(in srgb, var(--share-text) 18%, transparent) 19px 20px, transparent 21px),
-    radial-gradient(circle at 50% 46%, transparent 0 22px, color-mix(in srgb, var(--share-text) 22%, transparent) 23px 24px, transparent 25px),
-    radial-gradient(circle at 68% 50%, transparent 0 16px, color-mix(in srgb, var(--share-text) 16%, transparent) 17px 18px, transparent 19px),
-    color-mix(in srgb, var(--share-secondary) 24%, var(--share-surface));
 }
 
 .lib-skeletons {

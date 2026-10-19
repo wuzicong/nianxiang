@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AlbumFontScope } from "../album-fonts";
-import "../product-shell/product-shell.css";
+import "../library/library.css";
+import "../shell/shell.css";
 
 export const metadata: Metadata = {
   title: "登录 · 念册",

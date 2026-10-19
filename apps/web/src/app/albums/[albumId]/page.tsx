@@ -12,7 +12,8 @@ import {
   type ShareSummary,
 } from "../../../lib/albums-api";
 import { themeSkin } from "../../../lib/themes";
-import { ProductShell } from "../../product-shell/product-shell";
+import { useSessionEmail } from "../../../lib/use-session-email";
+import { MemoraShell } from "../../shell/memora-shell";
 import { shareThemeStyle } from "../../s/share-chrome";
 import "../album-share.css";
 import { AlbumAssetGrid } from "../album-asset-grid";
@@ -21,6 +22,7 @@ import { CreateShareForm } from "../create-share-form";
 import { UploadPhotos } from "../upload-photos";
 
 export default function AlbumDetailPage() {
+  const sessionEmail = useSessionEmail();
   const params = useParams<{ albumId: string }>();
   const albumId = params.albumId;
   const [album, setAlbum] = useState<AlbumSummary | null>(null);
@@ -107,53 +109,50 @@ export default function AlbumDetailPage() {
 
   const pageTitle = album?.title ?? "相册";
   const lede = album && skin
-    ? `主题：${skin.name} · 已收录 ${assets.length} 张。这里和分享页只显示预览，不展示原图。`
+    ? `${skin.name} · ${assets.length} 张 · 这里和分享页只显示预览，不展示原图。`
     : undefined;
 
   return (
-    <ProductShell
+    <MemoraShell
       active="albums"
       title={pageTitle}
       lede={lede}
       status={message || undefined}
       statusRole={showRetry || needsLogin ? "alert" : "status"}
+      userEmail={sessionEmail}
+      privacyBadge="相册默认私密"
     >
       {album && skin ? (
-        <p className="ps-inline-links">
-          <Link href={`/albums/${album.albumId}/preview`}>按主题看这本相册</Link>
-          <span className="ps-muted"> · 故事或翻页，只用预览图</span>
+        <p className="shell-preview-link">
+          <Link className="lib-quiet" href={`/albums/${album.albumId}/preview`}>按主题看这本相册</Link>
         </p>
       ) : null}
 
       {album && processing ? (
-        <p className="ps-muted" style={{ marginTop: "0.75rem" }}>
-          有照片正在生成预览。完成后会显示缩略图；已经打开的分享页需要刷新。
-        </p>
+        <p className="shell-muted">有照片正在生成预览。完成后会显示缩略图；已经打开的分享页需要刷新。</p>
       ) : null}
 
       {album && assets.length > 0 ? (
-        <p className="ps-muted" style={{ marginTop: "0.5rem", fontSize: "0.88rem" }}>
+        <p className="shell-muted" style={{ fontSize: "0.88rem" }}>
           预览地址大约 15 分钟内有效，停留在此页时会自动更换。
         </p>
       ) : null}
 
       {needsLogin ? (
-        <p className="ps-inline-links">
-          请先<Link href="/login">登录</Link>。
+        <p className="shell-inline-links">
+          请先<Link href={`/login?next=/albums/${albumId}`}>登录</Link>。
         </p>
       ) : null}
 
       {showRetry ? (
-        <div className="ps-actions">
-          <button type="button" className="ps-primary" onClick={() => void refresh("initial")}>
-            重试
-          </button>
+        <div className="shell-actions">
+          <button type="button" className="lib-primary" onClick={() => void refresh("initial")}>重试</button>
         </div>
       ) : null}
 
       {album && skin ? (
         <>
-          <section className="ps-section" aria-labelledby="album-photos-heading">
+          <section className="shell-section" aria-labelledby="album-photos-heading">
             <h2 id="album-photos-heading">照片</h2>
             <AlbumAssetGrid
               assets={assets}
@@ -161,7 +160,7 @@ export default function AlbumDetailPage() {
               uploadAnchorId="album-upload"
             />
           </section>
-          <section className="ps-section" id="album-upload" aria-labelledby="album-upload-heading">
+          <section className="shell-section" id="album-upload" aria-labelledby="album-upload-heading">
             <h2 id="album-upload-heading">上传</h2>
             <p>把新照片放进这本相册；上传后会自动排队生成预览。</p>
             <UploadPhotos
@@ -172,12 +171,13 @@ export default function AlbumDetailPage() {
               onUploaded={() => void refresh("silent")}
             />
           </section>
-          <section className="ps-section" id="album-create-share" aria-labelledby="album-share-heading">
+          <section className="shell-section" id="album-create-share" aria-labelledby="album-share-heading">
             <h2 id="album-share-heading">分享</h2>
             <p>生成可撤销的链接；可选密码保护。</p>
             <CreateShareForm albumId={album.albumId} theme={skin} onCreated={() => void refreshShares()} />
           </section>
-          <section className="ps-section" aria-labelledby="album-shares-heading">
+          <section className="shell-section" aria-labelledby="album-shares-heading">
+            <h2 id="album-shares-heading" className="lib-sr">已有分享</h2>
             <div
               className="share-shell album-share-list-shell"
               data-theme={skin.id}
@@ -192,6 +192,6 @@ export default function AlbumDetailPage() {
           </section>
         </>
       ) : null}
-    </ProductShell>
+    </MemoraShell>
   );
 }
