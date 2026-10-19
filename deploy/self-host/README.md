@@ -230,7 +230,7 @@ curl -fsS "https://photos.example.com/health"
 
 没有域名、只想在这台机器上看一眼时，把 `MEMORA_DOMAIN` 留空。Caddy 只听 80。用 `http://127.0.0.1/login` 和 `http://127.0.0.1/health`。这种开法不要放到公网。`COOKIE_SECURE=true` 时，浏览器和 curl 都不会在明文 HTTP 上带会话 Cookie。本机要走注册、登录、建册时，把 `COOKIE_SECURE=false`，公网 HTTPS 再改回 `true`。
 
-各服务怎么探活、上线后怎么抽查，见「健康检查」和「活体抽查」。
+各服务怎么探活、失败时怎么看日志，以及上线后怎么抽查，见「健康检查」、「健康检查失败时的自检清单」和「活体抽查」。
 
 ### 登录限流
 
@@ -426,7 +426,44 @@ docker compose -f compose.prod.yml exec -T web node -e "fetch('http://127.0.0.1:
 docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127.0.0.1:2019/config/
 ```
 
-建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。磁盘、备份新鲜度和 429 计数见「监控告警」。备份节奏见「备份与恢复」。
+建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。unhealthy 或这三条 curl 失败时，按下一节看日志。磁盘、备份新鲜度和 429 计数见「监控告警」。备份节奏见「备份与恢复」。
+
+### 健康检查失败时的自检清单
+
+`ps` 里有服务不是 healthy，或下面三条不是 200，在仓库根目录按这个顺序做。项目名是 `compose.prod.yml` 里的 `memora-prod`。命令和本文其他地方一样，写 `-f compose.prod.yml`。有域名时把主机换成 `https://photos.example.com`。开发栈 `docker compose up -d` 的项目名是 `memora`，里面没有 web、api、worker、caddy。
+
+公网只探这三条 GET。路径和 `deploy/self-host/proxy/Caddyfile.prod` 一致。
+
+| 路径 | 谁答 | 正常 |
+|------|------|------|
+| `/health` | Caddy 转到 `api:3001` 的 `/health` | 200 |
+| `/login` | Caddy 转到 `web:3000` 的登录页 | 200 |
+| `/ready` | Caddy 自己返回 `ok` | 200 |
+
+`/health` 不经过登录。`/ready` 只说明反代进程在应答。worker 的 `GET http://127.0.0.1:3002/health`、ml 的 `GET http://127.0.0.1:8000/health`、Caddy 管理接口 `GET http://127.0.0.1:2019/config/` 没有映射到宿主机，探法在上一节。不要用 `POST /api/v1/auth/login` 做探活。
+
+```bash
+docker compose -f compose.prod.yml ps
+curl -sS --max-time 5 --max-redirs 0 -o /dev/null -w 'health %{http_code}\n' http://127.0.0.1/health
+curl -sS --max-time 5 --max-redirs 0 -o /dev/null -w 'login %{http_code}\n' http://127.0.0.1/login
+curl -sS --max-time 5 --max-redirs 0 -o /dev/null -w 'ready %{http_code}\n' http://127.0.0.1/ready
+```
+
+连不上时状态码是 `000`。三条都是 200 时，worker 或 ml 仍可能不健康，以 `ps` 为准。
+
+然后看日志。服务名与 `compose.prod.yml` 相同。只看一个服务时把名字留在最后：
+
+```bash
+docker compose -f compose.prod.yml logs --tail 100 api
+```
+
+一次看完：
+
+```bash
+docker compose -f compose.prod.yml logs --tail 100 web api worker postgres redis minio caddy ml minio-init
+```
+
+三条都是 `000` 时先看 `caddy`。只有 `/health` 失败先看 `api`，再看 `postgres`、`redis`、`minio` 和 `minio-init`。只有 `/login` 失败看 `web`。只有 `/ready` 失败看 `caddy`。Caddy 写在卷里的 `memora-system.log` 见「TLS 证书续期」。
 
 ### 监控告警
 
@@ -483,7 +520,7 @@ COMPOSE_ENV_FILES=/tmp/memora-prod.env docker compose -f compose.prod.yml up -d 
 
 下面的邮箱、口令和 Cookie 都是占位，换成一次性值。输出里打掉口令和 `memora_session`。注册和登录 POST 共用每分钟 5 次，先做完业务步骤，再做限流短测。解锁 POST 每分钟 6 次，公开分享 GET 每分钟 60 次，这两项不要放在同一分钟。
 
-1. 健康。按「健康检查」的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
+1. 健康。按「健康检查」的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。不健康时按「健康检查失败时的自检清单」看日志。
 2. 端口。`docker compose -f compose.prod.yml ps` 只发布 `80` 和 `443`。不要出现 5432、6379、9000、9001、3000、3001、3002。`docker ps` 里如果看到 `443/udp` 或 `2019/tcp`，但前面没有 `0.0.0.0:`，那是镜像暴露的端口，没有映射到宿主机。管理端口 2019 只在容器内。
 3. 注册或登录：
 
