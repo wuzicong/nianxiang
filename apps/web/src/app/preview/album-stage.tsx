@@ -10,16 +10,38 @@ import { buttonInk, shareThemeStyle } from "../s/share-chrome";
 import { FlipBook, type FlipApi } from "./flip-book";
 import { SlotSheet, SvgMark } from "./slot-sheet";
 
+export type AlbumStageSource =
+  | { kind: "demo" }
+  | {
+      kind: "owned";
+      albumId: string;
+      placed: number;
+      ready: number;
+      pending: number;
+      unavailable: number;
+    };
+
+function layoutHref(source: AlbumStageSource, themeId: string, layout: AlbumLayoutMode): string {
+  if (source.kind === "owned") {
+    return `/albums/${encodeURIComponent(source.albumId)}/preview?layout=${layout}`;
+  }
+  return `/preview/${themeId}?layout=${layout}`;
+}
+
 export function AlbumStage({
   theme,
   album,
   decorations,
   initialLayout,
+  source,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   album: DemoAlbum;
   decorations: Record<string, string>;
   initialLayout: AlbumLayoutMode;
+  source: AlbumStageSource;
+  onPhotoError?: (src: string) => void;
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState<AlbumLayoutMode>(initialLayout);
@@ -41,7 +63,7 @@ export function AlbumStage({
   function selectLayout(next: AlbumLayoutMode) {
     const resolved = resolveAlbumLayout(theme, next);
     setLayout(resolved);
-    router.replace(`/preview/${theme.skin.id}?layout=${resolved}`, { scroll: false });
+    router.replace(layoutHref(source, theme.skin.id, resolved), { scroll: false });
   }
 
   const faces = albumFontFaces(theme);
@@ -63,6 +85,7 @@ export function AlbumStage({
       data-motion={theme.motionEnter}
       data-respect-motion={theme.respectReducedMotion ? "true" : "false"}
       data-layout={layout}
+      data-album-source={source.kind}
       style={style}
     >
       <div className="album-backdrop" aria-hidden="true">
@@ -81,24 +104,38 @@ export function AlbumStage({
         <p className="toolbar-brand">
           <Link href="/">念册</Link>
           <span aria-hidden="true"> / </span>
-          <Link href="/preview">样张</Link>
+          {source.kind === "owned" ? (
+            <>
+              <Link href="/albums">相册</Link>
+              <span aria-hidden="true"> / </span>
+              <Link href={`/albums/${encodeURIComponent(source.albumId)}`}>返回这本</Link>
+            </>
+          ) : (
+            <Link href="/preview">样张</Link>
+          )}
         </p>
-        <nav className="theme-switch" aria-label="模板">
-          {THEME_IDS.map((id) => {
-            const other = albumTheme(id);
-            if (!other) return null;
-            const mode = resolveAlbumLayout(other, layout);
-            return (
-              <Link
-                key={id}
-                href={`/preview/${id}?layout=${mode}`}
-                aria-current={id === theme.skin.id ? "page" : undefined}
-              >
-                {other.skin.name}
-              </Link>
-            );
-          })}
-        </nav>
+        {source.kind === "demo" ? (
+          <nav className="theme-switch" aria-label="模板">
+            {THEME_IDS.map((id) => {
+              const other = albumTheme(id);
+              if (!other) return null;
+              const mode = resolveAlbumLayout(other, layout);
+              return (
+                <Link
+                  key={id}
+                  href={`/preview/${id}?layout=${mode}`}
+                  aria-current={id === theme.skin.id ? "page" : undefined}
+                >
+                  {other.skin.name}
+                </Link>
+              );
+            })}
+          </nav>
+        ) : (
+          <p className="layout-note">
+            <Link href={`/preview/${theme.skin.id}`}>同主题样张</Link>
+          </p>
+        )}
         {theme.layouts.length > 1 ? (
           <div className="layout-switch" role="group" aria-label="版式">
             <button type="button" aria-pressed={layout === "story"} onClick={() => selectLayout("story")}>
@@ -117,7 +154,11 @@ export function AlbumStage({
         <p className="kicker">{theme.englishName}</p>
         <h1>{album.title}</h1>
         <p className="lede">{album.subtitle}</p>
-        <p className="sample-note">样张预览，使用示例图片，不读取上传的照片。</p>
+        {source.kind === "demo" ? (
+          <p className="sample-note">样张预览，使用示例图片，不读取上传的照片。</p>
+        ) : (
+          <p className="sample-note">{ownedNote(source)}</p>
+        )}
         {layout === "story" ? (
           <nav className="slot-nav" aria-label="册页">
             {album.slots.map((slot) => (
@@ -135,6 +176,7 @@ export function AlbumStage({
           album={album}
           decorations={decorations}
           reduced={prefersReduced && theme.respectReducedMotion}
+          onPhotoError={onPhotoError}
         />
       ) : (
         <div className="album-story">
@@ -153,6 +195,7 @@ export function AlbumStage({
                 mode="story"
                 pageNumber={index + 1}
                 pageCount={album.slots.length}
+                onPhotoError={onPhotoError}
               />
             </section>
           ))}
@@ -162,31 +205,46 @@ export function AlbumStage({
   );
 }
 
+function ownedNote(source: Extract<AlbumStageSource, { kind: "owned" }>): string {
+  const parts = ["放进版面的是这本相册的预览图，不是原图。页上的句子来自模板。"];
+  parts.push(source.placed > 0 ? `已排入 ${source.placed} 张。` : "还没有可排进册子的预览图。");
+  if (source.pending > 0) parts.push(`${source.pending} 张正在生成预览，好了会补进空位。`);
+  if (source.unavailable > 0) parts.push(`${source.unavailable} 张没有可用预览。`);
+  if (source.ready > source.placed) {
+    parts.push(`另有 ${source.ready - source.placed} 张预览图超出槽位，仍留在相册里。`);
+  }
+  return parts.join("");
+}
+
 function FlipStage({
   theme,
   album,
   decorations,
   reduced,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   album: DemoAlbum;
   decorations: Record<string, string>;
   reduced: boolean;
+  onPhotoError?: (src: string) => void;
 }) {
   if (reduced) {
-    return <InstantBook theme={theme} album={album} decorations={decorations} />;
+    return <InstantBook theme={theme} album={album} decorations={decorations} onPhotoError={onPhotoError} />;
   }
-  return <AnimatedBook theme={theme} album={album} decorations={decorations} />;
+  return <AnimatedBook theme={theme} album={album} decorations={decorations} onPhotoError={onPhotoError} />;
 }
 
 function AnimatedBook({
   theme,
   album,
   decorations,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   album: DemoAlbum;
   decorations: Record<string, string>;
+  onPhotoError?: (src: string) => void;
 }) {
   const apiRef = useRef<FlipApi | null>(null);
   const [cursor, setCursor] = useState({ page: 0, total: album.slots.length, orientation: "portrait" });
@@ -220,7 +278,14 @@ function AnimatedBook({
 
   return (
     <div className="album-flip-stage">
-      <FlipBook theme={theme} album={stableAlbum} decorations={decorations} apiRef={apiRef} onFlip={onFlip} />
+      <FlipBook
+        theme={theme}
+        album={stableAlbum}
+        decorations={decorations}
+        apiRef={apiRef}
+        onFlip={onFlip}
+        onPhotoError={onPhotoError}
+      />
       <div className="flip-controls">
         <button type="button" onClick={() => apiRef.current?.flipPrev()} disabled={atStart}>
           上一页
@@ -239,10 +304,12 @@ function InstantBook({
   theme,
   album,
   decorations,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   album: DemoAlbum;
   decorations: Record<string, string>;
+  onPhotoError?: (src: string) => void;
 }) {
   const [index, setIndex] = useState(0);
   const slot = album.slots[index];
@@ -258,6 +325,7 @@ function InstantBook({
             mode="flip"
             pageNumber={index + 1}
             pageCount={album.slots.length}
+            onPhotoError={onPhotoError}
           />
         </article>
       </div>

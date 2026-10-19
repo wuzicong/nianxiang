@@ -35,6 +35,7 @@ export default async function PreviewThemePage({
       album={buildDemoAlbum(theme)}
       decorations={decorations}
       initialLayout={resolveAlbumLayout(theme, requested)}
+      source={{ kind: "demo" }}
     />
   );
 }

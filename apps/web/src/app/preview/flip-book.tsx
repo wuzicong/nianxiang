@@ -17,24 +17,51 @@ export interface FlipApi {
  * page-flip 会把页节点挪进自己的容器，并把 destroy() 的根节点从文档里摘掉。
  * 所以书挂在 React 不接管子节点的空 div 里，页内容用独立 root 渲染。
  */
+function pageStructure(album: DemoAlbum): string {
+  return JSON.stringify(
+    album.slots.map((slot) => ({
+      id: slot.id,
+      type: slot.type,
+      title: slot.title,
+      body: slot.body,
+      kicker: slot.kicker,
+      beats: slot.beats,
+      photos: slot.photos.map((photo) => ({ id: photo.id, alt: photo.alt, caption: photo.caption })),
+    })),
+  );
+}
+
+function photoSelector(id: string): string {
+  const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(id) : id.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  return `img[data-photo-id="${escaped}"]`;
+}
+
 export const FlipBook = memo(function FlipBook({
   theme,
   album,
   decorations,
   apiRef,
   onFlip,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   album: DemoAlbum;
   decorations: Record<string, string>;
   apiRef: { current: FlipApi | null };
   onFlip: (page: number, total: number, orientation: string) => void;
+  onPhotoError?: (src: string) => void;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
+  const albumRef = useRef(album);
+  const onPhotoErrorRef = useRef(onPhotoError);
+  albumRef.current = album;
+  onPhotoErrorRef.current = onPhotoError;
+  const structure = pageStructure(album);
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
+    const current = albumRef.current;
     let cancelled = false;
     let flip: PageFlip | null = null;
     let block: HTMLDivElement | null = null;
@@ -46,7 +73,7 @@ export const FlipBook = memo(function FlipBook({
       block.className = "album-flip-block";
       mountRef.current.appendChild(block);
 
-      const pages = album.slots.map((slot, index) => {
+      const pages = current.slots.map((slot, index) => {
         const page = document.createElement("div");
         page.className = "album-page";
         page.dataset.density = index === 0 || slot.type === "closing" ? "hard" : "soft";
@@ -60,7 +87,8 @@ export const FlipBook = memo(function FlipBook({
               decorations={decorations}
               mode="flip"
               pageNumber={index + 1}
-              pageCount={album.slots.length}
+              pageCount={current.slots.length}
+              onPhotoError={(src) => onPhotoErrorRef.current?.(src)}
             />,
           );
         });
@@ -117,7 +145,17 @@ export const FlipBook = memo(function FlipBook({
       if (flip) flip.destroy();
       else block?.remove();
     };
-  }, [album, apiRef, decorations, onFlip, theme]);
+  }, [apiRef, decorations, onFlip, structure, theme]);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+    for (const photo of album.slots.flatMap((slot) => slot.photos)) {
+      mount.querySelectorAll(photoSelector(photo.id)).forEach((node) => {
+        if (node.getAttribute("src") !== photo.src) node.setAttribute("src", photo.src);
+      });
+    }
+  }, [album]);
 
   return <div ref={mountRef} className="album-flip-mount" aria-label="翻页相册" />;
 });

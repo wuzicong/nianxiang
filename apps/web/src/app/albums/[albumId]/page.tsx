@@ -112,6 +112,10 @@ export default function AlbumDetailPage() {
           <p style={{ lineHeight: 1.6, color: "#555" }}>
             主题：{skin?.name} · 已收录 {assets.length} 张。这里和分享页只显示预览，不展示原图。
           </p>
+          <p style={{ lineHeight: 1.6 }}>
+            <Link href={`/albums/${album.albumId}/preview`}>按主题看这本相册</Link>
+            <span style={{ color: "#777" }}> · 故事或翻页，只用预览图</span>
+          </p>
           {processing ? (
             <p style={{ lineHeight: 1.6, color: "#555" }}>
               有照片正在生成预览。完成后会显示缩略图；已经打开的分享页需要刷新。

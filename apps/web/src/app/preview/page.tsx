@@ -12,6 +12,7 @@ export default function PreviewIndexPage() {
       <h1>主题样张</h1>
       <p className="preview-index-lead">
         三套模板按 theme.json 的槽位排成一册。这里用的是示例图片，不需要登录，也不会打开真实相册。
+        已有相册时，在相册页打开成册预览，会用同一套版式排你的预览图。
       </p>
       <div className="preview-index-grid">
         {THEME_IDS.map((id) => {

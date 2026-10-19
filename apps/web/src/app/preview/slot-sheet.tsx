@@ -24,8 +24,21 @@ function pageNumberMarkup(markup: string | undefined, page: number): string | un
   return markup.includes(">01<") ? markup.replace(">01<", `>${label}<`) : markup;
 }
 
-function Photo({ photo }: { photo: DemoPhoto }) {
-  return <img src={photo.src} alt={photo.alt} />;
+function Photo({ photo, onError }: { photo: DemoPhoto; onError?: (src: string) => void }) {
+  return (
+    <img
+      src={photo.src}
+      alt={photo.alt}
+      data-photo-id={photo.id}
+      referrerPolicy="no-referrer"
+      onError={() => onError?.(photo.src)}
+    />
+  );
+}
+
+function FramePhoto({ photo, onError }: { photo: DemoPhoto | undefined; onError?: (src: string) => void }) {
+  if (!photo) return <p className="gap-copy">预览生成后出现在这里</p>;
+  return <Photo photo={photo} onError={onError} />;
 }
 
 function Beats({ beats, kind }: { beats: DemoBeat[]; kind: "timeline" | "route" | "contents" }) {
@@ -48,6 +61,7 @@ export function SlotSheet({
   mode,
   pageNumber,
   pageCount,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
@@ -55,6 +69,7 @@ export function SlotSheet({
   mode: "story" | "flip";
   pageNumber: number;
   pageCount: number;
+  onPhotoError?: (src: string) => void;
 }) {
   const themeId = theme.skin.id;
   return (
@@ -71,7 +86,14 @@ export function SlotSheet({
       {themeId === "magazine-heirloom" ? (
         <SvgMark markup={pageNumberMarkup(decorations["page-number"], pageNumber)} className="deco-folio" />
       ) : null}
-      <SlotBody theme={theme} slot={slot} decorations={decorations} pageNumber={pageNumber} pageCount={pageCount} />
+      <SlotBody
+        theme={theme}
+        slot={slot}
+        decorations={decorations}
+        pageNumber={pageNumber}
+        pageCount={pageCount}
+        onPhotoError={onPhotoError}
+      />
       {themeId === "cotton-candy" ? <SvgMark markup={decorations["torn-edge"]} className="deco-torn" /> : null}
     </article>
   );
@@ -83,17 +105,19 @@ function SlotBody({
   decorations,
   pageNumber,
   pageCount,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
   decorations: Record<string, string>;
   pageNumber: number;
   pageCount: number;
+  onPhotoError?: (src: string) => void;
 }) {
-  if (slot.id === "full-bleed") return <Bleed slot={slot} />;
-  if (slot.type === "hero") return <Hero theme={theme} slot={slot} decorations={decorations} />;
-  if (slot.type === "spread-2") return <Spread theme={theme} slot={slot} />;
-  if (slot.type === "polaroid-wall") return <Wall theme={theme} slot={slot} decorations={decorations} />;
+  if (slot.id === "full-bleed") return <Bleed slot={slot} onPhotoError={onPhotoError} />;
+  if (slot.type === "hero") return <Hero theme={theme} slot={slot} decorations={decorations} onPhotoError={onPhotoError} />;
+  if (slot.type === "spread-2") return <Spread theme={theme} slot={slot} onPhotoError={onPhotoError} />;
+  if (slot.type === "polaroid-wall") return <Wall theme={theme} slot={slot} decorations={decorations} onPhotoError={onPhotoError} />;
   if (slot.type === "timeline") return <TimelineBlock slot={slot} />;
   if (slot.type === "map-chapter") return <MapBlock theme={theme} slot={slot} decorations={decorations} />;
   if (slot.type === "closing") {
@@ -106,10 +130,12 @@ function Hero({
   theme,
   slot,
   decorations,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
   decorations: Record<string, string>;
+  onPhotoError?: (src: string) => void;
 }) {
   const photo = slot.photos[0];
   const themeId = theme.skin.id;
@@ -120,20 +146,18 @@ function Hero({
       {themeId === "magazine-heirloom" ? (
         <SvgMark markup={decorations["gold-accent-line"]} className="deco-gold" stretch />
       ) : null}
-      {photo ? (
-        <figure className="hero-frame">
-          <div className="frame">
-            <Photo photo={photo} />
-          </div>
-          {themeId === "cotton-candy" ? (
-            <>
-              <SvgMark markup={decorations["washi-tape"]} className="deco-tape" />
-              <SvgMark markup={decorations["heart-sticker"]} className="deco-heart" />
-            </>
-          ) : null}
-          {themeId === "kyoto-lantern" ? <SvgMark markup={decorations["lantern-glow"]} className="deco-lantern" /> : null}
-        </figure>
-      ) : null}
+      <figure className="hero-frame">
+        <div className="frame">
+          <FramePhoto photo={photo} onError={onPhotoError} />
+        </div>
+        {themeId === "cotton-candy" ? (
+          <>
+            <SvgMark markup={decorations["washi-tape"]} className="deco-tape" />
+            <SvgMark markup={decorations["heart-sticker"]} className="deco-heart" />
+          </>
+        ) : null}
+        {themeId === "kyoto-lantern" ? <SvgMark markup={decorations["lantern-glow"]} className="deco-lantern" /> : null}
+      </figure>
       <div className="hero-copy">
         {photo ? <p className="caption">{photo.caption}</p> : null}
         <p className="lede">{slot.body}</p>
@@ -142,11 +166,11 @@ function Hero({
   );
 }
 
-function Bleed({ slot }: { slot: FilledSlot }) {
+function Bleed({ slot, onPhotoError }: { slot: FilledSlot; onPhotoError?: (src: string) => void }) {
   const photo = slot.photos[0];
   return (
     <div className="bleed">
-      {photo ? <Photo photo={photo} /> : null}
+      {photo ? <Photo photo={photo} onError={onPhotoError} /> : <p className="gap-copy bleed-gap">预览生成后出现在这里</p>}
       <div className="bleed-copy">
         <p className="kicker">{slot.kicker}</p>
         <h2 className="hero-title">{slot.title}</h2>
@@ -156,19 +180,28 @@ function Bleed({ slot }: { slot: FilledSlot }) {
   );
 }
 
-function Spread({ theme, slot }: { theme: AlbumTheme; slot: FilledSlot }) {
+function Spread({
+  theme,
+  slot,
+  onPhotoError,
+}: {
+  theme: AlbumTheme;
+  slot: FilledSlot;
+  onPhotoError?: (src: string) => void;
+}) {
+  const cells = [slot.photos[0], slot.photos[1]];
   return (
     <div className="spread-block">
       <p className="kicker">{slot.kicker}</p>
       <h2 className="section-title">{slot.title}</h2>
       {theme.skin.id === "magazine-heirloom" ? null : <p className="lede">{slot.body}</p>}
       <div className="spread">
-        {slot.photos.map((photo) => (
-          <figure key={photo.id}>
+        {cells.map((photo, index) => (
+          <figure key={photo?.id ?? `gap-${index}`}>
             <div className="frame">
-              <Photo photo={photo} />
+              <FramePhoto photo={photo} onError={onPhotoError} />
             </div>
-            <figcaption>{photo.caption}</figcaption>
+            <figcaption>{photo?.caption ?? "空位"}</figcaption>
           </figure>
         ))}
       </div>
@@ -180,25 +213,28 @@ function Wall({
   theme,
   slot,
   decorations,
+  onPhotoError,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
   decorations: Record<string, string>;
+  onPhotoError?: (src: string) => void;
 }) {
   const tilts = theme.stickerTiltDeg;
+  const photos = slot.photos.length > 0 ? slot.photos : [undefined];
   return (
     <div className="wall-block">
       <p className="kicker">{slot.kicker}</p>
       <h2 className="section-title">{slot.title}</h2>
       <div className="wall">
-        {slot.photos.map((photo, index) => {
+        {photos.map((photo, index) => {
           const tilt = tilts[index % tilts.length] ?? 0;
           return (
-            <figure key={photo.id} className="polaroid" style={{ ["--tilt" as string]: `${tilt}deg` }}>
+            <figure key={photo?.id ?? "gap"} className="polaroid" style={{ ["--tilt" as string]: `${tilt}deg` }}>
               <div className="frame">
-                <Photo photo={photo} />
+                <FramePhoto photo={photo} onError={onPhotoError} />
               </div>
-              <figcaption>{photo.caption}</figcaption>
+              <figcaption>{photo?.caption ?? "空位"}</figcaption>
               {theme.skin.id === "cotton-candy" ? (
                 <SvgMark markup={decorations["washi-tape"]} className="deco-tape" />
               ) : null}

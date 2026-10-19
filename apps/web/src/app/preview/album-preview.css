@@ -227,6 +227,10 @@ figcaption {
   font-size: 0.85rem;
 }
 
+.layout-note a {
+  color: var(--share-text);
+}
+
 .album-intro {
   width: min(980px, 100%);
   margin: 0 auto;
@@ -430,6 +434,28 @@ figcaption {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.gap-copy {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 1rem;
+  text-align: center;
+  color: var(--share-muted);
+  font-size: 0.9rem;
+}
+
+.frame:has(.gap-copy) {
+  display: grid;
+  place-items: center;
+}
+
+.bleed-gap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
 }
 
 .album-shell[data-theme="cotton-candy"] .hero-frame .frame,
