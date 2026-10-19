@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { safeUserMessage } from "../../lib/album-assets";
+import { ProductShell } from "../product-shell/product-shell";
 
 type PublicUser = { id: string; email: string };
 
@@ -76,41 +78,44 @@ export default function LoginPage() {
     setMessage("退出失败");
   }
 
+  const statusRole = message.includes("没成功") || message.includes("不可达") || message === "退出失败"
+    ? "alert"
+    : "status";
+
   return (
-    <main style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1.5rem" }}>
-      <p style={{ marginBottom: "0.5rem" }}>
-        <a href="/">念册 · Memora</a>
-      </p>
-      <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>登录</h1>
-      <p style={{ lineHeight: 1.6, color: "#555" }}>
-        邮箱和密码会交给本机 API。会话放在 HttpOnly Cookie 里，页面脚本读不到。
-      </p>
-      <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{message}</p>
+    <ProductShell
+      active="login"
+      title="登录"
+      lede="邮箱和密码会交给本机 API。会话放在 HttpOnly Cookie 里，页面脚本读不到。"
+      status={message}
+      statusRole={statusRole}
+    >
       {user ? (
-        <section style={{ marginTop: "1.5rem" }}>
-          <p>
-            {user.email}
-            <br />
-            <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}>{user.id}</span>
-          </p>
-          <p style={{ marginTop: "0.75rem" }}>
-            <a href="/library">进入照片库</a>
+        <section className="ps-card">
+          <h2>当前账户</h2>
+          <p style={{ margin: "0.75rem 0 0" }}>{user.email}</p>
+          <p className="ps-session">{user.id}</p>
+          <div className="ps-inline-links">
+            <Link href="/library">进入照片库</Link>
             {" · "}
-            <a href="/albums">管理相册与分享</a>
-          </p>
-          <button type="button" onClick={() => void logout()}>
-            退出
-          </button>
+            <Link href="/albums">管理相册与分享</Link>
+          </div>
+          <div className="ps-actions">
+            <button type="button" className="ps-secondary" onClick={() => void logout()}>
+              退出
+            </button>
+          </div>
         </section>
       ) : (
         <form
-          style={{ display: "grid", gap: "0.75rem", maxWidth: 360, marginTop: "1.5rem" }}
+          className="ps-card"
           onSubmit={(event) => {
             event.preventDefault();
             void submit("/api/v1/auth/login");
           }}
         >
-          <label>
+          <h2>邮箱登录</h2>
+          <label className="ps-field">
             邮箱
             <input
               type="email"
@@ -118,10 +123,9 @@ export default function LoginPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "0.4rem" }}
             />
           </label>
-          <label>
+          <label className="ps-field">
             密码
             <input
               type="password"
@@ -130,17 +134,20 @@ export default function LoginPage() {
               onChange={(event) => setPassword(event.target.value)}
               required
               minLength={8}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "0.4rem" }}
             />
           </label>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="submit">登录</button>
-            <button type="button" onClick={() => void submit("/api/v1/auth/register")}>
+          <div className="ps-actions">
+            <button type="submit" className="ps-primary">登录</button>
+            <button
+              type="button"
+              className="ps-secondary"
+              onClick={() => void submit("/api/v1/auth/register")}
+            >
               注册
             </button>
           </div>
         </form>
       )}
-    </main>
+    </ProductShell>
   );
 }

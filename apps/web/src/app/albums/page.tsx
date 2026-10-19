@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createAlbum, listAlbums, type AlbumSummary } from "../../lib/albums-api";
 import { themeSkin } from "../../lib/themes";
-
-const fieldStyle = { display: "block", width: "100%", marginTop: 4, padding: "0.4rem" };
+import { ProductShell } from "../product-shell/product-shell";
 
 export default function AlbumsPage() {
   const [albums, setAlbums] = useState<AlbumSummary[]>([]);
@@ -54,33 +53,34 @@ export default function AlbumsPage() {
     }
   }
 
+  const needsLogin = message === "请先登录。";
+
   return (
-    <main style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1.5rem" }}>
-      <p style={{ marginBottom: "0.5rem" }}>
-        <Link href="/">念册 · Memora</Link>
-        {" · "}
-        <Link href="/library">照片库</Link>
-        {" · "}
-        <Link href="/login">登录</Link>
-      </p>
-      <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>相册</h1>
-      <p style={{ lineHeight: 1.6, color: "#555" }}>
-        在这里建相册、上传照片，并生成可撤销的分享链接。设密码的链接在打开时会先要求输入密码。
-        打开某本相册后可以按主题看故事或翻页，用的是预览图。想先看版式，打开{" "}
-        <Link href="/preview">主题样张</Link>
-        ，那里用的是示例照片。
-      </p>
-      <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{message}</p>
+    <ProductShell
+      active="albums"
+      title="相册"
+      lede="在这里建相册、上传照片，并生成可撤销的分享链接。设密码的链接在打开时会先要求输入密码。打开某本相册后可以按主题看故事或翻页，用的是预览图。想先看版式，打开主题样张，那里用的是示例照片。"
+      status={message}
+      statusRole={needsLogin || message.includes("不可达") ? "alert" : "status"}
+    >
+      {needsLogin ? (
+        <p className="ps-inline-links">
+          请先<Link href="/login">登录</Link>。
+        </p>
+      ) : null}
 
       <form
-        style={{ display: "grid", gap: "0.75rem", maxWidth: 420, marginTop: "1.5rem" }}
+        className="ps-card ps-card-wide"
         onSubmit={(event) => {
           event.preventDefault();
           void submitCreate();
         }}
       >
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>新建相册</h2>
-        <label>
+        <h2>新建相册</h2>
+        <p className="ps-muted" style={{ marginTop: "0.45rem" }}>
+          主路径建议在<Link href="/library">照片库</Link>选片后建册；此处保留无选片快速创建。
+        </p>
+        <label className="ps-field">
           标题
           <input
             type="text"
@@ -88,12 +88,16 @@ export default function AlbumsPage() {
             maxLength={80}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            style={fieldStyle}
+            disabled={needsLogin}
           />
         </label>
-        <label>
+        <label className="ps-field">
           主题
-          <select value={themeId} onChange={(event) => setThemeId(event.target.value)} style={fieldStyle}>
+          <select
+            value={themeId}
+            onChange={(event) => setThemeId(event.target.value)}
+            disabled={needsLogin}
+          >
             {THEME_IDS.map((id) => {
               const skin = themeSkin(id);
               return (
@@ -104,23 +108,27 @@ export default function AlbumsPage() {
             })}
           </select>
         </label>
-        <button type="submit" disabled={pending}>{pending ? "提交中…" : "创建相册"}</button>
+        <div className="ps-actions">
+          <button type="submit" className="ps-primary" disabled={pending || needsLogin}>
+            {pending ? "提交中…" : "创建相册"}
+          </button>
+          <Link className="ps-secondary" href="/preview">主题样张</Link>
+        </div>
       </form>
 
       {albums.length > 0 ? (
-        <ul style={{ listStyle: "none", padding: 0, marginTop: "2rem" }}>
+        <ul className="ps-album-list">
           {albums.map((album) => (
-            <li key={album.albumId} style={{ marginBottom: "0.75rem" }}>
+            <li key={album.albumId} className="ps-album-item">
               <Link href={`/albums/${album.albumId}`}>{album.title}</Link>
-              <span style={{ color: "#777", fontSize: 14 }}>
-                {" "}
-                · {themeSkin(album.themeId).name} · {album.assetCount} 张 ·{" "}
+              <span className="ps-album-meta">
+                {themeSkin(album.themeId).name} · {album.assetCount} 张 ·{" "}
                 <Link href={`/albums/${album.albumId}/preview`}>成册预览</Link>
               </span>
             </li>
           ))}
         </ul>
       ) : null}
-    </main>
+    </ProductShell>
   );
 }

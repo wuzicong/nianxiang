@@ -557,7 +557,8 @@ export function LibraryHome({
           ) : null}
 
           {phase === "ready" && shell ? (
-            <section className="lib-shell" aria-labelledby={`shell-${tab}`}>
+            <section className="lib-shell lib-shell-soon" aria-labelledby={`shell-${tab}`}>
+              <p className="lib-shell-seal">即将</p>
               <div className="lib-shell-art">
                 <LibraryDecor svg={decorations[shell.decor] ?? null} className="lib-decor-main" />
               </div>

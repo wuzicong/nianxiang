@@ -12,6 +12,7 @@ import {
   type ShareSummary,
 } from "../../../lib/albums-api";
 import { themeSkin } from "../../../lib/themes";
+import { ProductShell } from "../../product-shell/product-shell";
 import { shareThemeStyle } from "../../s/share-chrome";
 import "../album-share.css";
 import { AlbumAssetGrid } from "../album-asset-grid";
@@ -102,57 +103,67 @@ export default function AlbumDetailPage() {
   );
   const busy = message === "正在加载…" || message === "正在撤销…";
   const showRetry = !album && !busy && message !== "请先登录。" && message.length > 0;
+  const needsLogin = message === "请先登录。";
+
+  const pageTitle = album?.title ?? "相册";
+  const lede = album && skin
+    ? `主题：${skin.name} · 已收录 ${assets.length} 张。这里和分享页只显示预览，不展示原图。`
+    : undefined;
 
   return (
-    <main style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1.5rem" }}>
-      <p style={{ marginBottom: "0.5rem" }}>
-        <Link href="/">念册</Link>
-        {" · "}
-        <Link href="/albums">相册</Link>
-      </p>
-      {album ? (
-        <>
-          <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>{album.title}</h1>
-          <p style={{ lineHeight: 1.6, color: "#555" }}>
-            主题：{skin?.name} · 已收录 {assets.length} 张。这里和分享页只显示预览，不展示原图。
-          </p>
-          <p style={{ lineHeight: 1.6 }}>
-            <Link href={`/albums/${album.albumId}/preview`}>按主题看这本相册</Link>
-            <span style={{ color: "#777" }}> · 故事或翻页，只用预览图</span>
-          </p>
-          {processing ? (
-            <p style={{ lineHeight: 1.6, color: "#555" }}>
-              有照片正在生成预览。完成后会显示缩略图；已经打开的分享页需要刷新。
-            </p>
-          ) : null}
-          {assets.length > 0 ? (
-            <p style={{ color: "#777", fontSize: 14 }}>预览地址大约 15 分钟内有效，停留在此页时会自动更换。</p>
-          ) : null}
-        </>
-      ) : (
-        <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>相册</h1>
-      )}
-      {message === "请先登录。" ? (
-        <p style={{ lineHeight: 1.6, color: "#555" }}>
+    <ProductShell
+      active="albums"
+      title={pageTitle}
+      lede={lede}
+      status={message || undefined}
+      statusRole={showRetry || needsLogin ? "alert" : "status"}
+    >
+      {album && skin ? (
+        <p className="ps-inline-links">
+          <Link href={`/albums/${album.albumId}/preview`}>按主题看这本相册</Link>
+          <span className="ps-muted"> · 故事或翻页，只用预览图</span>
+        </p>
+      ) : null}
+
+      {album && processing ? (
+        <p className="ps-muted" style={{ marginTop: "0.75rem" }}>
+          有照片正在生成预览。完成后会显示缩略图；已经打开的分享页需要刷新。
+        </p>
+      ) : null}
+
+      {album && assets.length > 0 ? (
+        <p className="ps-muted" style={{ marginTop: "0.5rem", fontSize: "0.88rem" }}>
+          预览地址大约 15 分钟内有效，停留在此页时会自动更换。
+        </p>
+      ) : null}
+
+      {needsLogin ? (
+        <p className="ps-inline-links">
           请先<Link href="/login">登录</Link>。
         </p>
-      ) : message ? (
-        <p style={{ lineHeight: 1.6, color: "#555" }} role={showRetry ? "alert" : undefined}>{message}</p>
       ) : null}
+
       {showRetry ? (
-        <p style={{ marginTop: "0.75rem" }}>
-          <button type="button" onClick={() => void refresh("initial")}>重试</button>
-        </p>
+        <div className="ps-actions">
+          <button type="button" className="ps-primary" onClick={() => void refresh("initial")}>
+            重试
+          </button>
+        </div>
       ) : null}
 
       {album && skin ? (
         <>
-          <AlbumAssetGrid
-            assets={assets}
-            onPreviewError={onPreviewError}
-            uploadAnchorId="album-upload"
-          />
-          <div id="album-upload">
+          <section className="ps-section" aria-labelledby="album-photos-heading">
+            <h2 id="album-photos-heading">照片</h2>
+            <AlbumAssetGrid
+              assets={assets}
+              onPreviewError={onPreviewError}
+              uploadAnchorId="album-upload"
+            />
+          </section>
+          <section className="ps-section" id="album-upload" aria-labelledby="album-upload-heading">
+            <h2 id="album-upload-heading">上传</h2>
+            <p>把新照片放进这本相册；上传后会自动排队生成预览。</p>
             <UploadPhotos
               target={{ kind: "album", albumId: album.albumId }}
               theme={skin}
@@ -160,19 +171,27 @@ export default function AlbumDetailPage() {
               albumEmpty={assets.length === 0}
               onUploaded={() => void refresh("silent")}
             />
-          </div>
-          <div id="album-create-share">
+          </section>
+          <section className="ps-section" id="album-create-share" aria-labelledby="album-share-heading">
+            <h2 id="album-share-heading">分享</h2>
+            <p>生成可撤销的链接；可选密码保护。</p>
             <CreateShareForm albumId={album.albumId} theme={skin} onCreated={() => void refreshShares()} />
-          </div>
-          <div
-            className="share-shell album-share-list-shell"
-            data-theme={skin.id}
-            style={shareThemeStyle(skin)}
-          >
-            <AlbumShareList shares={shares} revokingId={revokingId} onRevoke={(shareId) => void revoke(shareId)} />
-          </div>
+          </section>
+          <section className="ps-section" aria-labelledby="album-shares-heading">
+            <div
+              className="share-shell album-share-list-shell"
+              data-theme={skin.id}
+              style={shareThemeStyle(skin)}
+            >
+              <AlbumShareList
+                shares={shares}
+                revokingId={revokingId}
+                onRevoke={(shareId) => void revoke(shareId)}
+              />
+            </div>
+          </section>
         </>
       ) : null}
-    </main>
+    </ProductShell>
   );
 }
