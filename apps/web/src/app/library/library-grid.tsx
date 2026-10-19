@@ -84,76 +84,79 @@ export function LibraryGrid({
       aria-multiselectable={selecting}
       onKeyDown={onKeyDown}
     >
-      {groups.years.map((year) =>
-        year.months.map((month) =>
-          month.days.map((day) => {
-            const dayIds = day.photos.map((p) => p.assetId);
-            const selectableIds = day.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
-            const selectedInDay = selectableIds.filter((id) => selected.includes(id)).length;
-            const dayChecked =
-              selectableIds.length > 0 && selectedInDay === selectableIds.length
-                ? true
-                : selectedInDay > 0
-                  ? "mixed"
-                  : false;
-            return (
-              <section key={day.key} className="lib-day-block" aria-labelledby={`day-${day.key}`}>
-                <div className="lib-sticky-stack">
-                  <div className="lib-sticky-year" aria-hidden="true">
-                    <span className="lib-sticky-year-num">{year.year}</span>
-                    <span className="lib-sticky-month-inline">{month.month} 月</span>
-                  </div>
-                  <p className="lib-sticky-month" aria-hidden="true">{month.month} 月</p>
-                  <div className="lib-sticky-day">
-                    <h3 id={`day-${day.key}`}>
-                      {month.month} 月 {day.day} 日 · {day.weekday} · {day.photos.length} 张
-                      {day.uploadFallback ? " · 按上传日期" : ""}
-                    </h3>
-                    <label className="lib-day-select">
-                      <input
-                        type="checkbox"
-                        checked={dayChecked === true}
-                        aria-checked={dayChecked === "mixed" ? "mixed" : dayChecked}
-                        disabled={locked || selectableIds.length === 0}
-                        onChange={() => {
-                          onSelectDay(selectableIds, dayChecked !== true);
-                        }}
-                      />
-                      选这天
-                    </label>
-                  </div>
-                </div>
-                <div className="lib-grid" role="rowgroup">
-                  {day.photos.map((photo, index) => (
-                    <LibraryTile
-                      key={photo.assetId}
-                      photo={photo}
-                      indexInDay={index + 1}
-                      totalInDay={day.photos.length}
-                      timeZone={timeZone}
-                      selected={selected.includes(photo.assetId)}
-                      selectable={libraryPhotoSelectable(photo)}
-                      selecting={selecting}
-                      tabIndex={focusId ? (focusId === photo.assetId ? 0 : -1) : photo.assetId === firstId ? 0 : -1}
-                      locked={locked}
-                      pressTimer={pressTimer}
-                      onFocus={() => onFocus(photo.assetId)}
-                      onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
-                      onPreviewError={onPreviewError}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          }),
-        ),
-      )}
+      {groups.years.map((year) => (
+        <section key={year.year} className="lib-year-block" aria-label={`${year.year} 年`}>
+          <div className="lib-sticky-year">
+            <span className="lib-sticky-year-num">{year.year}</span>
+          </div>
+          {year.months.map((month) => (
+            <div key={month.key} className="lib-month-block">
+              <p className="lib-sticky-month">
+                <span className="lib-sticky-month-inline">{year.year} · </span>
+                {month.month} 月
+              </p>
+              {month.days.map((day) => {
+                const selectableIds = day.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
+                const selectedInDay = selectableIds.filter((id) => selected.includes(id)).length;
+                const dayChecked =
+                  selectableIds.length > 0 && selectedInDay === selectableIds.length
+                    ? true
+                    : selectedInDay > 0
+                      ? "mixed"
+                      : false;
+                return (
+                  <section key={day.key} className="lib-day-block" aria-labelledby={`day-${day.key}`}>
+                    <div className="lib-sticky-day">
+                      <h3 id={`day-${day.key}`}>
+                        {month.month} 月 {day.day} 日 · {day.weekday} · {day.photos.length} 张
+                        {day.uploadFallback ? " · 按上传日期" : ""}
+                      </h3>
+                      <label className="lib-day-select">
+                        <input
+                          type="checkbox"
+                          checked={dayChecked === true}
+                          aria-checked={dayChecked === "mixed" ? "mixed" : dayChecked}
+                          disabled={locked || selectableIds.length === 0}
+                          onChange={() => {
+                            onSelectDay(selectableIds, dayChecked !== true);
+                          }}
+                        />
+                        选这天
+                      </label>
+                    </div>
+                    <div className="lib-grid" role="rowgroup">
+                      {day.photos.map((photo, index) => (
+                        <LibraryTile
+                          key={photo.assetId}
+                          photo={photo}
+                          indexInDay={index + 1}
+                          totalInDay={day.photos.length}
+                          timeZone={timeZone}
+                          selected={selected.includes(photo.assetId)}
+                          selectable={libraryPhotoSelectable(photo)}
+                          selecting={selecting}
+                          tabIndex={
+                            focusId ? (focusId === photo.assetId ? 0 : -1) : photo.assetId === firstId ? 0 : -1
+                          }
+                          locked={locked}
+                          pressTimer={pressTimer}
+                          onFocus={() => onFocus(photo.assetId)}
+                          onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
+                          onPreviewError={onPreviewError}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ))}
+        </section>
+      ))}
       {groups.undated.length > 0 ? (
         <section className="lib-day-block">
-          <div className="lib-sticky-stack">
-            <div className="lib-sticky-day">
-              <h3>日期待定</h3>
-            </div>
+          <div className="lib-sticky-day">
+            <h3>日期待定</h3>
           </div>
           <div className="lib-grid" role="rowgroup">
             {groups.undated.map((photo, index) => (

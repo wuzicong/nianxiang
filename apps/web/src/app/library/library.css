@@ -729,6 +729,8 @@ a.lib-primary {
 /* —— 规范 v1：share-shell 变量 + 方格网格 + 吸顶 + 选择栏 —— */
 .lib.share-shell {
   --lib-sticky-top: 7.25rem;
+  --lib-year-h: 2.75rem;
+  --lib-month-h: 2rem;
   color: var(--share-text, var(--lib-ink));
   background: var(--share-bg, var(--lib-bg));
   font-family: var(--share-font-body, var(--font-inter), system-ui, "PingFang SC", sans-serif);
@@ -794,10 +796,10 @@ a.lib-primary {
   width: 100%;
 }
 
-.lib-sticky-stack {
-  position: sticky;
-  top: var(--lib-sticky-top);
-  z-index: 5;
+.lib-year-block,
+.lib-month-block,
+.lib-day-block {
+  position: relative;
 }
 
 .lib-sticky-year,
@@ -809,22 +811,38 @@ a.lib-primary {
 }
 
 .lib-sticky-year {
+  position: sticky;
+  top: var(--lib-sticky-top);
+  z-index: 8;
   font-family: var(--share-font-title, var(--font-fraunces), serif);
   font-size: clamp(1.6rem, 3vw, 2rem);
   padding: 0.35rem 0;
+  min-height: var(--lib-year-h);
+  display: flex;
+  align-items: center;
+}
+
+.lib-sticky-month {
+  position: sticky;
+  top: calc(var(--lib-sticky-top) + var(--lib-year-h));
+  z-index: 7;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.2rem 0;
+  min-height: var(--lib-month-h);
+  display: flex;
+  align-items: center;
 }
 
 .lib-sticky-month-inline {
   display: none;
 }
 
-.lib-sticky-month {
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 0.2rem 0;
-}
-
 .lib-sticky-day {
+  position: sticky;
+  top: calc(var(--lib-sticky-top) + var(--lib-year-h) + var(--lib-month-h));
+  z-index: 6;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -850,16 +868,19 @@ a.lib-primary {
 }
 
 @media (max-width: 767px) {
-  .lib-sticky-month {
+  .lib.share-shell {
+    --lib-sticky-top: 6.5rem;
+    --lib-year-h: 0px;
+  }
+
+  .lib-sticky-year {
     display: none;
   }
+
   .lib-sticky-month-inline {
     display: inline;
-    margin-left: 0.5rem;
-    font-size: 1rem;
     font-weight: 600;
   }
-  --lib-sticky-top: 6.5rem;
 }
 
 .lib-selection-bar {
