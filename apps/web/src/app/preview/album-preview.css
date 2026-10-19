@@ -1,13 +1,13 @@
 .album-preview-root {
-  min-height: 100vh;
-}
-
-.album-shell {
   --album-duration-1: 80ms;
   --album-duration-2: 120ms;
   --album-duration-3: 180ms;
   --album-duration-4: 280ms;
   --album-ease-out: ease-out;
+  min-height: 100vh;
+}
+
+.album-shell {
   /* 组间呼吸（册页/章节）> 组内缝（对页、拍立得墙） */
   --album-gap-section: clamp(2.15rem, 5vw, 2.85rem);
   --album-gap-within: 0.55rem;
