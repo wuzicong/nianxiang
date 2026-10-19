@@ -3,7 +3,7 @@
 import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from "@memora/shared";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { albumRefreshDelay, visibleMessage, type AlbumAssetView } from "../../../../lib/album-assets";
+import { albumRefreshDelay, safeUserMessage, type AlbumAssetView } from "../../../../lib/album-assets";
 import { albumTheme, resolveAlbumLayout, type AlbumTheme } from "../../../../lib/album-theme";
 import { getAlbum } from "../../../../lib/albums-api";
 import { buildOwnedAlbum, type OwnedAlbumFill } from "../../../../lib/owned-album";
@@ -110,7 +110,9 @@ export function OwnedAlbumStage({
             setAssets([]);
             setAlbumTitle(null);
             setStatus(detail.status);
-            setMessage(detail.status === 401 ? "请先登录。" : visibleMessage(detail.message, "打不开这本相册"));
+            setMessage(
+              detail.status === 401 ? "请先登录。" : safeUserMessage(detail.message, "打不开这本相册。"),
+            );
           }
           if (mode === "initial") setFetching(false);
           return;
@@ -137,7 +139,7 @@ export function OwnedAlbumStage({
       } catch {
         if (mode === "initial") {
           setStatus(null);
-          setMessage("API 暂时不可达");
+          setMessage("暂时连不上服务器，请检查网络后重试。");
           setFetching(false);
         }
       }
@@ -192,15 +194,31 @@ export function OwnedAlbumStage({
 
   if (!theme || !filled) {
     return chrome(
-      <p className="preview-owned-lead">
-        {status === 401 ? (
-          <>
-            请先<Link href="/login">登录</Link>，再打开这本相册。
-          </>
-        ) : (
-          message
-        )}
-      </p>,
+      <>
+        <p className="preview-owned-lead">
+          {status === 401 ? (
+            <>
+              请先<Link href="/login">登录</Link>，再打开这本相册。
+            </>
+          ) : (
+            message
+          )}
+        </p>
+        {status !== 401 ? (
+          <p className="preview-owned-inline-cta">
+            <button
+              type="button"
+              className="preview-owned-secondary preview-owned-retry"
+              onClick={() => {
+                setFetching(true);
+                void refresh("initial");
+              }}
+            >
+              重试
+            </button>
+          </p>
+        ) : null}
+      </>,
       { showShareCta: false, showLoginCta: status === 401 },
     );
   }

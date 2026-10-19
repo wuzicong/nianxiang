@@ -10,7 +10,7 @@ import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from "@memora/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { assetNeedsRefresh, type AlbumAssetView } from "../../lib/album-assets";
+import { assetNeedsRefresh, safeUserMessage, type AlbumAssetView } from "../../lib/album-assets";
 import { createThemedAlbum, listLibrary } from "../../lib/library-api";
 import {
   applyPhotoSelection,
@@ -141,7 +141,7 @@ export function LibraryHome({
       }
       if (!listed.ok) {
         if (mode === "initial") {
-          setError(libraryLoadErrorMessage(listed.message));
+          setError(safeUserMessage(listed.message, "照片暂时没加载出来。"));
           setPhase("error");
         }
         return;
@@ -633,14 +633,6 @@ export function LibraryHome({
       <p className="lib-sr" aria-live="polite">{toast}</p>
     </div>
   );
-}
-
-function libraryLoadErrorMessage(message: string): string {
-  const trimmed = message.trim();
-  if (!trimmed) return "照片暂时没加载出来。";
-  if (/stack|trace|exception|Error:|ECONN|HTTP\s*\d/i.test(trimmed)) return "照片暂时没加载出来。";
-  if (trimmed.endsWith("。") || trimmed.endsWith("！")) return trimmed;
-  return `${trimmed}。`;
 }
 
 function onTabKey(event: React.KeyboardEvent) {

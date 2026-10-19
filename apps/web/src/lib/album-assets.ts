@@ -51,6 +51,18 @@ export function visibleMessage(message: string | null | undefined, fallback: str
   return trimmed.length > 180 ? `${trimmed.slice(0, 180)}…` : trimmed;
 }
 
+/** 用户可见失败文案：具体、可中文、不泄堆栈或长英文异常。 */
+export function safeUserMessage(message: string | null | undefined, fallback: string): string {
+  const raw = visibleMessage(message, "");
+  if (!raw) return fallback;
+  if (/stack|trace|exception|Error:|ECONN|HTTP\s*\d/i.test(raw)) return fallback;
+  if (/^[\x00-\x7F]+$/.test(raw) && raw.length > 64 && !/[\u4e00-\u9fa5]/.test(raw)) {
+    return fallback;
+  }
+  if (raw.endsWith("。") || raw.endsWith("！")) return raw;
+  return `${raw}。`;
+}
+
 function httpPreviewUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length < 8 || value.length > 8192) return null;
   try {

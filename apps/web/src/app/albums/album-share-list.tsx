@@ -29,7 +29,7 @@ export function AlbumShareList({
     return (
       <section className="album-share-list-section" aria-labelledby="album-share-list-title">
         <h2 id="album-share-list-title">分享记录</h2>
-        <p style={{ marginTop: "0.75rem", color: "#6b6560", lineHeight: 1.6 }}>还没有分享链接。</p>
+        <p className="album-share-list-empty">还没有分享链接。</p>
       </section>
     );
   }
@@ -37,7 +37,7 @@ export function AlbumShareList({
   return (
     <section className="album-share-list-section" aria-labelledby="album-share-list-title">
       <h2 id="album-share-list-title">分享记录</h2>
-      <p style={{ margin: "0.45rem 0 0", fontSize: "0.88rem", color: "#6b6560", lineHeight: 1.55 }}>
+      <p className="album-share-list-hint">
         列表不显示密码或完整链接。已撤销或已过期的链接无法再打开。
       </p>
       <ul className="album-share-list">

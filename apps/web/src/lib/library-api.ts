@@ -1,4 +1,4 @@
-import { visibleMessage } from "./album-assets";
+import { safeUserMessage, visibleMessage } from "./album-assets";
 import { apiMessage, parseJsonResponse, type ApiErrorBody } from "./api-client";
 import { albumAssetClientMessage, attachAlbumAssets, createAlbum } from "./albums-api";
 import {
@@ -34,7 +34,7 @@ export async function listLibrary(
     return {
       ok: false,
       status: response.status,
-      message: visibleMessage(apiMessage(body), response.status === 401 ? "请先登录" : "照片暂时没加载出来"),
+      message: safeUserMessage(apiMessage(body), response.status === 401 ? "请先登录" : "照片暂时没加载出来"),
     };
   }
   const parsed = parseLibraryPayload(body);
