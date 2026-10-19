@@ -115,3 +115,5 @@
 | **三主题纹理：噪点 / 纸纹 / 金线薄规** | [`docs/design/theme-textures.md`](../theme-textures.md)（终稿） | stealbook **#5** · Canva Texture Check / Paper Shaders | unlock locked 三皮 + 空库 cotton grain；OOS album-preview #8 |
 
 - [成册预览 CTA 文案/层级](../album-preview-cta.md) — W6 单主动词「生成分享链接」+ 次级文字链
+- [分享图注短注](../share-gallery-captions.md) — ShareGallery 禁原始 filename；短日期或无脚注
+- [分享页 refresh muted](../share-refresh-muted.md) — 刷新提示弱于说明；并入末句或单独一行 muted
