@@ -38,11 +38,14 @@ export function bullJobId(assetId: string, jobType: JobName): string {
 
 export const ASSET_JOB_ATTEMPTS = 3;
 
+/** 指数退避起点。第 2 次大约等 2 秒，第 3 次大约等 4 秒。永久错误由 worker 跳过重试。 */
+export const ASSET_JOB_BACKOFF_MS = 2_000;
+
 export function assetJobOptions(jobId: string) {
   return {
     jobId,
     attempts: ASSET_JOB_ATTEMPTS,
-    backoff: { type: "exponential" as const, delay: 2_000 },
+    backoff: { type: "exponential" as const, delay: ASSET_JOB_BACKOFF_MS },
     removeOnComplete: 1_000,
     removeOnFail: 5_000,
   };

@@ -23,7 +23,51 @@ S3_BUCKET=memora-local
 
 `DATABASE_URL` 的口令要和 `POSTGRES_PASSWORD` 相同；`S3_SECRET_ACCESS_KEY` 要和 `MINIO_ROOT_PASSWORD` 相同。模板里的 `memora-dev-change-me` 只给本机用。
 
-要在一台机器上把 web / api / worker 和 Caddy 一起跑起来，用下面的「生产部署」，不要把这条开发命令暴露到公网。
+要在一台机器上把 web / api / worker 和 Caddy 一起跑起来，用下面的「生产部署」，不要把这条开发命令暴露到公网。公网新机器先勾「从零装机」。
+
+## 监控最短路径
+
+默认关闭。`MEMORA_ALERT_ENABLE` 默认 `0`（`deploy/self-host/monitoring/env.monitor.example` 和 `check.sh` 内置都是这个值）。不进 `compose.prod.yml`，也不要装 cron。阈值从仓库外的 env 读，调用时用 `MEMORA_MONITOR_ENV` 指向它。没设这个变量时，下表这几项用脚本内置默认，和示例文件相同。渠道、状态目录和可选 cron 在「监控告警」。
+
+在仓库根目录：
+
+- [ ] `--self-test`：只用临时文件自检，不访问 Docker，不外发。成功时最后一行是 `[memora] monitor self-test ok`。
+
+```bash
+deploy/self-host/monitoring/check.sh --self-test
+```
+
+- [ ] `--dry-run`：按仓库外的 env 检查一轮。不写状态，不外发。退出码 0 表示这一轮没有要外发的问题，退出码 1 表示有。输出里不应出现口令、Webhook URL 或邮箱。
+
+```bash
+umask 077
+sudo mkdir -p /etc/memora
+sudo cp deploy/self-host/monitoring/env.monitor.example /etc/memora/monitor.env
+sudo chmod 600 /etc/memora/monitor.env
+MEMORA_MONITOR_ENV=/etc/memora/monitor.env deploy/self-host/monitoring/check.sh --dry-run
+```
+
+`env.monitor.example` 里的默认项：
+
+| 变量 | 默认 | 含义 |
+|------|------|------|
+| `MEMORA_ALERT_ENABLE` | `0` | `1` 才外发 |
+| `MEMORA_HTTP_FAILS` | `3` | `GET /health`、`GET /login`、`GET /ready` 连续失败多少次才记成要外发 |
+| `MEMORA_DISK_PERCENT` | `85` | `df` 使用率。路径 `MEMORA_DISK_PATH` 默认 `/` |
+| `MEMORA_BACKUP_MAX_AGE_HOURS` | `26` | 最新 `manifest-*.txt` 的年龄上限。目录 `MEMORA_BACKUP_DIR` 默认 `/var/backups/memora`。不读正文 |
+| `MEMORA_UNLOCK_429_ALERT` | `30` | 一轮新增的解锁 429，日志 zone 是 `memora_share_unlock` |
+| `MEMORA_AUTH_429_ALERT` | `20` | 一轮新增的登录/注册 429，日志 zone 是 `memora_auth` |
+
+公开分享 429（zone `memora_public_shares`）只打印次数，示例里没有单独阈值。
+
+## 从零装机
+
+新机器勾这四项。步骤在后面的专章。
+
+- [ ] 域名。DNS 指到这台机器，防火墙放行 80 和 443。`MEMORA_DOMAIN`、`WEB_ORIGINS` 见「生产部署」的「环境」。域名留空只适合本机明文，不要放到公网。
+- [ ] 证书。见「TLS 证书续期」。`MEMORA_DOMAIN` 写成纯域名后，Caddy 申请证书并在后台续期。
+- [ ] 备份目录。另一块盘或另一台机器，目录 `700`。见「备份与恢复」的「做一次备份」。
+- [ ] 首次 restore drill。先 `deploy/self-host/restore-drill.sh --dry-run`（成功最后一行是 `[memora] drill dry-run ok`），再按「演练」做隔离演练。通过与否看「验收清单」。
 
 ## 服务
 
@@ -66,8 +110,8 @@ Caddy 和 Nginx 把这两条路径上刚好 43 位的令牌写成 `***`，`Refer
 
 限流按来源 IP，次数写在片段里，可以改：
 
-- 解锁平均每分钟 6 次。Caddy 只限制 `POST .../unlock`，滑动窗口满 6 次后 429。Nginx 按这条路径限，GET 也算；短时大约能过 7 次，第 8 次起 429。Traefik 的 `burst` 是短时次数，解锁连续第 7 次 429
-- `/api/v1/public/shares/` 平均每分钟 60 次。Caddy 满 60 次后 429。Nginx 短时大约能过 21 次。Traefik 短时 20 次
+- 解锁平均每分钟 6 次。Caddy 只限制 `POST .../unlock`。滑动窗口里已经有 6 次时，下一次是 429；同一来源连续打，第 7 次就是 429。Nginx 按这条路径限，GET 也算；短时大约能过 7 次，第 8 次起 429。Traefik 的 `burst` 是短时次数，解锁连续第 7 次 429
+- `/api/v1/public/shares/` 平均每分钟 60 次。Caddy 窗口里已经有 60 次时，下一次是 429；同一来源连续 GET，第 61 次就是 429。解锁 POST 也计入这一档。Nginx 短时大约能过 21 次。Traefik 短时 20 次
 - `POST /api/v1/auth/login` 和 `POST /api/v1/auth/register` 共用一个额度，平均每分钟 5 次。Caddy 满 5 次后 429。Nginx `5r/m`、`burst=4`，短时大约 5 次，第 6 次 429；GET 不计数。Traefik `average: 5`、`burst: 5`，第 6 次 429。登出和 `GET /api/v1/auth/me` 不在这档里。改 Caddy 的 `memora_auth` `events`、Nginx 的 `memora_auth`、Traefik 的 `memora-auth-limit`
 
 出口 IP 若很多人共用，把次数调高。只有上一跳是你自己的负载均衡时才相信 `X-Forwarded-For`。配错的话，客户端可以伪造来源，绕过限流。
@@ -198,6 +242,91 @@ docker compose -f compose.prod.yml up -d --force-recreate caddy
 
 Nginx、Traefik 的档位见上面「公网反代」。出口 IP 很多人共用时把次数调高。登录密码在 JSON 正文里，访问日志不记正文。不要开 debug。
 
+### 解锁限流
+
+`POST /api/v1/public/shares/<43 位令牌>/unlock` 有两层额度，默认都是每分钟 6 次，第 7 次 429。边缘按来源 IP，次数在 `proxy/Caddyfile.ratelimit` 的 `memora_share_unlock` `events`。应用层是 API 的 `SHARE_UNLOCK_LIMIT`（默认 6），固定窗口，按客户端计数，键不是令牌：上一跳在内网或本机时用 `X-Forwarded-For` 最右边的地址，否则用 socket 地址。假令牌同样计数，限流键看不出分享是否存在。令牌必须刚好 43 位（`secrets.token_urlsafe(32)`）。更短的一段应用直接 404「分享不存在」，访问日志也不会把它打成 `***`。
+
+经 Caddy 时反代在前，第 7 次多为边缘 429。同一来源连续 POST，窗口是空的时候：
+
+| 次序 | 谁返回 | 状态 | 正文 |
+|------|--------|------|------|
+| 1–6 | 应用 | 401 | `share_unavailable`，「无法打开分享」 |
+| 7 起 | Caddy（边缘） | 429 | `rate_limited`，「请稍后再试」，并带 `Retry-After` |
+
+边缘 429 用片段里的 `memora_rate_limited`。进程日志有 `zone=memora_share_unlock`。
+
+直连 api、绕过 Caddy（容器内 `http://127.0.0.1:3001`）时，同一客户端连续 POST，窗口是空的时候：1–6 仍是 401 `share_unavailable`「无法打开分享」，第 7 次是应用自己的 429，正文同样是 `rate_limited`「请稍后再试」，并带 `Retry-After`。`SHARE_UNLOCK_LIMIT` 非法或写成 0 时回落 6。这一层不写 Caddy 的 zone。
+
+这条 POST 同时计入公开分享前缀 `memora_public_shares`（每分钟 60 次）。和下面的 GET 抽查隔开至少一分钟，否则公开前缀会先吃掉额度。
+
+口令只放 JSON 正文。访问日志不记正文。改完 `events` 后：
+
+```bash
+docker compose -f compose.prod.yml up -d --force-recreate caddy
+```
+
+明文本机（`MEMORA_DOMAIN` 留空，`http://127.0.0.1`）这样复现。口令、Cookie、Authorization 换成一次性值，不要写进仓库、工单或日志。输出只留序号、状态码和 `error`：
+
+```bash
+umask 077
+token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+test "${#token}" -eq 43
+for n in 1 2 3 4 5 6 7 8; do
+  code="$(curl -sS -o /tmp/memora-unlock.body -w '%{http_code}' \
+    -X POST "http://127.0.0.1/api/v1/public/shares/${token}/unlock" \
+    -H 'content-type: application/json' \
+    -H 'cookie: memora_session=replace-me' \
+    -H 'authorization: Bearer replace-me' \
+    -d '{"password":"replace-with-8-plus-chars"}')"
+  printf '%s %s ' "$n" "$code"
+  python3 -c 'import json; b=json.load(open("/tmp/memora-unlock.body")); print(b.get("error"), b.get("message"))'
+done
+rm -f /tmp/memora-unlock.body
+```
+
+期望：1 到 6 打印 `401 share_unavailable 无法打开分享`；7 和 8 打印 `429 rate_limited 请稍后再试`。第 7 次多为边缘 429（Caddy 先拦）。第 7 次的 `Retry-After` 在刚打满窗口时是 `60`，之后随这一分钟里剩余的时间减小。
+
+绕过 Caddy，看应用自己的 429：
+
+```bash
+docker compose -f compose.prod.yml exec -T -e TOKEN="$token" api \
+  node --input-type=module -e '
+const token = process.env.TOKEN;
+for (let n = 1; n <= 8; n += 1) {
+  const res = await fetch(`http://127.0.0.1:3001/api/v1/public/shares/${token}/unlock`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: "replace-with-8-plus-chars" }),
+  });
+  const body = await res.json();
+  console.log(n, res.status, body.error, body.message);
+}
+'
+```
+
+期望：1 到 6 打印 `401 share_unavailable 无法打开分享`；7 和 8 打印 `429 rate_limited 请稍后再试`。这是应用 429（`SHARE_UNLOCK_LIMIT` 默认 6），不是边缘。进程日志里没有 `zone=memora_share_unlock`。
+
+然后看日志。访问日志在 `/var/log/caddy/memora-access.log`，进程日志在同目录的 `memora-system.log`：
+
+```bash
+docker compose -f compose.prod.yml exec -T caddy cat /var/log/caddy/memora-access.log
+docker compose -f compose.prod.yml exec -T caddy cat /var/log/caddy/memora-system.log
+```
+
+访问日志里这条 URI 是 `/api/v1/public/shares/***/unlock`。没有 43 位令牌，没有 `Cookie`、`Authorization`，也没有 JSON 正文里的口令。查询串里的 `password` 和 `token` 写成 `***`。`Referer` 里的 `/s/<令牌>` 同样是 `***`。经 Caddy 超额时，进程日志有 `msg` 为 `rate limit exceeded`、`zone` 为 `memora_share_unlock`，字段里没有请求路径。直连 api 的应用 429 不出现在这份日志里。
+
+可选：公开分享 GET。先等上一分钟的解锁计数过期，再用同一个 43 位假令牌。前 60 次是应用的 404 `share_not_found`「分享不存在」，第 61 次是 Caddy 的 429 `rate_limited`「请稍后再试」。进程日志的 `zone` 是 `memora_public_shares`。日志里的路径是 `/api/v1/public/shares/***`。
+
+```bash
+for n in $(seq 1 61); do
+  code="$(curl -sS -o /tmp/memora-share.body -w '%{http_code}' \
+    "http://127.0.0.1/api/v1/public/shares/${token}")"
+  printf '%s %s ' "$n" "$code"
+  python3 -c 'import json; b=json.load(open("/tmp/memora-share.body")); print(b.get("error"), b.get("message"))'
+done
+rm -f /tmp/memora-share.body
+```
+
 ### TLS 证书续期
 
 生产站点地址是 `{$MEMORA_DOMAIN}`，写在 `proxy/Caddyfile.prod`。设成纯域名（例如 `photos.example.com`，不要带 `https://`、端口或路径）后，Caddy 打开自动 HTTPS：用 ACME 申请证书，80 上的 HTTP 会跳到 HTTPS。本仓库没有改 `acme_ca`，默认机构是 Let's Encrypt。不要把测试 CA 留在公网配置里。
@@ -297,11 +426,50 @@ docker compose -f compose.prod.yml exec -T web node -e "fetch('http://127.0.0.1:
 docker compose -f compose.prod.yml exec -T caddy wget -q -O /dev/null http://127.0.0.1:2019/config/
 ```
 
-建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。磁盘告警另做。备份节奏见「备份与恢复」。
+建议：公网每 60 秒探一次 `GET /health` 和 `GET /login`，连续 3 次失败再告警。每 1 到 5 分钟看一次 `docker compose ps` 里有没有 unhealthy。不要用登录或注册的 POST 做探活，那一档一分钟只有 5 次。磁盘、备份新鲜度和 429 计数见「监控告警」。备份节奏见「备份与恢复」。
+
+### 监控告警
+
+默认关闭。`compose.prod.yml` 不启动监控容器，仓库里没有已启用的 cron。不跑下面的脚本，生产栈和现在一样。本机照抄的命令和默认阈值在上面「监控最短路径」。
+
+建议看这些信号。可选脚本是 `deploy/self-host/monitoring/check.sh`，变量表在同目录的 README。
+
+| 信号 | 从哪看 | 脚本默认 |
+|------|--------|----------|
+| caddy、web、api、worker、postgres、redis、minio | `docker compose ps` 的 healthy | 不是 healthy 就记一笔。`starting` 只打印 |
+| 公网入口 | `GET /health`、`GET /login`、`GET /ready` | 连续 3 次失败再记成要外发 |
+| 磁盘 | `df` 使用率 | 达到 85%。默认看 `/`，备份目录在另一块盘时再看那一块 |
+| 备份 | 最新 `manifest-*.txt` 的修改时间 | 超过 26 小时，或目录里没有 manifest，就记一笔。不读正文 |
+| 解锁 429 | Caddy 进程日志 `zone=memora_share_unlock` | 只数新出现的行。一轮里达到 30 次再外发 |
+| 登录 429 | 同一份日志 `zone=memora_auth` | 一轮里达到 20 次再外发 |
+| 公开分享 429 | `zone=memora_public_shares` | 只打印次数 |
+
+ml 建议在 `docker compose ps` 里一起看，脚本不把它算进失败。应用没有 Prometheus 出口。进程日志保持 `INFO`，`rate limit exceeded` 那一行不带请求路径。脚本只输出次数。
+
+第一次真正执行会从日志末尾起算，不回放旧的 429。`--dry-run` 不写偏移。
+
+告警渠道写在仓库外。示例是 `deploy/self-host/monitoring/env.monitor.example` 里的 `https://hooks.example.com/memora` 和 `ops@example.com`。`MEMORA_ALERT_ENABLE` 默认 `0`：检查照常做，只打印，不外发。设成 `1` 之后才会 POST JSON `{"text":"..."}`，或交给本机的 `mail` / `sendmail`。示例地址即使打开开关也不会发出去。Webhook 用 https，URL 里不要夹带账号口令。SMTP 口令留在本机 MTA，不要写进 env。`MEMORA_ALERT_ENABLE=1` 时这个文件权限必须是 `400` 或 `600`。
+
+```bash
+deploy/self-host/monitoring/check.sh --self-test
+umask 077
+sudo mkdir -p /etc/memora
+sudo cp deploy/self-host/monitoring/env.monitor.example /etc/memora/monitor.env
+sudo chmod 600 /etc/memora/monitor.env
+MEMORA_MONITOR_ENV=/etc/memora/monitor.env deploy/self-host/monitoring/check.sh --dry-run
+```
+
+`--dry-run` 不写状态、不外发。输出里不应出现口令、Webhook URL 或邮箱。确认之后把仓库外文件的 `MEMORA_ALERT_ENABLE` 改成 `1`，换上自己的渠道，再加 cron（路径按机器改）。下面是每 5 分钟一次。要贴近上面「每 60 秒」的建议，把分钟改成 `*`，连续 3 次失败大约 3 分钟。
+
+```cron
+*/5 * * * * MEMORA_MONITOR_ENV=/etc/memora/monitor.env /opt/memora/deploy/self-host/monitoring/check.sh
+```
+
+同一组问题 6 小时内不重复外发。退出码 1 表示这一轮有要看的问题。跑 cron 的用户要能访问 Docker。
 
 ### 活体抽查
 
-第一次上线、升级之后，以及每季度，和「备份与恢复」里的演练一起做。演练是否通过仍以那一节的验收清单为准。这里是对外服务能不能用的顺序：登录、相册、备份、恢复命令。
+第一次上线、升级之后，以及每季度，和「备份与恢复」里的演练一起做。演练是否通过仍以那一节的验收清单为准。这里是对外服务能不能用的顺序：登录、相册、备份、恢复命令、解锁限流。
 
 口令放临时 env 或 Docker secret，不要写进仓库、工单或日志。项目名保持 `memora-prod`。演练项目是 `memora-backup-drill`。开发栈是 `memora`。不要对着生产库做演练删除。
 
@@ -313,9 +481,9 @@ COMPOSE_ENV_FILES=/tmp/memora-prod.env docker compose -f compose.prod.yml up -d 
 
 没有域名时按「启动」把 `MEMORA_DOMAIN` 留空，只用 `http://127.0.0.1`。明文抽查设 `COOKIE_SECURE=false`。公网改回 `true`。
 
-下面的邮箱、口令和 Cookie 都是占位，换成一次性值。输出里打掉口令和 `memora_session`。注册和登录 POST 共用每分钟 5 次，先做完业务步骤，再做限流短测。
+下面的邮箱、口令和 Cookie 都是占位，换成一次性值。输出里打掉口令和 `memora_session`。注册和登录 POST 共用每分钟 5 次，先做完业务步骤，再做限流短测。解锁 POST 每分钟 6 次，公开分享 GET 每分钟 60 次，这两项不要放在同一分钟。
 
-1. 健康。上一节的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
+1. 健康。按「健康检查」的 `ps` 和 curl。web、api、worker、postgres、redis、minio、caddy 为 healthy，minio-init 退出码 0。
 2. 端口。`docker compose -f compose.prod.yml ps` 只发布 `80` 和 `443`。不要出现 5432、6379、9000、9001、3000、3001、3002。`docker ps` 里如果看到 `443/udp` 或 `2019/tcp`，但前面没有 `0.0.0.0:`，那是镜像暴露的端口，没有映射到宿主机。管理端口 2019 只在容器内。
 3. 注册或登录：
 
@@ -338,9 +506,10 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 5. 上传探针。`POST /api/v1/assets/upload-url`，正文带 `filename`、`mime`、`size`，可以带上一步的 `albumId`。返回的 `url` 指向内部的 `minio:9000`，宿主机解析不了，也不要打印这个 URL。把响应存进权限 `600` 的临时文件，在 api 容器里按返回的 `headers` 做 PUT，再 `POST /api/v1/assets/<assetId>/complete`。浏览器里的拖拽上传标「需运维人工」。
 6. 备份。按「做一次备份」执行 `backup.sh --compose`。目录里要有 `manifest-<时间>.txt`，目录权限 `700`，dump 权限 `600`。标准输出里没有口令。
 7. 恢复命令。`restore.sh --dry-run --stamp <时间>` 只核对文件，不改库。隔离的完整路径用「演练」里的 `restore-drill.sh`（先 `--dry-run`，再不带参数）。不要对 `memora-prod` 加 `--yes` 做演练。
-8. 访问日志。向 Caddy 打一条带假 `Cookie`、假 `Authorization` 和 `?password=` 的请求，再看 `/var/log/caddy/memora-access.log`。日志里不应出现 Cookie 值、Authorization 或查询串里的口令。登录密码在 JSON 正文里，访问日志不记正文。
-9. 登录限流。同一来源连续 POST `/api/v1/auth/login`，第 6 次是 429，正文含 `请稍后再试`。测完等一分钟再给真人登录。
-10. 页面点击（打开登录页、进入相册、拖拽上传）标「需运维人工」。第 3 到 5 步的 curl 是替代。
+8. 解锁限流。按「解锁限流」对一个 43 位假令牌连续 POST `.../unlock`。经 Caddy：前 6 次是 401「无法打开分享」，第 7 次多为边缘 429「请稍后再试」（`rate_limited`，带 `Retry-After`；Caddy 先拦）。api 容器内绕过 Caddy、直连 `127.0.0.1:3001`：前 6 次仍是 401，第 7 次是应用 429，正文同为 `rate_limited`（`SHARE_UNLOCK_LIMIT` 默认 6）。可选的公开 GET 见那一节，和这次解锁隔开一分钟。
+9. 访问日志。用上一节的请求看 `/var/log/caddy/memora-access.log`。路径是 `/api/v1/public/shares/***/unlock`，`Referer` 里的 `/s/` 令牌也是 `***`。没有 Cookie 值、Authorization、查询串口令或 JSON 正文。经 Caddy 超额的那几行进程日志是 `zone=memora_share_unlock`，字段里没有请求路径。直连 api 的应用 429 不在这份日志里。登录密码同样只在 JSON 正文里，访问日志不记正文。
+10. 登录限流。同一来源连续 POST `/api/v1/auth/login`，第 6 次是 429，正文含 `请稍后再试`。测完等一分钟再给真人登录。登录和注册单独一档，按来源 IP。测完给真人用之前留出这一分钟。
+11. 页面点击（打开登录页、进入相册、拖拽上传）标「需运维人工」。第 3 到 5 步的 curl 是替代。
 
 勾选：
 
@@ -352,7 +521,8 @@ curl -sS -b /tmp/memora.cookies -X POST http://127.0.0.1/api/v1/albums \
 - [ ] 上传探针已完成，或注明需运维人工并留下 curl
 - [ ] `backup.sh --compose` 写出 manifest，权限正确，输出无口令
 - [ ] `restore.sh --dry-run --stamp` 成功；`restore-drill.sh` 按「演练」通过，没有动 `memora` / `memora-prod`
-- [ ] 访问日志无 Cookie、Authorization 和口令
+- [ ] 假令牌解锁：经 Caddy 前 6 次 401「无法打开分享」，第 7 次多为边缘 429「请稍后再试」；直连 api 第 7 次为应用 429（同一 `rate_limited` 正文）
+- [ ] 访问日志路径为 `***`，无 Cookie、Authorization 和口令
 - [ ] 登录第 6 次 429
 - [ ] 浏览器点击已由运维人工过，或明确留下未做
 

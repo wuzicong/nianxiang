@@ -1,5 +1,6 @@
 import { derivativeObjectKey, type DerivativeSize } from "@memora/shared";
 import type { AssetRepository, ObjectStore } from "@memora/storage";
+import { DerivativeJobError } from "./derivative-error.js";
 import { renderDerivatives } from "./render.js";
 
 /**
@@ -21,28 +22,46 @@ export async function runMediaDerivative(
   },
 ): Promise<void> {
   const asset = await deps.assets.get(input.assetId);
-  if (!asset) throw new Error("asset_not_found");
+  if (!asset) throw new DerivativeJobError("asset_not_found");
   if (asset.userId !== input.userId || asset.storageKey !== input.storageKey) {
-    throw new Error("asset_payload_mismatch");
+    throw new DerivativeJobError("asset_payload_mismatch");
   }
-  if (asset.status === "pending_upload") throw new Error("asset_not_uploaded");
+  if (asset.status === "pending_upload") throw new DerivativeJobError("asset_not_uploaded");
 
   await deps.assets.markProcessing(asset.id);
-  const original = await deps.objects.getBuffer(asset.storageKey);
-  const rendered = await renderDerivatives(original);
-  const derivatives: Partial<Record<DerivativeSize, string>> = {};
-  for (const file of rendered.files) {
-    const key = derivativeObjectKey(asset.userId, asset.id, file.size);
-    await deps.objects.putObject({
-      key,
-      body: file.body,
-      contentType: "image/webp",
-      cacheControl: DERIVATIVE_CACHE_CONTROL,
-    });
-    derivatives[file.size] = key;
+  let original: Buffer;
+  try {
+    original = await deps.objects.getBuffer(asset.storageKey);
+  } catch (err) {
+    throw new DerivativeJobError("original_unreadable", err);
   }
-  await deps.assets.markReady(asset.id, derivatives, {
-    width: rendered.width,
-    height: rendered.height,
-  });
+  let rendered: Awaited<ReturnType<typeof renderDerivatives>>;
+  try {
+    rendered = await renderDerivatives(original);
+  } catch (err) {
+    throw new DerivativeJobError("render_failed", err);
+  }
+  const derivatives: Partial<Record<DerivativeSize, string>> = {};
+  try {
+    for (const file of rendered.files) {
+      const key = derivativeObjectKey(asset.userId, asset.id, file.size);
+      await deps.objects.putObject({
+        key,
+        body: file.body,
+        contentType: "image/webp",
+        cacheControl: DERIVATIVE_CACHE_CONTROL,
+      });
+      derivatives[file.size] = key;
+    }
+  } catch (err) {
+    throw new DerivativeJobError("derivative_store_failed", err);
+  }
+  try {
+    await deps.assets.markReady(asset.id, derivatives, {
+      width: rendered.width,
+      height: rendered.height,
+    });
+  } catch (err) {
+    throw new DerivativeJobError("derivative_failed", err);
+  }
 }

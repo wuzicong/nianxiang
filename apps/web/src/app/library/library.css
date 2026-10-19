@@ -543,6 +543,43 @@ a.lib-primary {
   color: inherit;
 }
 
+.lib-empty-library .lib-empty-art {
+  max-width: 12rem;
+  margin-inline: auto;
+}
+
+.lib-empty-library .lib-decor-bg svg,
+.lib-empty-library .lib-decor-fg svg {
+  opacity: 0.88;
+}
+
+.lib-empty-secondary-wrap {
+  margin-top: 0.65rem;
+}
+
+.lib-empty-library .lib-empty-secondary {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--share-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--share-muted) 70%, transparent);
+}
+
+.lib-empty-library .lib-empty-secondary:hover {
+  color: var(--share-text);
+  text-decoration-color: color-mix(in srgb, var(--share-text) 45%, transparent);
+}
+
+.lib-empty-library .lib-empty-secondary:focus-visible {
+  outline: 2px solid var(--share-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 .lib-dialog {
   width: min(52rem, calc(100vw - 1.5rem));
   max-height: calc(100vh - 2rem);
@@ -804,7 +841,15 @@ a.lib-primary {
 }
 
 /* —— 规范 v1：share-shell 变量 + 方格网格 + 吸顶 + 选择栏 —— */
+/* 图库根节点复用 share-shell 主题变量，但需覆盖 share-theme 里解锁页用的 grid/overflow */
 .lib.share-shell {
+  display: block;
+  place-items: unset;
+  place-content: unset;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
   --library-sticky-top: 7.25rem;
   --library-year-h: 2.75rem;
   --library-month-h: 2rem;
@@ -1149,6 +1194,15 @@ a.lib-primary {
 
 .lib-tile[data-failed="true"] {
   outline: 1px dashed var(--share-muted);
+  cursor: not-allowed;
+}
+
+.lib-tile[data-failed="true"] .lib-placeholder {
+  color: var(--share-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  background: color-mix(in srgb, var(--share-border) 40%, var(--share-surface));
+  box-sizing: border-box;
 }
 
 .lib-no-taken {

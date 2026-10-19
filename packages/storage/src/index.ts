@@ -27,6 +27,11 @@ export {
   type AssetPipelineInput,
 } from "./enqueue.js";
 export {
+  createRedisIncrCounter,
+  type IncrCounter,
+  type RedisEvalClient,
+} from "./rate-limit.js";
+export {
   createObjectStore,
   isMissingObjectError,
   objectStoreConfigFromRuntime,

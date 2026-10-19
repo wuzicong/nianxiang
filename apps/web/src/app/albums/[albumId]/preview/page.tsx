@@ -10,11 +10,13 @@ export default async function OwnedAlbumPreviewPage({
   searchParams,
 }: {
   params: Promise<{ albumId: string }>;
-  searchParams: Promise<{ layout?: string | string[] }>;
+  searchParams: Promise<{ layout?: string | string[]; focus?: string | string[] }>;
 }) {
   const { albumId } = await params;
   const query = await searchParams;
   const requested = Array.isArray(query.layout) ? query.layout[0] : query.layout;
+  const focusRaw = Array.isArray(query.focus) ? query.focus[0] : query.focus;
+  const focusTitleOnMount = focusRaw === "title";
   const decorationsByTheme: Record<string, Record<string, string>> = {};
   for (const themeId of THEME_IDS) {
     const theme = albumTheme(themeId);
@@ -25,6 +27,7 @@ export default async function OwnedAlbumPreviewPage({
       albumId={albumId}
       requestedLayout={requested ?? null}
       decorationsByTheme={decorationsByTheme}
+      focusTitleOnMount={focusTitleOnMount}
     />
   );
 }

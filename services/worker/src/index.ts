@@ -18,6 +18,7 @@ import {
   runtimeWarnings,
   safeErrorMessage,
 } from "@memora/storage";
+import { asWorkerError } from "./derivative-error.js";
 import { runMediaDerivative } from "./derivative.js";
 import { runMetaExif } from "./exif.js";
 import { onJobFailed } from "./failure.js";
@@ -96,7 +97,11 @@ const derivativeWorker = new Worker<MediaDerivativePayload>(
     console.log(
       `[worker] media.derivative start asset=${job.data.assetId} attempt=${job.attemptsMade + 1}`,
     );
-    await runMediaDerivative(job.data, { objects, assets });
+    try {
+      await runMediaDerivative(job.data, { objects, assets });
+    } catch (err) {
+      throw asWorkerError(err);
+    }
     console.log(`[worker] media.derivative done asset=${job.data.assetId}`);
   },
   { connection: workerConnection(), concurrency: 2, lockDuration: 120_000 },

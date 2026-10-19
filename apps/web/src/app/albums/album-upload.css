@@ -118,11 +118,11 @@
 }
 
 .album-upload-summary[data-kind="error"] {
-  color: #b91c1c;
+  color: color-mix(in srgb, var(--share-accent) 55%, var(--share-text));
 }
 
 .album-upload-summary[data-kind="success"] {
-  color: #166534;
+  color: color-mix(in srgb, var(--share-brand) 70%, var(--share-text));
 }
 
 .album-upload-queue {
@@ -138,6 +138,10 @@
   border-radius: var(--share-radius-button);
   padding: 0.7rem 0.85rem;
   background: var(--share-surface);
+}
+
+.album-upload-queue-item[data-upload-state="failed"] {
+  border-left: 3px solid color-mix(in srgb, var(--share-accent) 55%, var(--share-text));
 }
 
 .album-upload-queue-head {
@@ -163,7 +167,7 @@
 }
 
 .album-upload-queue-status[data-state="failed"] {
-  color: #b91c1c;
+  color: color-mix(in srgb, var(--share-accent) 55%, var(--share-text));
 }
 
 .album-upload-queue-tools {
@@ -174,8 +178,10 @@
 
 .album-upload-queue-tools button {
   font: inherit;
-  font-size: 0.78rem;
-  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.45rem 0.75rem;
   border-radius: 8px;
   border: 1px solid var(--share-border);
   background: color-mix(in srgb, var(--share-bg) 40%, var(--share-surface));

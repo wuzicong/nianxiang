@@ -7,6 +7,7 @@ import { hashPassword } from "../auth/password.js";
 import { resolveSession, type PublicUser } from "../auth/service.js";
 import { HttpError, asyncRoute } from "../http.js";
 import { sharePasswordMatches } from "../shares/password.js";
+import { clientKeyFromRequest, type ShareRateLimiter } from "../shares/rate-limit.js";
 import { hashShareToken, newShareToken } from "../shares/token.js";
 import { asRecord } from "../validate.js";
 import {
@@ -30,6 +31,9 @@ export interface AlbumRouteDeps {
   objects: ObjectStore;
   /** 为真时新建分享必须带密码。已有的无密码分享仍可公开读取。 */
   sharePasswordRequired: boolean;
+  shareRateLimit: ShareRateLimiter;
+  shareReadLimit: number;
+  shareUnlockLimit: number;
 }
 
 function param(value: string | string[] | undefined): string {
@@ -45,6 +49,7 @@ async function requireUser(auth: AuthRepository, req: Request): Promise<PublicUs
 
 const SHARE_MISSING = { error: "share_not_found", message: "分享不存在" };
 const SHARE_UNAVAILABLE = { error: "share_unavailable", message: "无法打开分享" };
+const SHARE_RATE_LIMITED = { error: "rate_limited", message: "请稍后再试" };
 
 /** 上锁挑战只多带模板 id，方便分享页上肤。不带标题、照片、哈希或令牌。 */
 function shareLockedBody(themeId: string): {
@@ -79,6 +84,25 @@ function sendShareJson(
 
 function presentedPassword(value: unknown): string {
   return typeof value === "string" ? value : "\u0000";
+}
+
+/**
+ * 先计数再查分享。真令牌、不存在的令牌和格式不对的令牌走同一额度，
+ * 避免用 429 的出现时机判断链接是否存在。GET 与 unlock 分桶，客户端键相同。
+ */
+async function rejectIfShareLimited(
+  deps: AlbumRouteDeps,
+  req: Request,
+  res: Response,
+  scope: "read" | "unlock",
+): Promise<boolean> {
+  const limit = scope === "unlock" ? deps.shareUnlockLimit : deps.shareReadLimit;
+  const decision = await deps.shareRateLimit.consume(scope, clientKeyFromRequest(req), limit);
+  if (decision.allowed) return false;
+  console.log(`[memora-api] share rate-limited scope=${scope} retry=${decision.retryAfterSeconds}`);
+  res.setHeader("Retry-After", String(decision.retryAfterSeconds));
+  sendShareJson(res, 429, SHARE_RATE_LIMITED);
+  return true;
 }
 
 export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
@@ -250,6 +274,7 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
    * 撤销、过期、无效仍是 404「分享不存在」。
    * POST unlock：密码不对、分享不存在、已撤销、已过期都是同一句 401，不写明原因，也不带回模板。
    * 密码只读 JSON 正文，不读 query，避免进访问日志。
+   * 超额是 429 rate_limited，和 401 分开。计数发生在查库之前。
    */
   async function sendShareContent(
     res: Response,
@@ -283,6 +308,7 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
   app.get(
     "/api/v1/public/shares/:token",
     asyncRoute(async (req, res) => {
+      if (await rejectIfShareLimited(deps, req, res, "read")) return;
       const token = param(req.params.token);
       if (!isShareToken(token)) {
         sendShareJson(res, 404, SHARE_MISSING);
@@ -305,6 +331,7 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
   app.post(
     "/api/v1/public/shares/:token/unlock",
     asyncRoute(async (req, res) => {
+      if (await rejectIfShareLimited(deps, req, res, "unlock")) return;
       const token = param(req.params.token);
       if (!isShareToken(token)) {
         sendShareJson(res, 404, SHARE_MISSING);

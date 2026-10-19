@@ -3,6 +3,7 @@ import test from "node:test";
 import sharp from "sharp";
 import { derivativeObjectKey } from "@memora/shared";
 import type { AssetRecord, AssetRepository, ExifSummary, ObjectStore } from "@memora/storage";
+import { asWorkerError, DerivativeJobError } from "./derivative-error.js";
 import { runMediaDerivative } from "./derivative.js";
 import { runMetaExif } from "./exif.js";
 import { onJobFailed } from "./failure.js";
@@ -133,7 +134,78 @@ test("runMediaDerivative stores derivative keys and runMetaExif keeps GPS in the
         { assetId: current.id, userId: "other", storageKey: current.storageKey },
         { objects, assets },
       ),
-    /asset_payload_mismatch/,
+    (err: unknown) => {
+      assert.ok(err instanceof DerivativeJobError);
+      assert.equal(err.code, "asset_payload_mismatch");
+      assert.equal(err.permanent, true);
+      const wrapped = asWorkerError(err);
+      assert.equal(wrapped.name, "UnrecoverableError");
+      assert.equal(wrapped.message, "asset_payload_mismatch");
+      return true;
+    },
+  );
+});
+
+test("unreadable originals and bad bytes become retryable derivative codes", async () => {
+  const current = asset();
+  const assets = {
+    async get() {
+      return current;
+    },
+    async markProcessing() {
+      current.status = "processing";
+    },
+    async markReady() {
+      throw new Error("should not store");
+    },
+  } as Pick<AssetRepository, "get" | "markProcessing" | "markReady">;
+
+  await assert.rejects(
+    () =>
+      runMediaDerivative(
+        { assetId: current.id, userId: current.userId, storageKey: current.storageKey },
+        {
+          objects: {
+            async getBuffer() {
+              throw new Error(
+                "GetObject http://127.0.0.1:9000/memora-local/users/local/originals/asset1?X-Amz-Signature=supersecret",
+              );
+            },
+            async putObject() {},
+          },
+          assets,
+        },
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof DerivativeJobError);
+      assert.equal(err.code, "original_unreadable");
+      assert.equal(err.permanent, false);
+      assert.equal(err.message.includes("supersecret"), false);
+      assert.equal(asWorkerError(err).name, "DerivativeJobError");
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      runMediaDerivative(
+        { assetId: current.id, userId: current.userId, storageKey: current.storageKey },
+        {
+          objects: {
+            async getBuffer() {
+              return Buffer.from("not-an-image");
+            },
+            async putObject() {},
+          },
+          assets,
+        },
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof DerivativeJobError);
+      assert.equal(err.code, "render_failed");
+      assert.equal(err.permanent, false);
+      return true;
+    },
   );
 });
 
@@ -170,7 +242,21 @@ test("final derivative failure records a redacted error and earlier attempts do 
     log: (line) => logs.push(line),
   });
   assert.equal(failures.length, 1);
-  assert.equal(failures[0]?.includes("supersecret"), false);
-  assert.equal(failures[0]?.includes("memora-dev-change-me"), false);
-  assert.match(failures[0] ?? "", /9000\/memora-local\/k\?\*\*\*/);
+  assert.equal(failures[0], "derivative_failed");
+  assert.match(logs.join("\n"), /code=derivative_failed/);
+  assert.match(logs.join("\n"), /9000\/memora-local\/k\?\*\*\*/);
+
+  failures.length = 0;
+  await onJobFailed({
+    label: "media.derivative",
+    assetId: "asset1",
+    attemptsMade: 1,
+    maxAttempts: 3,
+    err: new DerivativeJobError("asset_not_found"),
+    markFailed: async (_id, error) => {
+      failures.push(error);
+    },
+    log: (line) => logs.push(line),
+  });
+  assert.deepEqual(failures, ["asset_not_found"]);
 });
