@@ -25,23 +25,6 @@ S3_BUCKET=memora-local
 
 要在一台机器上把 web / api / worker 和 Caddy 一起跑起来，用下面的「生产部署」，不要把这条开发命令暴露到公网。
 
-### 监控脚本
-
-默认关。不进 `compose.prod.yml`，仓库里也没有 cron。`MEMORA_ALERT_ENABLE` 默认 `0`：检查可以跑，只打印，不外发。不跑脚本，生产栈和现在一样。
-
-在仓库根目录：
-
-```bash
-deploy/self-host/monitoring/check.sh --self-test
-umask 077
-sudo mkdir -p /etc/memora
-sudo cp deploy/self-host/monitoring/env.monitor.example /etc/memora/monitor.env
-sudo chmod 600 /etc/memora/monitor.env
-MEMORA_MONITOR_ENV=/etc/memora/monitor.env deploy/self-host/monitoring/check.sh --dry-run
-```
-
-`--self-test` 不访问 Docker，不外发。`--dry-run` 对当前栈做检查并打印，不写状态，不外发。阈值从 `MEMORA_MONITOR_ENV` 指向的仓库外文件读；没写的项用脚本默认。模板是 `deploy/self-host/monitoring/env.monitor.example`：`MEMORA_HTTP_FAILS=3`，`MEMORA_DISK_PERCENT=85`，`MEMORA_BACKUP_MAX_AGE_HOURS=26`，`MEMORA_UNLOCK_429_ALERT=30`，`MEMORA_AUTH_429_ALERT=20`。改阈值只改这份仓库外的文件。信号表和 cron 见「监控告警」。
-
 ## 服务
 
 | 服务 | 地址 | 说明 |
@@ -121,15 +104,6 @@ http {
 开发那条 `docker compose up -d` 只起 Postgres、Redis、MinIO 和 ML。web / api / worker 仍在宿主机用 `pnpm dev:*`。生产用仓库根目录的 `compose.prod.yml`：构建 web、api、worker，前面放已经编进限流插件的 Caddy，套用 `proxy/` 里的打码片段。公网只映射 80 和 443。数据库、Redis、MinIO、ML 和三个应用在内部网络上，没有宿主机端口。
 
 证书在卷 `caddy_data`。数据卷跟开发项目 `memora` 分开，这个项目名是 `memora-prod`。
-
-### 从零装机
-
-第一次把生产栈放到一台新机器上时按这个勾。命令在后面的专节，这里不重复。
-
-- [ ] 域名。`MEMORA_DOMAIN` 写成纯域名（不要协议、端口或路径），DNS 指到这台机器。`WEB_ORIGINS` 是 `https://` 加这个域名。防火墙只放行 80 和 443。见「环境」和「启动」。留空只听明文 80，不能当成公网已经装完
-- [ ] 证书。域名非空时 Caddy 用 Let's Encrypt 自动申请，证书在卷 `caddy_data`（容器内 `/data`）。`caddy validate` 通过，该域名目录里有证书。不要 `docker compose down -v`。见「TLS 证书续期」
-- [ ] 备份目录。`BACKUP_DIR` 放在另一块盘或另一台机器，建议 `/var/backups/memora`，权限 `700`。不要和数据库、MinIO 卷同一块盘。见「做一次备份」
-- [ ] 首次 restore drill。先 `deploy/self-host/restore-drill.sh --dry-run`（最后一行是 `[memora] drill dry-run ok`），再跑不带参数的 `restore-drill.sh`。成功判定和其余勾选见「演练」和「验收清单」。不要对 `memora` 或 `memora-prod` 演练删除
 
 ### 环境
 
