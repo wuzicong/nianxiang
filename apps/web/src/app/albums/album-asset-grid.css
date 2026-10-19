@@ -1,0 +1,97 @@
+.album-assets {
+  margin-top: 0.75rem;
+}
+
+.album-assets-empty {
+  padding: 1.25rem 1rem;
+  border-radius: var(--share-radius-card);
+  border: 1px dashed var(--share-border);
+  background: color-mix(in srgb, var(--share-bg) 55%, var(--share-surface));
+  color: var(--share-muted);
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+
+.album-assets-empty h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--share-text);
+}
+
+.album-assets-empty p {
+  margin: 0.45rem 0 0;
+}
+
+.album-assets-empty .shell-upload-anchor {
+  font-weight: 600;
+  color: var(--share-text);
+  text-decoration-color: color-mix(in srgb, var(--share-accent) 45%, var(--share-border));
+}
+
+.album-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .album-assets-grid {
+    gap: 0.65rem;
+  }
+}
+
+.album-assets-tile {
+  border: 1px solid var(--share-border);
+  border-radius: var(--share-radius-button);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--share-surface) 96%, var(--share-bg));
+}
+
+.album-assets-thumb,
+.album-assets-placeholder {
+  width: 100%;
+  height: 140px;
+  display: block;
+  object-fit: cover;
+}
+
+.album-assets-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--share-bg) 65%, var(--share-surface));
+  color: var(--share-muted);
+  font-size: 0.88rem;
+}
+
+.album-assets-caption {
+  margin: 0;
+  padding: 0.55rem 0.7rem 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--share-text);
+}
+
+.album-assets-meta {
+  margin: 0;
+  padding: 0 0.7rem 0.65rem;
+  font-size: 0.82rem;
+  color: var(--share-muted);
+}
+
+.album-assets-filename {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+  word-break: break-all;
+}
+
+.album-assets-tile[data-failed="true"] {
+  border-style: dashed;
+}

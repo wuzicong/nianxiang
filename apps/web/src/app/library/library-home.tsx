@@ -54,7 +54,7 @@ const SHELLS: Record<Exclude<Tab, "time">, { title: string; body: string; decor:
     },
     scene: {
       title: "场景识别还在路上",
-      body: "之后会按夜景、海边、美食这类场景自动归类。现在还没有分析任何照片。",
+      body: "之后会按「夜景」「海边」「美食」这类场景自动归类。现在还没有分析任何照片。",
       decor: "sparkle",
     },
     people: {
@@ -557,13 +557,22 @@ export function LibraryHome({
           ) : null}
 
           {phase === "ready" && shell ? (
-            <section className="lib-shell" aria-labelledby={`shell-${tab}`}>
-              <div className="lib-shell-art">
-                <LibraryDecor svg={decorations[shell.decor] ?? null} className="lib-decor-main" />
+            <section className="lib-shell lib-empty-library" aria-labelledby={`shell-${tab}`}>
+              <div className="lib-empty-art" aria-hidden="true">
+                {tab === "people" ? (
+                  <LibraryDecor svg={decorations["soft-blob"] ?? null} className="lib-decor-bg" />
+                ) : tab === "place" ? (
+                  <>
+                    <LibraryDecor svg={decorations["soft-blob"] ?? null} className="lib-decor-bg" />
+                    <LibraryDecor svg={decorations.envelope ?? null} className="lib-decor-fg" />
+                  </>
+                ) : (
+                  <LibraryDecor svg={decorations.sparkle ?? null} className="lib-decor-main" />
+                )}
               </div>
               <h2 id={`shell-${tab}`}>{shell.title}</h2>
               <p>{shell.body}</p>
-              <button type="button" className="lib-primary" onClick={() => setTab("time")}>回到时间</button>
+              <button type="button" className="lib-quiet" onClick={() => setTab("time")}>回到时间</button>
             </section>
           ) : null}
 

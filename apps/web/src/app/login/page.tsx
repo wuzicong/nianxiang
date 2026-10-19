@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { safeUserMessage } from "../../lib/album-assets";
+import { useSessionEmail } from "../../lib/use-session-email";
+import { MemoraShell } from "../shell/memora-shell";
 
 type PublicUser = { id: string; email: string };
 
@@ -24,10 +27,12 @@ async function postAuth(path: string, body: { email: string; password: string })
 
 export default function LoginPage() {
   const router = useRouter();
+  const sessionEmail = useSessionEmail();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState<PublicUser | null>(null);
   const [message, setMessage] = useState("正在检查会话…");
+  const [pending, setPending] = useState<"login" | "register" | null>(null);
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/v1/auth/me", { credentials: "include" });
@@ -46,7 +51,8 @@ export default function LoginPage() {
   }, [refresh]);
 
   async function submit(path: "/api/v1/auth/register" | "/api/v1/auth/login") {
-    setMessage("提交中…");
+    setPending(path.endsWith("login") ? "login" : "register");
+    setMessage(path.endsWith("login") ? "登录中…" : "注册中…");
     try {
       const result = await postAuth(path, { email, password });
       if (result.body.user) {
@@ -59,6 +65,8 @@ export default function LoginPage() {
       setMessage(safeUserMessage(result.body.message, "登录或注册没成功，请检查邮箱和密码后再试。"));
     } catch {
       setMessage("API 暂时不可达");
+    } finally {
+      setPending(null);
     }
   }
 
@@ -76,41 +84,41 @@ export default function LoginPage() {
     setMessage("退出失败");
   }
 
+  const statusRole =
+    message.includes("没成功") || message.includes("不可达") || message === "退出失败" ? "alert" : "status";
+
   return (
-    <main style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1.5rem" }}>
-      <p style={{ marginBottom: "0.5rem" }}>
-        <a href="/">念册 · Memora</a>
-      </p>
-      <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>登录</h1>
-      <p style={{ lineHeight: 1.6, color: "#555" }}>
-        邮箱和密码会交给本机 API。会话放在 HttpOnly Cookie 里，页面脚本读不到。
-      </p>
-      <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{message}</p>
+    <MemoraShell variant="auth" active="login" userEmail={sessionEmail}>
       {user ? (
-        <section style={{ marginTop: "1.5rem" }}>
-          <p>
-            {user.email}
-            <br />
-            <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}>{user.id}</span>
-          </p>
-          <p style={{ marginTop: "0.75rem" }}>
-            <a href="/library">进入照片库</a>
-            {" · "}
-            <a href="/albums">管理相册与分享</a>
-          </p>
-          <button type="button" onClick={() => void logout()}>
-            退出
-          </button>
+        <section className="shell-card" aria-labelledby="login-session-title">
+          <Link className="shell-card-brand" href="/">念册 · Memora</Link>
+          <p className="shell-kicker">欢迎回来</p>
+          <h1 id="login-session-title">登录</h1>
+          <p className="shell-muted" style={{ marginTop: "0.75rem" }}>{user.email}</p>
+          <p className="lib-sr">{user.id}</p>
+          <p className="shell-status" role="status" aria-live="polite">{message}</p>
+          <div className="shell-actions">
+            <Link className="lib-primary lib-link" href="/library">进入照片库</Link>
+            <Link className="lib-quiet" href="/albums">管理相册</Link>
+            <button type="button" className="lib-quiet" onClick={() => void logout()}>退出</button>
+          </div>
         </section>
       ) : (
         <form
-          style={{ display: "grid", gap: "0.75rem", maxWidth: 360, marginTop: "1.5rem" }}
+          className="shell-card"
+          aria-labelledby="login-form-title"
           onSubmit={(event) => {
             event.preventDefault();
             void submit("/api/v1/auth/login");
           }}
         >
-          <label>
+          <Link className="shell-card-brand" href="/">念册 · Memora</Link>
+          <p className="shell-kicker">欢迎回来</p>
+          <h1 id="login-form-title">登录</h1>
+          <p className="shell-privacy">
+            邮箱和密码只在你的空间里使用。会话放在 HttpOnly Cookie，页面脚本读不到。
+          </p>
+          <label className="shell-field">
             邮箱
             <input
               type="email"
@@ -118,10 +126,9 @@ export default function LoginPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "0.4rem" }}
             />
           </label>
-          <label>
+          <label className="shell-field">
             密码
             <input
               type="password"
@@ -130,17 +137,24 @@ export default function LoginPage() {
               onChange={(event) => setPassword(event.target.value)}
               required
               minLength={8}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "0.4rem" }}
             />
           </label>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="submit">登录</button>
-            <button type="button" onClick={() => void submit("/api/v1/auth/register")}>
-              注册
+          <p className="shell-status" role={statusRole} aria-live="polite">{message}</p>
+          <div className="shell-actions">
+            <button type="submit" className="lib-primary" disabled={pending !== null}>
+              {pending === "login" ? "登录中…" : "登录"}
+            </button>
+            <button
+              type="button"
+              className="lib-quiet"
+              disabled={pending !== null}
+              onClick={() => void submit("/api/v1/auth/register")}
+            >
+              {pending === "register" ? "注册中…" : "注册"}
             </button>
           </div>
         </form>
       )}
-    </main>
+    </MemoraShell>
   );
 }

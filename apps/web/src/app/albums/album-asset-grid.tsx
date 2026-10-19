@@ -1,6 +1,7 @@
 "use client";
 
 import { assetStatusLabel, previewUrl, type AlbumAssetView } from "../../lib/album-assets";
+import "./album-asset-grid.css";
 
 export function AlbumAssetGrid({
   assets,
@@ -13,27 +14,14 @@ export function AlbumAssetGrid({
 }) {
   if (assets.length === 0) {
     return (
-      <div
-        style={{
-          marginTop: "1rem",
-          padding: "1.25rem 1rem",
-          borderRadius: 12,
-          border: "1px dashed #e7e0d8",
-          background: "#faf8f5",
-          color: "#555",
-          lineHeight: 1.65,
-          fontSize: 15,
-        }}
-      >
-        <p style={{ margin: 0, fontWeight: 600, color: "#44403c" }}>这本相册还是空的</p>
-        <p style={{ margin: "0.45rem 0 0" }}>
+      <div className="album-assets album-assets-empty">
+        <h3>这本相册还是空的</h3>
+        <p>
           在下方上传区域拖入或选择照片，预览生成后会出现在这里。
           {uploadAnchorId ? (
             <>
               {" "}
-              <a href={`#${uploadAnchorId}`} style={{ color: "#8a5a44", fontWeight: 600 }}>
-                前往上传
-              </a>
+              <a className="lib-quiet shell-upload-anchor" href={`#${uploadAnchorId}`}>前往上传</a>
             </>
           ) : null}
         </p>
@@ -42,60 +30,39 @@ export function AlbumAssetGrid({
   }
 
   return (
-    <ul
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-        gap: "0.75rem",
-        padding: 0,
-        margin: "1rem 0 0",
-        listStyle: "none",
-      }}
-    >
+    <ul className="album-assets album-assets-grid">
       {assets.map((asset) => {
         const src = previewUrl(asset.previews);
         const label = assetStatusLabel(asset.status);
+        const failed = asset.status === "failed";
         return (
           <li
             key={asset.assetId}
+            className="album-assets-tile"
             data-asset-id={asset.assetId}
             data-asset-status={asset.status}
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 8,
-              overflow: "hidden",
-              background: "#fff",
-            }}
+            data-failed={failed ? "true" : undefined}
           >
             {src ? (
               <img
+                className="album-assets-thumb"
                 src={src}
-                alt={asset.filename || "照片"}
+                alt="照片"
                 referrerPolicy="no-referrer"
                 onError={() => onPreviewError(src)}
-                style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }}
               />
             ) : (
-              <div
-                style={{
-                  height: 140,
-                  display: "grid",
-                  placeItems: "center",
-                  padding: "0.5rem",
-                  textAlign: "center",
-                  background: "#f3f1ec",
-                  color: "#666",
-                }}
-              >
+              <div className="album-assets-placeholder">
                 {asset.status === "ready" ? "暂无预览" : label}
               </div>
             )}
-            <p style={{ margin: 0, padding: "0.55rem 0.7rem 0", fontSize: 14 }}>
-              {asset.filename || "照片"}
-            </p>
-            <p style={{ margin: 0, padding: "0.2rem 0.7rem 0.7rem", fontSize: 13, color: "#666" }}>
+            <p className="album-assets-caption">照片</p>
+            <p className="album-assets-meta">
               {label}
-              {asset.status === "failed" && asset.error ? ` · ${asset.error}` : ""}
+              {failed && asset.error ? ` · ${asset.error}` : ""}
+              {asset.filename ? (
+                <span className="album-assets-filename" title={asset.filename}>{asset.filename}</span>
+              ) : null}
             </p>
           </li>
         );

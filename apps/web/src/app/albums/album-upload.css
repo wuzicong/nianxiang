@@ -36,7 +36,7 @@
   background: color-mix(in srgb, var(--share-bg) 30%, var(--share-surface));
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 120ms ease-out, background 120ms ease-out, box-shadow 120ms ease-out;
 }
 
 .album-upload-dropzone[data-empty="true"] {
@@ -211,7 +211,7 @@
     var(--share-brand),
     color-mix(in srgb, var(--share-accent) 65%, var(--share-brand))
   );
-  transition: width 0.15s ease;
+  transition: width 120ms ease-out;
 }
 
 .album-upload-file-input {
