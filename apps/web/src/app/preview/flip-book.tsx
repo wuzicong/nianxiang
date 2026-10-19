@@ -36,6 +36,40 @@ function photoSelector(id: string): string {
   return `img[data-photo-id="${escaped}"]`;
 }
 
+function flipSettings(theme: AlbumTheme) {
+  const viewW = typeof window !== "undefined" ? window.innerWidth : 420;
+  const viewH = typeof window !== "undefined" ? window.innerHeight : 800;
+  const narrow = viewW < 720;
+  const coarse =
+    typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  const flippingTime = theme.motionEnter === "spring" ? 900 : theme.motionEnter === "editorial-fade" ? 640 : 800;
+  const pageWidth = narrow ? Math.min(360, Math.max(280, viewW - 36)) : 420;
+  const pageHeight = narrow ? Math.min(Math.round(viewH * 0.62), 620) : 620;
+  return {
+    width: pageWidth,
+    height: Math.max(430, pageHeight),
+    size: "stretch" as const,
+    minWidth: narrow ? 260 : 280,
+    maxWidth: narrow ? Math.min(viewW - 20, 480) : 520,
+    minHeight: narrow ? 380 : 430,
+    maxHeight: narrow ? Math.min(Math.round(viewH * 0.78), 720) : 760,
+    drawShadow: true,
+    flippingTime,
+    usePortrait: true,
+    startZIndex: 2,
+    autoSize: true,
+    maxShadowOpacity: theme.skin.id === "kyoto-lantern" ? 0.55 : 0.35,
+    showCover: true,
+    mobileScrollSupport: coarse,
+    swipeDistance: coarse ? 42 : 28,
+    clickEventForward: true,
+    useMouseEvents: true,
+    showPageCorners: true,
+    disableFlipByClick: false,
+    startPage: 0,
+  };
+}
+
 export const FlipBook = memo(function FlipBook({
   theme,
   album,
@@ -65,6 +99,7 @@ export const FlipBook = memo(function FlipBook({
     let cancelled = false;
     let flip: PageFlip | null = null;
     let block: HTMLDivElement | null = null;
+    let onResize: (() => void) | null = null;
     const roots: Root[] = [];
 
     void import("page-flip").then(({ PageFlip }) => {
@@ -102,31 +137,12 @@ export const FlipBook = memo(function FlipBook({
         return;
       }
 
-      const flippingTime = theme.motionEnter === "spring" ? 900 : theme.motionEnter === "editorial-fade" ? 640 : 800;
-      flip = new PageFlip(block, {
-        width: 420,
-        height: 620,
-        size: "stretch",
-        minWidth: 280,
-        maxWidth: 520,
-        minHeight: 430,
-        maxHeight: 760,
-        drawShadow: true,
-        flippingTime,
-        usePortrait: true,
-        startZIndex: 2,
-        autoSize: true,
-        maxShadowOpacity: theme.skin.id === "kyoto-lantern" ? 0.55 : 0.35,
-        showCover: true,
-        mobileScrollSupport: false,
-        swipeDistance: 24,
-        clickEventForward: true,
-        useMouseEvents: true,
-        showPageCorners: true,
-        disableFlipByClick: false,
-        startPage: 0,
-      });
+      flip = new PageFlip(block, flipSettings(theme));
       flip.loadFromHTML(pages);
+      onResize = () => {
+        flip?.update();
+      };
+      window.addEventListener("resize", onResize);
       const report = () => {
         onFlip(flip?.getCurrentPageIndex() ?? 0, flip?.getPageCount() ?? pages.length, flip?.getOrientation() ?? "portrait");
       };
@@ -141,6 +157,7 @@ export const FlipBook = memo(function FlipBook({
     return () => {
       cancelled = true;
       apiRef.current = null;
+      if (onResize) window.removeEventListener("resize", onResize);
       roots.forEach((root) => root.unmount());
       if (flip) flip.destroy();
       else block?.remove();

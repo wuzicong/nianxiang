@@ -771,6 +771,13 @@ figcaption {
 .album-flip-mount {
   width: 100%;
   min-height: 640px;
+  touch-action: pan-y pinch-zoom;
+}
+
+.album-flip-block {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .album-page {
@@ -876,6 +883,58 @@ figcaption {
   max-width: 38rem;
   line-height: 1.6;
   color: #5c564f;
+}
+
+.preview-owned-body {
+  max-width: 38rem;
+}
+
+.preview-owned-foot {
+  margin-top: 1.5rem;
+}
+
+.preview-owned-status {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.5rem 0 0;
+  line-height: 1.6;
+  color: #5c564f;
+}
+
+.preview-owned-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  border: 2px solid #d8d2c8;
+  border-top-color: #6b6258;
+  border-radius: 50%;
+  animation: preview-owned-spin 0.75s linear infinite;
+}
+
+@keyframes preview-owned-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.preview-owned-cta {
+  margin: 1rem 0 0;
+}
+
+.preview-owned-upload-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: #2c2a29;
+  color: #fafaf7;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.preview-owned-upload-link:focus-visible {
+  outline: 2px solid #c4a574;
+  outline-offset: 3px;
 }
 
 .preview-index-grid {
@@ -998,6 +1057,37 @@ figcaption {
 }
 
 @media (max-width: 720px) {
+  .album-flip-stage {
+    width: calc(100% - 0.75rem);
+    margin-bottom: 1.75rem;
+  }
+
+  .album-flip-mount {
+    min-height: min(72vh, 620px);
+  }
+
+  .flip-controls {
+    gap: 0.55rem;
+    margin-top: 1rem;
+  }
+
+  .flip-controls button {
+    min-height: 2.75rem;
+    min-width: 5.25rem;
+    padding: 0.55rem 1.05rem;
+    font-size: 0.95rem;
+  }
+
+  .flip-controls p {
+    min-width: 6.5rem;
+    font-size: 0.92rem;
+  }
+
+  .flip-hint {
+    font-size: 0.88rem;
+    padding: 0 0.5rem;
+  }
+
   .spread,
   .wall {
     grid-template-columns: 1fr 1fr;

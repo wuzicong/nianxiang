@@ -286,16 +286,16 @@ function AnimatedBook({
         onFlip={onFlip}
         onPhotoError={onPhotoError}
       />
-      <div className="flip-controls">
-        <button type="button" onClick={() => apiRef.current?.flipPrev()} disabled={atStart}>
+      <nav className="flip-controls" aria-label="翻页控制">
+        <button type="button" aria-label="上一页" onClick={() => apiRef.current?.flipPrev()} disabled={atStart}>
           上一页
         </button>
-        <p>{pageLabel}</p>
-        <button type="button" onClick={() => apiRef.current?.flipNext()} disabled={atEnd}>
+        <p aria-live="polite" aria-atomic="true">{pageLabel}</p>
+        <button type="button" aria-label="下一页" onClick={() => apiRef.current?.flipNext()} disabled={atEnd}>
           下一页
         </button>
-      </div>
-      <p className="flip-hint">点书页右侧或按右方向键翻到下一页。封面在翻开前单独占一页。</p>
+      </nav>
+      <p className="flip-hint">点书页边缘、左右滑动或按方向键翻页。封面在翻开前单独占一页。</p>
     </div>
   );
 }
@@ -329,21 +329,27 @@ function InstantBook({
           />
         </article>
       </div>
-      <div className="flip-controls">
-        <button type="button" onClick={() => setIndex((value) => Math.max(0, value - 1))} disabled={index === 0}>
+      <nav className="flip-controls" aria-label="翻页控制">
+        <button
+          type="button"
+          aria-label="上一页"
+          onClick={() => setIndex((value) => Math.max(0, value - 1))}
+          disabled={index === 0}
+        >
           上一页
         </button>
-        <p>
+        <p aria-live="polite" aria-atomic="true">
           第 {index + 1} / {album.slots.length} 页
         </p>
         <button
           type="button"
+          aria-label="下一页"
           onClick={() => setIndex((value) => Math.min(album.slots.length - 1, value + 1))}
           disabled={index >= album.slots.length - 1}
         >
           下一页
         </button>
-      </div>
+      </nav>
       <p className="flip-hint">系统开启了减少动态效果，这一册改成逐页切换，不再播放翻页动画。</p>
     </div>
   );
