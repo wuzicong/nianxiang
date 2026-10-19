@@ -121,6 +121,11 @@ export function previewUrl(previews: AlbumAssetView["previews"]): string | null 
   return previews.thumb?.url ?? previews.preview?.url ?? previews.hero?.url ?? null;
 }
 
+/** 灯箱用大图：preview → hero → thumb，仍走衍生图 URL 校验。 */
+export function lightboxUrl(previews: AlbumAssetView["previews"]): string | null {
+  return previews.preview?.url ?? previews.hero?.url ?? previews.thumb?.url ?? null;
+}
+
 export function albumRefreshDelay(assets: AlbumAssetView[]): number | null {
   if (assets.some((asset) => assetNeedsRefresh(asset.status))) return PROCESSING_POLL_MS;
   if (assets.some((asset) => previewUrl(asset.previews))) return PREVIEW_REFRESH_MS;

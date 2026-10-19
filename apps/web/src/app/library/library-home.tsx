@@ -18,6 +18,7 @@ import {
   flattenGroupIds,
   groupPhotosByTime,
   LIBRARY_SELECTION_LIMIT,
+  libraryLightboxIds,
   libraryPhotoSelectable,
   libraryRefreshDelay,
   type LibraryPhoto,
@@ -30,6 +31,7 @@ import "../albums/album-upload.css";
 import { shareThemeStyle } from "../s/share-chrome";
 import { defaultComposeTitle, LibraryCreateDialog } from "./library-create-dialog";
 import { LibraryGrid } from "./library-grid";
+import { LibraryLightbox } from "./library-lightbox";
 
 type Phase = "loading" | "guest" | "error" | "ready";
 type Tab = "time" | "place" | "scene" | "people";
@@ -96,6 +98,8 @@ export function LibraryHome({
   const [offline, setOffline] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const brokenPreviews = useRef(new Set<string>());
+  const [lightboxId, setLightboxId] = useState<string | null>(null);
+  const lightboxReturnRef = useRef<string | null>(null);
 
   const load = useCallback(async (mode: "initial" | "silent") => {
     if (mode === "initial") setPhase("loading");
@@ -188,6 +192,33 @@ export function LibraryHome({
     };
   }, []);
 
+  const lightboxOrderedIds = useMemo(
+    () => libraryLightboxIds(photos, timeZone),
+    [photos, timeZone],
+  );
+
+  const photosById = useMemo(() => new Map(photos.map((photo) => [photo.assetId, photo])), [photos]);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxId(null);
+    const returnId = lightboxReturnRef.current;
+    lightboxReturnRef.current = null;
+    if (!returnId) return;
+    window.requestAnimationFrame(() => {
+      const escaped = CSS.escape(returnId);
+      document.querySelector<HTMLButtonElement>(`[data-asset-id="${escaped}"]`)?.focus();
+    });
+  }, []);
+
+  const openLightbox = useCallback(
+    (id: string) => {
+      if (!lightboxOrderedIds.includes(id)) return;
+      lightboxReturnRef.current = id;
+      setLightboxId(id);
+    },
+    [lightboxOrderedIds],
+  );
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
@@ -196,6 +227,11 @@ export function LibraryHome({
         setUploadOpen(true);
       }
       if (event.key !== "Escape" || composerOpen) return;
+      if (lightboxId) {
+        event.preventDefault();
+        closeLightbox();
+        return;
+      }
       if (!selecting && selected.length === 0) return;
       setSelecting(false);
       setSelected([]);
@@ -204,7 +240,7 @@ export function LibraryHome({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [composerOpen, selecting, selected.length]);
+  }, [closeLightbox, composerOpen, lightboxId, selecting, selected.length]);
 
   const orderedIds = useMemo(
     () => flattenGroupIds(groupPhotosByTime(photos, timeZone)).filter((id) => {
@@ -477,11 +513,12 @@ export function LibraryHome({
                 selected={selected}
                 selecting={selecting}
                 focusId={focusId}
-                locked={pending}
+                locked={pending || lightboxId !== null}
                 onFocus={setFocusId}
                 onToggle={selectPhoto}
                 onSelectDay={selectDay}
                 onClear={clearSelection}
+                onOpenLightbox={openLightbox}
                 onPreviewError={(src) => {
                   if (brokenPreviews.current.has(src)) return;
                   brokenPreviews.current.add(src);
@@ -521,6 +558,21 @@ export function LibraryHome({
           />
         </div>
       </dialog>
+
+      <LibraryLightbox
+        open={lightboxId !== null}
+        assetId={lightboxId}
+        orderedIds={lightboxOrderedIds}
+        photosById={photosById}
+        timeZone={timeZone}
+        onClose={closeLightbox}
+        onChange={setLightboxId}
+        onPreviewError={(src) => {
+          if (brokenPreviews.current.has(src)) return;
+          brokenPreviews.current.add(src);
+          void load("silent");
+        }}
+      />
 
       <LibraryCreateDialog
         open={composerOpen}
