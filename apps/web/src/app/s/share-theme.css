@@ -1,5 +1,10 @@
 .share-shell {
   --share-ink: var(--share-text);
+  --share-duration-1: 80ms;
+  --share-duration-2: 120ms;
+  --share-duration-3: 180ms;
+  --share-duration-4: 280ms;
+  --share-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0;
@@ -359,41 +364,134 @@
 
 .share-form button:not(:disabled):active {
   transform: scale(0.98);
-  transition: transform 100ms ease;
+  transition: transform var(--share-duration-1) ease;
 }
 
-.share-card[data-share-shake] {
-  animation: share-card-shake 240ms ease;
+/* 挑战态：仅文案/反馈的安静过渡，无循环装饰动效 */
+.share-shell[data-share-state="locked"] .share-note {
+  transition:
+    opacity var(--share-duration-2) var(--share-ease-out),
+    color var(--share-duration-2) var(--share-ease-out);
 }
 
-@keyframes share-card-shake {
+.share-shell[data-share-state="locked"] .share-form input[aria-invalid="true"] {
+  transition: border-color var(--share-duration-2) var(--share-ease-out);
+}
+
+.share-note[data-share-feedback="pending"] {
+  color: var(--share-muted);
+}
+
+/* 错误/限流：反馈区轻微位移，不晃整张卡片 */
+.share-note[data-share-nudge] {
+  animation: share-note-nudge var(--share-duration-3) var(--share-ease-out);
+}
+
+@keyframes share-note-nudge {
   0%,
   100% {
-    transform: translateX(0);
+    transform: translateY(0);
+    opacity: 1;
   }
-  25% {
-    transform: translateX(-4px);
+  45% {
+    transform: translateY(4px);
+    opacity: 0.9;
   }
-  75% {
-    transform: translateX(4px);
+}
+
+/* 解锁成功：序章信封 → 交叉淡入相册 */
+.share-reveal {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.share-reveal-overture.share-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  animation: share-overture-fade-out var(--share-duration-3) var(--share-ease-out) forwards;
+  animation-delay: calc(var(--share-duration-3) + var(--share-duration-2));
+}
+
+.share-reveal-mark {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  animation: share-overture-mark-in var(--share-duration-3) var(--share-ease-out) both;
+}
+
+.share-reveal-envelope {
+  color: var(--share-accent);
+}
+
+.share-reveal-envelope rect {
+  fill: color-mix(in srgb, var(--share-surface) 88%, var(--share-bg));
+  stroke: var(--share-accent);
+}
+
+.share-reveal-envelope path:first-of-type {
+  stroke: var(--share-accent);
+}
+
+.share-reveal-envelope path:last-of-type {
+  fill: var(--share-brand);
+}
+
+.share-reveal-target {
+  animation: share-gallery-reveal-in var(--share-duration-4) var(--share-ease-out) both;
+  animation-delay: calc(var(--share-duration-3) + var(--share-duration-2));
+}
+
+@keyframes share-overture-mark-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes share-overture-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes share-gallery-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .share-card[data-share-shake] {
-    animation: share-card-shake-reduced 120ms ease;
-  }
-
-  @keyframes share-card-shake-reduced {
-    from {
-      opacity: 0.92;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
   .share-form button:not(:disabled):active {
+    transform: none;
+  }
+
+  .share-note[data-share-nudge] {
+    animation: none;
+  }
+
+  .share-reveal-overture {
+    display: none;
+  }
+
+  .share-reveal-target {
+    animation: none;
+    opacity: 1;
     transform: none;
   }
 }

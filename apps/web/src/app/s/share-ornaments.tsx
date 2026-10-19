@@ -146,3 +146,41 @@ function PageNumber() {
     </svg>
   );
 }
+
+/** 解锁成功序章：己方 envelope 资产，色值走 --share-* */
+export function ShareRevealEnvelope() {
+  return (
+    <svg
+      className="share-reveal-envelope"
+      viewBox="0 0 96 72"
+      width="96"
+      height="72"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect
+        x="6"
+        y="10"
+        width="84"
+        height="54"
+        rx="6"
+        fill="currentColor"
+        fillOpacity="0.12"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 14l40 28 40-28M8 62l28-22m52 22L60 40"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M48 50s-8-5-10-9c-2-3 0-7 4-7 2 0 4 1 6 3 2-2 4-3 6-3 4 0 6 4 4 7-2 4-10 9-10 9z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
