@@ -44,6 +44,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-memora-dev-change-me}
+      # 社区版没有按桶 CORS。只放行本机页面，浏览器才能 PUT 原图、GET 衍生图。
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-http://127.0.0.1:3000,http://localhost:3000}
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
@@ -68,7 +70,6 @@ services:
       S3_BUCKET: ${S3_BUCKET:-memora-local}
     volumes:
       - ./deploy/self-host/minio-init.sh:/minio-init.sh:ro
-      - ./deploy/self-host/minio-cors.xml:/minio-cors.xml:ro
     entrypoint: ["/bin/sh", "/minio-init.sh"]
     restart: "no"
 

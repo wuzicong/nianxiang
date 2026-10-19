@@ -124,7 +124,7 @@ users/{userId}/originals/{assetId}
 users/{userId}/derivatives/{assetId}/{thumb|preview|hero}.webp
 ```
 
-`minio-init` 会 `mc anonymous set none`。匿名拒绝的策略意图写在 `bucket-policy.json`，init **不会**把这份 Deny 套到桶上，避免误伤根用户。同一组固定镜像里 `mc cors set` 可能打印未实现的警告；`curl` 上传不依赖 CORS。浏览器从 3000 跨域 PUT 时，要在反代上加 CORS，或换更新的 MinIO。
+`minio-init` 会 `mc anonymous set none`。匿名拒绝的策略意图写在 `bucket-policy.json`，init **不会**把这份 Deny 套到桶上，避免误伤根用户。社区版不实现按桶 CORS（`mc cors set` 返回 501）。浏览器跨域靠 MinIO 的 `MINIO_API_CORS_ALLOW_ORIGIN`，Compose 默认只放行 `http://127.0.0.1:3000` 和 `http://localhost:3000`。`curl` 上传不经过 CORS。
 
 素材表在 API 或 Worker 第一次连上 Postgres 时创建，SQL 见 `packages/storage/migrations/001_assets.sql`。
 
