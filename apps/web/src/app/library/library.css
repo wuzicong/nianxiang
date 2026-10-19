@@ -2,6 +2,12 @@
    首页固定棉花糖；建册弹层里各主题卡自带 share-shell。悬停抬起 4px，与 hoverLift 一致。 */
 
 .lib {
+  --lib-duration-1: 80ms;
+  --lib-duration-2: 120ms;
+  --lib-duration-3: 180ms;
+  --lib-duration-4: 280ms;
+  --lib-ease-out: ease-out;
+
   position: relative;
   min-height: 100vh;
   color: var(--share-text);
@@ -352,6 +358,7 @@
   background: color-mix(in srgb, var(--share-surface) 86%, transparent);
   color: transparent;
   opacity: 0;
+  transform: scale(0.88);
   box-shadow: 0 4px 10px color-mix(in srgb, var(--share-text) 12%, transparent);
 }
 
@@ -359,6 +366,7 @@
 .lib-tile[aria-pressed="true"] .lib-check,
 .lib-tile:focus-visible .lib-check {
   opacity: 1;
+  transform: scale(1);
 }
 
 .lib-tile[aria-pressed="true"] .lib-check {
@@ -684,14 +692,90 @@ a.lib-primary {
     animation: lib-shimmer 1.6s ease-in-out infinite;
   }
 
+  .lib-check {
+    transition:
+      opacity var(--lib-duration-2) var(--lib-ease-out),
+      transform var(--lib-duration-2) var(--lib-ease-out);
+  }
+
   .lib-tile {
-    transition: transform 0.18s ease;
+    transition:
+      transform var(--lib-duration-3) var(--lib-ease-out),
+      opacity var(--lib-duration-2) var(--lib-ease-out);
+  }
+
+  .lib-tab,
+  .lib-primary,
+  .lib-quiet,
+  .lib-text-button,
+  .lib-nav a,
+  .lib-nav button,
+  .lib-select,
+  .lib-drawer-close {
+    transition:
+      transform var(--lib-duration-1) var(--lib-ease-out),
+      opacity var(--lib-duration-1) var(--lib-ease-out);
+  }
+
+  .lib-selection-bar-bottom {
+    animation: lib-selection-in var(--lib-duration-3) var(--lib-ease-out);
+  }
+
+  .lib-page-drop {
+    animation: lib-overlay-in var(--lib-duration-3) var(--lib-ease-out);
+  }
+
+  .lib-theme {
+    transition: transform var(--lib-duration-2) var(--lib-ease-out);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
   .lib-tile:hover {
     transform: translateY(-4px);
+  }
+
+  .lib-tile:active {
+    transform: translateY(-2px) scale(0.98);
+  }
+
+  .lib-tab:active,
+  .lib-primary:active:not(:disabled),
+  .lib-quiet:active:not(:disabled),
+  .lib-text-button:active,
+  .lib-nav a:active,
+  .lib-nav button:active,
+  .lib-select:active:not(:disabled),
+  .lib-drawer-close:active {
+    transform: scale(0.97);
+  }
+
+  .lib-theme:hover {
+    transform: translateY(-2px);
+  }
+
+  .lib-theme:active {
+    transform: translateY(0) scale(0.99);
+  }
+}
+
+@keyframes lib-selection-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lib-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -958,22 +1042,74 @@ a.lib-primary {
 .lib-drawer {
   border: 0;
   padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
   max-width: none;
   max-height: none;
   background: transparent;
+  overflow: hidden;
 }
 
 .lib-drawer::backdrop {
   background: color-mix(in srgb, var(--share-text) 35%, transparent);
+  opacity: 0;
+  transition: opacity var(--lib-duration-3) var(--lib-ease-out);
+  transition-behavior: allow-discrete;
+}
+
+.lib-drawer[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  .lib-drawer[open]::backdrop {
+    opacity: 0;
+  }
 }
 
 .lib-drawer-panel {
+  position: relative;
   width: min(420px, 100vw);
   max-height: 100vh;
+  min-height: 100%;
   margin-left: auto;
   padding: 1rem;
+  padding-top: 2.75rem;
   background: var(--share-bg);
   overflow: auto;
+  opacity: 0;
+  transform: translateX(100%);
+  transition:
+    transform var(--lib-duration-4) var(--lib-ease-out),
+    opacity var(--lib-duration-3) var(--lib-ease-out);
+}
+
+.lib-drawer[open] .lib-drawer-panel {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@starting-style {
+  .lib-drawer[open] .lib-drawer-panel {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.lib-drawer-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.75rem;
+  z-index: 2;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  color: var(--share-text);
+  background: color-mix(in srgb, var(--share-surface) 88%, transparent);
+  border: 1px solid var(--share-border);
 }
 
 .lib-skel-grid {
@@ -1128,7 +1264,7 @@ a.lib-primary {
 
 .lib-timeline-mobile {
   opacity: 0;
-  transition: opacity 120ms ease-out;
+  transition: opacity var(--lib-duration-2) var(--lib-ease-out);
 }
 
 .lib-timeline-mobile:has(.lib-timeline-bubble),
@@ -1173,11 +1309,11 @@ a.lib-primary {
   width: 100vw;
   height: 100dvh;
   color: color-mix(in srgb, var(--share-surface) 96%, var(--share-text));
-  animation: lib-lightbox-in 280ms ease-out;
+  animation: lib-lightbox-in var(--lib-duration-4) var(--lib-ease-out);
 }
 
 .lib-lightbox-inner[data-reduced="true"] {
-  animation: lib-lightbox-in-reduced 120ms ease-out;
+  animation: lib-lightbox-in-reduced var(--lib-duration-2) var(--lib-ease-out);
 }
 
 @keyframes lib-lightbox-in {
@@ -1251,7 +1387,7 @@ a.lib-primary {
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
-  transition: transform 120ms ease-out;
+  transition: transform var(--lib-duration-2) var(--lib-ease-out);
 }
 
 .lib-lightbox-inner[data-reduced="true"] .lib-lightbox-img {
@@ -1303,5 +1439,74 @@ a.lib-primary {
 
   .lib-lightbox-footer {
     grid-column: 1 / -1;
+  }
+}
+
+/* 图库 / 上传抽屉：减弱动效偏好时仅保留瞬时 opacity，不做位移 */
+@media (prefers-reduced-motion: reduce) {
+  .lib-skel {
+    animation: none;
+    background-position: 0 0;
+  }
+
+  .lib-tile,
+  .lib-check,
+  .lib-tab,
+  .lib-primary,
+  .lib-quiet,
+  .lib-text-button,
+  .lib-nav a,
+  .lib-nav button,
+  .lib-select,
+  .lib-theme,
+  .lib-drawer-close,
+  .lib-drawer::backdrop,
+  .lib-drawer-panel,
+  .lib-timeline-mobile,
+  .lib-lightbox-img {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  .lib-tile:hover,
+  .lib-tile:active,
+  .lib-theme:hover,
+  .lib-theme:active,
+  .lib-tab:active,
+  .lib-primary:active:not(:disabled),
+  .lib-quiet:active:not(:disabled),
+  .lib-text-button:active,
+  .lib-nav a:active,
+  .lib-nav button:active,
+  .lib-select:active:not(:disabled),
+  .lib-drawer-close:active {
+    transform: none;
+  }
+
+  .lib-selection-bar-bottom,
+  .lib-page-drop {
+    animation: lib-overlay-in-reduced 0.01ms ease-out;
+  }
+
+  .lib-drawer-panel {
+    transform: none;
+    opacity: 1;
+  }
+
+  .lib-drawer::backdrop {
+    opacity: 1;
+  }
+
+  .lib-lightbox-inner {
+    animation: lib-lightbox-in-reduced 0.01ms ease-out;
+  }
+}
+
+@keyframes lib-overlay-in-reduced {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 1;
   }
 }
