@@ -109,4 +109,5 @@
 | 刀 | 规格 | Steal | 表面 |
 |---|---|---|---|
 | **网格 chrome：半透顶栏 + 选中描边** | [`docs/design/library-grid-chrome.md`](../library-grid-chrome.md)（终稿） | stealbook **#2** · Glass / VSCO / Glow Up | `/library` sticky 顶栏 · Tabs · selection ring（禁色洗） |
+| **网格缝隙：gapless / hairline · 禁投影墙** | [`docs/design/library-grid-gaps.md`](../library-grid-gaps.md)（终稿） | stealbook **#9** · VSCO Studio / Frame.io density | `/library` 组内 2/4/6 · 组间呼吸 · 缩略零外投影 |
 | **三主题纹理：噪点 / 纸纹 / 金线薄规** | [`docs/design/theme-textures.md`](../theme-textures.md)（终稿） | stealbook **#5** · Canva Texture Check / Paper Shaders | unlock locked 三皮 + 空库 cotton grain；OOS album-preview #8 |
