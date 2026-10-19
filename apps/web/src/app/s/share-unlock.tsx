@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { parsePublicSharePayload, type PublicSharePayload } from "../../lib/share";
+import { parsePublicSharePayload, UNLOCK_FAILED, UNLOCK_RATE_LIMIT, type PublicSharePayload } from "../../lib/share";
 import { themeSkin, type ThemeSkin } from "../../lib/themes";
 import { ShareGallery } from "./share-gallery";
 import { ShareChrome } from "./share-chrome";
 
-const FAILED = "无法打开分享。请确认密码；链接撤销或过期时也是这句话。";
 const HINT = "输入密码后才能查看照片。";
 
-function feedbackFor(message: string): "hint" | "pending" | "error" {
+function feedbackFor(message: string): "hint" | "pending" | "error" | "limited" {
   if (message === HINT) return "hint";
   if (message === "正在打开…") return "pending";
+  if (message === UNLOCK_RATE_LIMIT) return "limited";
   return "error";
 }
 
@@ -21,8 +21,10 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
   const [pending, setPending] = useState(false);
   const [share, setShare] = useState<PublicSharePayload | null>(null);
 
+  const limited = message === UNLOCK_RATE_LIMIT;
+
   async function unlock() {
-    if (pending) return;
+    if (pending || limited) return;
     setPending(true);
     setMessage("正在打开…");
     try {
@@ -34,8 +36,12 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
         body: JSON.stringify({ password }),
       });
       const text = await response.text();
+      if (response.status === 429) {
+        setMessage(UNLOCK_RATE_LIMIT);
+        return;
+      }
       if (!response.ok) {
-        setMessage(FAILED);
+        setMessage(UNLOCK_FAILED);
         return;
       }
       let parsed: PublicSharePayload | null = null;
@@ -99,12 +105,13 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
           minLength={8}
           maxLength={128}
           required
+          disabled={pending || limited}
           value={password}
           aria-describedby="share-feedback"
           onChange={(event) => setPassword(event.target.value)}
         />
-        <button type="submit" disabled={pending}>
-          {pending ? "正在打开…" : "打开"}
+        <button type="submit" disabled={pending || limited} data-share-submit={limited ? "limited" : "ready"}>
+          {limited ? "请稍后再试" : pending ? "正在打开…" : "打开"}
         </button>
       </form>
       <p id="share-feedback" className="share-note" role="status" data-share-feedback={feedback}>

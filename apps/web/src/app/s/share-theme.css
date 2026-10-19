@@ -284,13 +284,15 @@
 
 .share-shell[data-theme="cotton-candy"] .share-form input,
 .share-shell[data-theme="cotton-candy"] .share-form button,
-.share-shell[data-theme="cotton-candy"] .share-note[data-share-feedback="error"] {
+.share-shell[data-theme="cotton-candy"] .share-note[data-share-feedback="error"],
+.share-shell[data-theme="cotton-candy"] .share-note[data-share-feedback="limited"] {
   border-radius: var(--share-radius-pill);
 }
 
 .share-shell[data-theme="magazine-heirloom"] .share-form input,
 .share-shell[data-theme="magazine-heirloom"] .share-form button,
-.share-shell[data-theme="magazine-heirloom"] .share-note[data-share-feedback="error"] {
+.share-shell[data-theme="magazine-heirloom"] .share-note[data-share-feedback="error"],
+.share-shell[data-theme="magazine-heirloom"] .share-note[data-share-feedback="limited"] {
   border-radius: var(--share-radius-button);
 }
 
@@ -319,6 +321,10 @@
   opacity: 0.58;
 }
 
+.share-form button[data-share-submit="limited"]:disabled {
+  cursor: not-allowed;
+}
+
 .share-form input:focus-visible,
 .share-form button:focus-visible,
 .share-brand a:focus-visible {
@@ -337,6 +343,14 @@
   padding: 0.8rem 0.95rem 0.8rem 1rem;
   background: color-mix(in srgb, var(--share-accent) 18%, var(--share-surface));
   box-shadow: inset 3px 0 0 var(--share-accent);
+}
+
+.share-note[data-share-feedback="limited"] {
+  color: var(--share-text);
+  border: 1.5px solid var(--share-border);
+  border-radius: var(--share-radius-button);
+  padding: 0.8rem 0.95rem;
+  background: color-mix(in srgb, var(--share-bg) 72%, var(--share-surface));
 }
 
 .share-noscript {

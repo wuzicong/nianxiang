@@ -3,7 +3,7 @@
  *
  * 注册 / 登录 → 建相册 → 上传 3 张图 → 等衍生图 → 打开成册预览 →
  * 创建带密码分享 → 无痕打开 /s/<token> → 错密码 401 → 对密码看到衍生图 →
- * 撤销后 404。
+ * 撤销后 404。分享页和解锁遇到 429 时是「请求太频繁」，不是不存在，也不是 FAILED。
  *
  * 预览页、分享页和公开接口里不能出现 /originals/、EXIF 或明文密码。
  * 应用日志里不能出现明文分享令牌、会话令牌或密码。
@@ -201,6 +201,21 @@ function assertLocked(body, themeId, title) {
   }
   if (body.themeId !== themeId) throw new Error("locked share theme drifted");
   if (JSON.stringify(body).includes(title)) throw new Error("locked share leaked the album");
+}
+
+function assertRateLimitedSharePage(response, visible) {
+  if (!response || response.status() === 404) {
+    throw new Error(`share page 429 branch status ${response?.status() ?? "none"} (not-found)`);
+  }
+  if (response.status() !== 200) {
+    throw new Error(`share page 429 branch status ${response.status()}`);
+  }
+  if (!visible.includes("请求太频繁") || !visible.includes("请稍后再试")) {
+    throw new Error("share page 429 copy drifted");
+  }
+  for (const banned of ["分享不存在", "链接无效", "无法打开分享", "相册不存在"]) {
+    if (visible.includes(banned)) throw new Error(`share page 429 copy looks like ${banned}`);
+  }
 }
 
 function assertUnavailable(body, title) {
@@ -430,6 +445,78 @@ async function main() {
     assertSurface("challenge", await guestPage.content(), [sharePassword, accountPassword, title]);
     await snap(guestPage, "smoke-challenge.png");
     say("challenge shown");
+
+    const limitedContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const limitedPage = await limitedContext.newPage();
+    pages.push(limitedPage);
+    limitedPage.setDefaultTimeout(20_000);
+    watch(limitedPage);
+    const limitedUrl = new URL(linkValue);
+    limitedUrl.searchParams.set("smokeRateLimit", "429");
+    const limitedDoc = await limitedPage.goto(limitedUrl.toString());
+    const limitedMain = limitedPage.locator('main[data-share-state="limited"]');
+    try {
+      await limitedMain.waitFor({ timeout: 15_000 });
+    } catch {
+      const heading = await limitedPage.getByRole("heading").innerText().catch(() => "");
+      throw new Error(
+        `share page 429 branch missing (${heading || "no heading"}). next dev accepts ?smokeRateLimit=429; next start needs MEMORA_SHARE_STATUS_HOOK=1`,
+      );
+    }
+    const limitedState = await limitedMain.getAttribute("data-share-state");
+    if (limitedState !== "limited") throw new Error(`share page 429 state ${limitedState ?? "none"}`);
+    const limitedVisible = [
+      await limitedMain.getByRole("heading").innerText(),
+      await limitedMain.locator(".share-copy").innerText(),
+    ].join("\n");
+    assertRateLimitedSharePage(limitedDoc, limitedVisible);
+    assertSurface("rate limited page", limitedVisible, [sharePassword, accountPassword, title]);
+    await snap(limitedPage, "smoke-rate-limit.png");
+    await limitedContext.close();
+    say("share page 429 is rate limited");
+
+    await guestPage.setViewportSize({ width: 390, height: 844 });
+    await guestPage.route("**/api/v1/public/shares/*/unlock", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 429,
+        contentType: "text/plain; charset=utf-8",
+        body: "请稍后再试",
+      });
+    });
+    const limitedUnlockWait = guestPage.waitForResponse(
+      (response) => response.url().includes("/unlock") && response.request().method() === "POST",
+    );
+    await guestPage.locator("#share-password").fill(sharePassword);
+    await guestPage.getByRole("button", { name: "打开" }).click();
+    const limitedUnlock = await limitedUnlockWait;
+    if (limitedUnlock.status() !== 429) {
+      throw new Error(`unlock 429 branch status ${limitedUnlock.status()}`);
+    }
+    const limitedFeedback = guestPage.locator('#share-feedback[data-share-feedback="limited"]');
+    await limitedFeedback.waitFor();
+    const limitedUnlockText = await limitedFeedback.innerText();
+    if (limitedUnlockText.includes("无法打开分享")) throw new Error("unlock 429 showed FAILED");
+    if (!limitedUnlockText.includes("请求太频繁") || !limitedUnlockText.includes("每分钟 6 次")) {
+      throw new Error("unlock 429 copy drifted");
+    }
+    if (!limitedUnlockText.includes("不要连续点击")) throw new Error("unlock 429 copy invites another click");
+    if (await guestPage.locator('button[data-share-submit="limited"]').isEnabled()) {
+      throw new Error("unlock 429 still accepts another click");
+    }
+    if (await guestPage.locator("#share-password").isEnabled()) {
+      throw new Error("unlock 429 still accepts another password");
+    }
+    assertSurface("rate limited unlock", limitedUnlockText, [sharePassword, accountPassword]);
+    await snap(guestPage, "smoke-unlock-limited.png");
+    await guestPage.unroute("**/api/v1/public/shares/*/unlock");
+    await guestPage.setViewportSize({ width: 1280, height: 800 });
+    await guestPage.reload();
+    await guestPage.getByRole("heading", { name: "这本相册需要密码" }).waitFor();
+    say("unlock 429 is rate limited");
 
     const wrongPassword = `${sharePassword}no`;
     notePassword(wrongPassword);
