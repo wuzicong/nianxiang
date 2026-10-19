@@ -3,6 +3,7 @@
  * 需要 API、Worker、Postgres、Redis、MinIO 已经起来。不打印预签名 URL。
  */
 import { randomBytes } from "node:crypto";
+import { DERIVATIVE_SIZES, derivativeObjectKey } from "../packages/shared/dist/index.js";
 import {
   createObjectStore,
   objectStoreConfigFromRuntime,
@@ -17,6 +18,15 @@ const png = Buffer.from(
 
 function redact(text) {
   return String(text).replace(/\?[^\s]*/g, "?***").slice(0, 300);
+}
+
+function userIdFromUploadKey(key, assetId) {
+  const prefix = "users/";
+  const suffix = `/originals/${assetId}`;
+  if (typeof key !== "string" || !key.startsWith(prefix) || !key.endsWith(suffix)) return null;
+  const userId = key.slice(prefix.length, key.length - suffix.length);
+  if (!userId || userId.includes("/")) return null;
+  return userId;
 }
 
 function cookiePair(response) {
@@ -135,6 +145,26 @@ if (!asset || asset.status !== "ready") {
   process.exit(1);
 }
 
+const assetText = JSON.stringify(asset);
+if (
+  asset.key ||
+  asset.storageKey ||
+  asset.exif ||
+  asset.derivatives ||
+  assetText.includes("/originals/") ||
+  assetText.includes("hasGps") ||
+  assetText.includes('"exif"')
+) {
+  console.error("[verify] asset read leaked a storage key or exif");
+  process.exit(1);
+}
+
+const userId = userIdFromUploadKey(upload.key, upload.assetId);
+if (!userId) {
+  console.error("[verify] upload key is not an original object key");
+  process.exit(1);
+}
+
 const runtime = loadRuntimeConfig();
 const anonymousOriginal = await fetch(
   `${runtime.s3.endpoint.replace(/\/$/, "")}/${runtime.s3.bucket}/${upload.key}`,
@@ -147,7 +177,8 @@ if (anonymousOriginal.status === 200) {
 
 const objects = createObjectStore(objectStoreConfigFromRuntime(runtime));
 const bytes = {};
-for (const [size, key] of Object.entries(asset.derivatives ?? {})) {
+for (const size of DERIVATIVE_SIZES) {
+  const key = derivativeObjectKey(userId, upload.assetId, size);
   const head = await objects.head(key);
   if (!head || head.contentLength < 1) {
     console.error(`[verify] missing derivative ${size} key=${key}`);
@@ -175,7 +206,7 @@ const summary = {
   expiresAt: upload.expiresAt,
   status: asset.status,
   derivatives: bytes,
-  exif: asset.exif,
+  takenAt: asset.takenAt ?? null,
   anonymousOriginal: anonymousOriginal.status,
 };
 console.log(JSON.stringify(summary));

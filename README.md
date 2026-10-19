@@ -149,9 +149,9 @@ pnpm dev:worker
 pnpm verify:upload
 ```
 
-脚本会先确认未登录是 401，再注册一个一次性用户、申请 `PUT` 预签名、把一张 1×1 PNG 传到 `memora-local`、调用完成接口，然后轮询到 `ready`。它只打印 asset id、对象键、过期时间和衍生图字节数，**不打印带签名的 URL，也不打印密码或会话令牌**。
+脚本会先确认未登录是 401，再注册一个一次性用户、申请 `PUT` 预签名、把一张 1×1 PNG 传到 `memora-local`、调用完成接口，然后轮询到 `ready`。它只打印 asset id、上传时的对象键、过期时间、拍摄时间和衍生图字节数，**不打印带签名的 URL，也不打印密码或会话令牌**。
 
-`mime` 只接受 jpeg / png / webp / gif，`size` 默认不超过 25 MiB。请求体里的 `userId` 会被忽略。完成接口确认对象大小和类型与申请一致后，入队 `media.derivative` 和 `meta.exif`。Worker 写出 `thumb.webp`、`preview.webp`、`hero.webp`。衍生图失败按指数退避最多 3 次（起点 2 秒）；素材不存在或任务参数对不上则不再重试。最终失败把 `assets.status` 写成 `failed`，`assets.error` 只留稳定错误码（例如 `render_failed`），日志带 `code=`。读取接口不返回 GPS 坐标。
+`mime` 只接受 jpeg / png / webp / gif，`size` 默认不超过 25 MiB。请求体里的 `userId` 会被忽略。完成接口确认对象大小和类型与申请一致后，入队 `media.derivative` 和 `meta.exif`。Worker 写出 `thumb.webp`、`preview.webp`、`hero.webp`。衍生图失败按指数退避最多 3 次（起点 2 秒）；素材不存在或任务参数对不上则不再重试。最终失败把 `assets.status` 写成 `failed`，`assets.error` 只留稳定错误码（例如 `render_failed`），日志带 `code=`。读取接口不返回原图键、EXIF 或 GPS，只给短时签名的衍生图和拍摄时间。
 
 ## 本地验证登录
 
