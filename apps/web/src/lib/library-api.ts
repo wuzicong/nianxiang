@@ -1,9 +1,7 @@
 import { visibleMessage } from "./album-assets";
 import { apiMessage, parseJsonResponse, type ApiErrorBody } from "./api-client";
-import { createAlbum } from "./albums-api";
+import { albumAssetClientMessage, attachAlbumAssets, createAlbum } from "./albums-api";
 import {
-  batchIds,
-  LIBRARY_ASSET_BATCH,
   LIBRARY_SELECTION_LIMIT,
   parseLibraryPayload,
   safeAlbumId,
@@ -44,8 +42,8 @@ export async function listLibrary(
 }
 
 /**
- * 图库建册：createAlbum({ title, themeId, assetIds })。
- * 关联资产仍走 POST /api/v1/albums/:id/assets（见 albums-api.ts）。
+ * 图库建册：createAlbum({ title, themeId, assetIds }) 一次原子建册。
+ * 已有空册补挂时走 attachAlbumAssets（分批 POST .../assets）。
  */
 export async function createThemedAlbum(
   input: { title: string; themeId: string; assetIds: readonly string[]; albumId?: string | null },
@@ -82,13 +80,15 @@ export async function createThemedAlbum(
     return { ok: true, albumId: created.album.albumId };
   }
 
-  for (const chunk of batchIds(assetIds, LIBRARY_ASSET_BATCH)) {
-    const added = await postJson(fetchImpl, `/api/v1/albums/${encodeURIComponent(albumId)}/assets`, {
-      assetIds: chunk,
-    });
-    if (!added.ok) {
-      return { ok: false, status: added.status, message: added.message, albumId, attachFailed: true };
-    }
+  const attached = await attachAlbumAssets(albumId, assetIds, { fetchImpl });
+  if (!attached.ok) {
+    return {
+      ok: false,
+      status: attached.status,
+      message: attached.message,
+      albumId: attached.albumId,
+      attachFailed: attached.attachFailed,
+    };
   }
   return { ok: true, albumId };
 }
@@ -115,7 +115,7 @@ async function postJson(
     return {
       ok: false,
       status: response.status,
-      message: visibleMessage(apiMessage(parsed), "请求失败"),
+      message: albumAssetClientMessage(response.status, parsed),
     };
   }
   return { ok: true, body: parsed };

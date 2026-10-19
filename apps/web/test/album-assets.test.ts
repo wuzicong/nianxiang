@@ -127,7 +127,8 @@ test("upload uses the presign flow and does not return or echo the signed url", 
 
   assert.deepEqual(result, { ok: true, assetId: "asset1" });
   assert.equal(JSON.stringify(result).includes("supersecret"), false);
-  assert.deepEqual(phases, ["request", "put", "complete", "attach"]);
+  assert.deepEqual(phases, ["request", "put", "complete"]);
+  assert.equal(calls.length, 3);
   assert.equal(calls[0]?.init?.credentials, "include");
   assert.equal(calls[1]?.url, signed);
   assert.equal(calls[1]?.init?.credentials, "omit");
@@ -137,11 +138,46 @@ test("upload uses the presign flow and does not return or echo the signed url", 
   assert.equal(putHeaders["Content-Length"], undefined);
   assert.equal(putHeaders.Cookie, undefined);
   assert.equal(calls[2]?.init?.credentials, "include");
-  assert.equal(calls[3]?.init?.credentials, "include");
-  assert.equal(calls[0]?.init?.body, JSON.stringify({ filename: "pixel.png", mime: "image/png", size: png.size }));
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), {
+    filename: "pixel.png",
+    mime: "image/png",
+    size: png.size,
+    albumId: "album-1",
+  });
   assert.equal(String(calls[0]?.init?.body).includes("userId"), false);
   assert.equal(calls[2]?.init?.body, "{}");
-  assert.deepEqual(JSON.parse(String(calls[3]?.init?.body)), { assetIds: ["asset1"] });
+});
+
+test("library upload omits albumId on upload-url", async () => {
+  const png = new Blob([Uint8Array.from([1, 2, 3, 4])], { type: "image/png" });
+  const signed = "http://127.0.0.1:9000/memora-local/users/owner/originals/lib1?X-Amz-Signature=supersecret";
+  const grantBodies: string[] = [];
+  const fetchImpl = async (url: string, init?: RequestInit) => {
+    if (url === "/api/v1/assets/upload-url") {
+      grantBodies.push(String(init?.body ?? ""));
+      return Response.json({
+        assetId: "lib1",
+        url: signed,
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+      }, { status: 201 });
+    }
+    if (url === signed) return new Response(null, { status: 200 });
+    if (url === "/api/v1/assets/lib1/complete") {
+      return Response.json({ assetId: "lib1", status: "uploaded" });
+    }
+    throw new Error(`unexpected ${url}`);
+  };
+  const result = await uploadPhotoToAlbum(
+    { filename: "pixel.png", mime: "image/png", body: png },
+    { fetchImpl },
+  );
+  assert.deepEqual(result, { ok: true, assetId: "lib1" });
+  assert.deepEqual(JSON.parse(grantBodies[0] ?? "{}"), {
+    filename: "pixel.png",
+    mime: "image/png",
+    size: png.size,
+  });
 });
 
 test("failed upload messages omit the presigned url", async () => {
@@ -207,9 +243,6 @@ test("upload retries presign when the signed PUT expires", async () => {
     if (url === signedB) return new Response(null, { status: 200 });
     if (url === "/api/v1/assets/asset-b/complete") {
       return Response.json({ assetId: "asset-b", status: "uploaded" });
-    }
-    if (url === "/api/v1/albums/album-1/assets") {
-      return Response.json({ albumId: "album-1", assetIds: ["asset-b"] });
     }
     throw new Error(`unexpected ${url}`);
   };

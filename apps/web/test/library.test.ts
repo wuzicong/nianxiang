@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ALBUM_ASSET_UNAVAILABLE } from "../src/lib/albums-api";
 import { createThemedAlbum } from "../src/lib/library-api";
 import {
   applyPhotoSelection,
@@ -232,7 +233,7 @@ test("album title and asset order follow the calendar", () => {
   assert.deepEqual(flattenGroupIds(groups), ["new", "old"]);
 });
 
-test("create themed album reuses the album APIs and chunks asset ids", async () => {
+test("create themed album posts assetIds atomically on create", async () => {
   const calls: { url: string; body: string }[] = [];
   const ids = Array.from({ length: 60 }, (_, index) => `p${index}`);
   const fetchImpl = async (url: string, init?: RequestInit) => {
@@ -250,15 +251,14 @@ test("create themed album reuses the album APIs and chunks asset ids", async () 
     { fetchImpl },
   );
   assert.deepEqual(created, { ok: true, albumId: "album-1" });
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 1);
   assert.equal(calls[0]?.url, "/api/v1/albums");
   assert.equal(calls[0]?.body.includes("userId"), false);
-  assert.deepEqual(JSON.parse(calls[0]?.body ?? "{}"), {
-    title: "2024年5月1日",
-    themeId: "kyoto-lantern",
-  });
-  assert.equal(JSON.parse(calls[1]?.body ?? "{}").assetIds.length, 50);
-  assert.equal(JSON.parse(calls[2]?.body ?? "{}").assetIds.length, 10);
+  const body = JSON.parse(calls[0]?.body ?? "{}") as { title: string; themeId: string; assetIds: string[] };
+  assert.deepEqual(
+    { title: body.title, themeId: body.themeId, count: body.assetIds.length },
+    { title: "2024年5月1日", themeId: "kyoto-lantern", count: 60 },
+  );
 
   const retryCalls: string[] = [];
   const failed = await createThemedAlbum(
@@ -273,6 +273,7 @@ test("create themed album reuses the album APIs and chunks asset ids", async () 
   assert.equal(failed.ok, false);
   if (!failed.ok) {
     assert.equal(failed.albumId, "album-1");
+    assert.equal(failed.message, ALBUM_ASSET_UNAVAILABLE);
     assert.equal(failed.message.includes("supersecret"), false);
   }
   assert.deepEqual(retryCalls, ["/api/v1/albums/album-1/assets"]);
