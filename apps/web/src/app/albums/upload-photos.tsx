@@ -17,6 +17,27 @@ import "./album-upload.css";
 
 type QueueStatus = "waiting" | "uploading" | "processing" | "done" | "failed";
 
+export type UploadQueueSnapshot = {
+  waiting: number;
+  uploading: number;
+  processing: number;
+  done: number;
+  failed: number;
+  total: number;
+  hasActive: boolean;
+};
+
+export function uploadQueueSnapshot(entries: { status: QueueStatus }[]): UploadQueueSnapshot {
+  const waiting = entries.filter((e) => e.status === "waiting").length;
+  const uploading = entries.filter((e) => e.status === "uploading").length;
+  const processing = entries.filter((e) => e.status === "processing").length;
+  const done = entries.filter((e) => e.status === "done").length;
+  const failed = entries.filter((e) => e.status === "failed").length;
+  const total = entries.length;
+  const hasActive = waiting + uploading + processing > 0;
+  return { waiting, uploading, processing, done, failed, total, hasActive };
+}
+
 type QueueEntry = {
   id: string;
   file: File;
@@ -72,6 +93,7 @@ export function UploadPhotos({
   albumEmpty,
   onUploaded,
   embedded,
+  onQueueSnapshot,
 }: {
   target: UploadPhotosTarget;
   theme: ThemeSkin;
@@ -80,6 +102,7 @@ export function UploadPhotos({
   onUploaded: () => void;
   /** 图库抽屉内嵌时隐藏二级标题，保留拖放区与队列。 */
   embedded?: boolean;
+  onQueueSnapshot?: (snapshot: UploadQueueSnapshot) => void;
 }) {
   const albumId = target.kind === "album" ? target.albumId : undefined;
   const libraryMode = target.kind === "library";
@@ -185,6 +208,10 @@ export function UploadPhotos({
     if (running) return;
     refreshSummary();
   }, [queue, running, libraryMode]);
+
+  useEffect(() => {
+    onQueueSnapshot?.(uploadQueueSnapshot(queue));
+  }, [queue, onQueueSnapshot]);
 
   const uploadOne = useCallback(
     async (entry: QueueEntry) => {

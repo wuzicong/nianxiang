@@ -237,56 +237,56 @@
 }
 
 /* 图库上传抽屉：仅 opacity / transform 状态过渡（时长继承 .lib --lib-duration-*） */
-.lib-drawer .album-upload-dropzone {
+.lib-upload-workbench .album-upload-dropzone {
   transition:
     transform var(--lib-duration-3, 180ms) ease-out,
     opacity var(--lib-duration-2, 120ms) ease-out;
 }
 
-.lib-drawer .album-upload-dropzone[data-drag="true"] {
+.lib-upload-workbench .album-upload-dropzone[data-drag="true"] {
   transform: scale(1.01);
   opacity: 0.96;
 }
 
-.lib-drawer .album-upload-btn,
-.lib-drawer .album-upload-queue-tools button {
+.lib-upload-workbench .album-upload-btn,
+.lib-upload-workbench .album-upload-queue-tools button {
   transition:
     transform var(--lib-duration-1, 80ms) ease-out,
     opacity var(--lib-duration-1, 80ms) ease-out;
 }
 
-.lib-drawer .album-upload-btn:active:not(:disabled),
-.lib-drawer .album-upload-queue-tools button:active {
+.lib-upload-workbench .album-upload-btn:active:not(:disabled),
+.lib-upload-workbench .album-upload-queue-tools button:active {
   transform: scale(0.97);
 }
 
-.lib-drawer .album-upload-queue-item {
+.lib-upload-workbench .album-upload-queue-item {
   transition: opacity var(--lib-duration-2, 120ms) ease-out;
 }
 
-.lib-drawer .album-upload-queue-item[data-upload-state="uploading"] {
+.lib-upload-workbench .album-upload-queue-item[data-upload-state="uploading"] {
   opacity: 0.92;
 }
 
-.lib-drawer .album-upload-progress > span {
+.lib-upload-workbench .album-upload-progress > span {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lib-drawer .album-upload-dropzone,
-  .lib-drawer .album-upload-btn,
-  .lib-drawer .album-upload-queue-tools button,
-  .lib-drawer .album-upload-queue-item {
+  .lib-upload-workbench .album-upload-dropzone,
+  .lib-upload-workbench .album-upload-btn,
+  .lib-upload-workbench .album-upload-queue-tools button,
+  .lib-upload-workbench .album-upload-queue-item {
     transition-duration: 0.01ms !important;
   }
 
-  .lib-drawer .album-upload-dropzone[data-drag="true"] {
+  .lib-upload-workbench .album-upload-dropzone[data-drag="true"] {
     transform: none;
     opacity: 1;
   }
 
-  .lib-drawer .album-upload-btn:active:not(:disabled),
-  .lib-drawer .album-upload-queue-tools button:active {
+  .lib-upload-workbench .album-upload-btn:active:not(:disabled),
+  .lib-upload-workbench .album-upload-queue-tools button:active {
     transform: none;
   }
 }
