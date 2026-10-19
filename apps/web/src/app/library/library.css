@@ -1,6 +1,7 @@
 /* 照片库：色板与圆角仅走 share-shell 注入的 --share-*（见 shareThemeStyle）。
    首页固定棉花糖；建册弹层里各主题卡自带 share-shell。
-   网格悬停：Linear 式不位移，仅照片层 opacity/scale（见 NOTES-motion-media）。 */
+   时间轴网格缝/禁投影：docs/design/library-grid-gaps.md（steal #9）。
+   网格悬停：无位移/scale，仅照片层 opacity/brightness（120ms）。 */
 
 .lib {
   --lib-duration-1: 80ms;
@@ -334,10 +335,11 @@
   position: relative;
   display: block;
   padding: 0;
+  margin: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 18px;
-  background: var(--share-surface);
+  border-radius: 2px;
+  background: transparent;
   box-shadow: none;
   color: inherit;
   cursor: pointer;
@@ -363,10 +365,9 @@
 .lib-placeholder {
   display: grid;
   place-items: center;
-  padding: 0.7rem;
+  padding: 0.35rem;
   text-align: center;
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--share-brand) 70%, white), color-mix(in srgb, var(--share-secondary) 45%, white));
+  background: color-mix(in srgb, var(--share-border) 40%, transparent);
   font-size: 0.82rem;
 }
 
@@ -780,10 +781,6 @@ a.lib-primary {
       transform var(--lib-duration-2) var(--lib-ease-out);
   }
 
-  .lib-tile {
-    transition: transform var(--lib-duration-1) var(--lib-ease-out);
-  }
-
   .lib-tile img,
   .lib-placeholder {
     transition:
@@ -826,10 +823,6 @@ a.lib-primary {
   .lib-tile:hover .lib-placeholder {
     opacity: 0.92;
     filter: brightness(0.97);
-  }
-
-  .lib-tile:active {
-    transform: scale(0.98);
   }
 
   .lib-tile:active img,
@@ -958,6 +951,8 @@ a.lib-primary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px;
+  margin: 0;
+  background: var(--share-bg);
 }
 
 @media (min-width: 768px) {
@@ -994,6 +989,27 @@ a.lib-primary {
 .lib-month-block,
 .lib-day-block {
   position: relative;
+}
+
+/* 组间呼吸：mobile 16 / tablet 20 / desktop 24（§3.2） */
+.lib-day-block {
+  margin-bottom: 16px;
+}
+
+.lib-day-block:last-child {
+  margin-bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .lib-day-block {
+    margin-bottom: 20px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .lib-day-block {
+    margin-bottom: 24px;
+  }
 }
 
 .lib-sticky-year,
@@ -1043,7 +1059,7 @@ a.lib-primary {
   gap: 0.5rem;
   font-size: 0.88rem;
   color: var(--share-muted);
-  padding: 0.25rem 0 0.45rem;
+  padding: 0.25rem 0 0.375rem;
 }
 
 .lib-sticky-day h3 {
