@@ -500,7 +500,7 @@ docker compose -f compose.prod.yml exec -T caddy ls -la /data/caddy
 
 #### 备份目录权限
 
-现象：跑 `deploy/self-host/backup.sh` 时 `mkdir` 或 `chmod` 报 permission denied，目录里没有新的 `manifest-*.txt`。
+现象：跑 `deploy/self-host/backup.sh` 时 `mkdir` 报 permission denied，或 `chmod` 报 Operation not permitted，目录里没有新的 `manifest-*.txt`。
 
 检查：`MEMORA_BACKUP_DIR` 默认 `/var/backups/memora`，和「做一次备份」里的 `BACKUP_DIR` 是同一条路径。目录 `700`，dump `600`。脚本 `umask 077`，并自己 `chmod`。父目录不可写，或目录属主不是当前用户时，这一步会失败。
 
