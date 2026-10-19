@@ -113,3 +113,5 @@
 | **相册侧栏 push** | [`docs/design/album-preview-sidebar-push-oos.md`](../album-preview-sidebar-push-oos.md)（**W6 OOS**） | stealbook **#7** 可选 | 不进 W6；#50 已覆盖呼吸/zoom |
 | **网格缝隙：gapless / hairline · 禁投影墙** | [`docs/design/library-grid-gaps.md`](../library-grid-gaps.md)（终稿） | stealbook **#9** · VSCO Studio / Frame.io density | `/library` 组内 2/4/6 · 组间呼吸 · 缩略零外投影 |
 | **三主题纹理：噪点 / 纸纹 / 金线薄规** | [`docs/design/theme-textures.md`](../theme-textures.md)（终稿） | stealbook **#5** · Canva Texture Check / Paper Shaders | unlock locked 三皮 + 空库 cotton grain；OOS album-preview #8 |
+
+- [成册预览 CTA 文案/层级](../album-preview-cta.md) — W6 单主动词「生成分享链接」+ 次级文字链
