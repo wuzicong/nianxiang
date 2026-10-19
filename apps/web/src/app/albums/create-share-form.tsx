@@ -77,8 +77,11 @@ export function CreateShareForm({
 
   const expiresMin = useMemo(() => localDatetimeMin(), []);
 
+  const sharePath = issued ? `${issued.path}?t=${encodeURIComponent(theme.id)}` : "";
   const shareUrl =
-    issued && typeof window !== "undefined" ? `${window.location.origin}${issued.path}` : issued?.path ?? "";
+    issued && typeof window !== "undefined"
+      ? `${window.location.origin}${sharePath}`
+      : sharePath;
 
   async function copyShareLink() {
     if (!shareUrl) return;
