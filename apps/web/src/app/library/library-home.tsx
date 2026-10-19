@@ -26,12 +26,13 @@ import {
 import { generateMockLibraryPhotos } from "../../lib/library-mock";
 import { LibraryDecor } from "../../lib/library-decor";
 import { themeSkin } from "../../lib/themes";
-import { UploadPhotos } from "../albums/upload-photos";
 import "../albums/album-upload.css";
 import { shareThemeStyle } from "../s/share-chrome";
 import { defaultComposeTitle, LibraryCreateDialog } from "./library-create-dialog";
 import { LibraryGrid } from "./library-grid";
 import { LibraryLightbox } from "./library-lightbox";
+import { LibraryUploadWorkbench } from "./library-upload-workbench";
+import type { UploadQueueSnapshot } from "../albums/upload-photos";
 
 type Phase = "loading" | "guest" | "error" | "ready";
 type Tab = "time" | "place" | "scene" | "people";
@@ -71,7 +72,15 @@ export function LibraryHome({
 }) {
   const router = useRouter();
   const uploadTriggerRef = useRef<HTMLButtonElement>(null);
-  const uploadDialogRef = useRef<HTMLDialogElement>(null);
+  const uploadQueueRef = useRef<UploadQueueSnapshot>({
+    waiting: 0,
+    uploading: 0,
+    processing: 0,
+    done: 0,
+    failed: 0,
+    total: 0,
+    hasActive: false,
+  });
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("照片暂时没加载出来。");
   const [email, setEmail] = useState<string | null>(null);
@@ -93,7 +102,8 @@ export function LibraryHome({
   const [createError, setCreateError] = useState<string | null>(null);
   const [draftAlbumId, setDraftAlbumId] = useState<string | null>(null);
   const [draftIds, setDraftIds] = useState<string[] | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadWorkbenchOpen, setUploadWorkbenchOpen] = useState(false);
+  const [uploadCollapsed, setUploadCollapsed] = useState(false);
   const [pageDrag, setPageDrag] = useState(false);
   const [offline, setOffline] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -156,12 +166,16 @@ export function LibraryHome({
     void load("initial");
   }, [load]);
 
-  useEffect(() => {
-    const dialog = uploadDialogRef.current;
-    if (!dialog) return;
-    if (uploadOpen && !dialog.open) dialog.showModal();
-    if (!uploadOpen && dialog.open) dialog.close();
-  }, [uploadOpen]);
+  const openUploadWorkbench = useCallback(() => {
+    setUploadWorkbenchOpen(true);
+    setUploadCollapsed(false);
+  }, []);
+
+  const dismissUploadWorkbench = useCallback(() => {
+    setUploadWorkbenchOpen(false);
+    setUploadCollapsed(false);
+    uploadTriggerRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (phase !== "ready") return;
@@ -224,9 +238,14 @@ export function LibraryHome({
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       if (event.key === "u" || event.key === "U") {
         event.preventDefault();
-        setUploadOpen(true);
+        openUploadWorkbench();
       }
       if (event.key !== "Escape" || composerOpen) return;
+      if (uploadWorkbenchOpen && !uploadCollapsed) {
+        event.preventDefault();
+        setUploadCollapsed(true);
+        return;
+      }
       if (lightboxId) {
         event.preventDefault();
         closeLightbox();
@@ -240,7 +259,16 @@ export function LibraryHome({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeLightbox, composerOpen, lightboxId, selecting, selected.length]);
+  }, [
+    closeLightbox,
+    composerOpen,
+    lightboxId,
+    openUploadWorkbench,
+    selecting,
+    selected.length,
+    uploadCollapsed,
+    uploadWorkbenchOpen,
+  ]);
 
   const orderedIds = useMemo(
     () => flattenGroupIds(groupPhotosByTime(photos, timeZone)).filter((id) => {
@@ -369,7 +397,7 @@ export function LibraryHome({
       onDrop={(event) => {
         event.preventDefault();
         setPageDrag(false);
-        setUploadOpen(true);
+        openUploadWorkbench();
       }}
       onDragOver={(event) => event.preventDefault()}
     >
@@ -408,7 +436,7 @@ export function LibraryHome({
                 type="button"
                 className="lib-primary"
                 disabled={offline || phase !== "ready"}
-                onClick={() => setUploadOpen(true)}
+                onClick={openUploadWorkbench}
               >
                 上传
               </button>
@@ -495,7 +523,7 @@ export function LibraryHome({
               </div>
               <h2>这里还空着</h2>
               <p>把照片放进来，念册会按时间帮你排好。只有你能看到。</p>
-              <button type="button" className="lib-primary" disabled={offline} onClick={() => setUploadOpen(true)}>
+              <button type="button" className="lib-primary" disabled={offline} onClick={openUploadWorkbench}>
                 上传第一批照片
               </button>
               <p className="lib-empty-secondary-wrap">
@@ -548,19 +576,20 @@ export function LibraryHome({
         </div>
       ) : null}
 
-      <dialog ref={uploadDialogRef} className="lib-drawer" onClose={() => setUploadOpen(false)}>
-        <div className="lib-drawer-panel">
-          <button type="button" className="lib-drawer-close" onClick={() => setUploadOpen(false)}>关闭</button>
-          <UploadPhotos
-            target={{ kind: "library" }}
-            theme={shellSkin}
-            assets={uploadAssets}
-            albumEmpty={photos.length === 0}
-            embedded
-            onUploaded={() => void load("silent")}
-          />
-        </div>
-      </dialog>
+      <LibraryUploadWorkbench
+        open={uploadWorkbenchOpen}
+        collapsed={uploadCollapsed}
+        theme={shellSkin}
+        assets={uploadAssets}
+        albumEmpty={photos.length === 0}
+        onExpand={() => setUploadCollapsed(false)}
+        onCollapse={() => setUploadCollapsed(true)}
+        onDismiss={dismissUploadWorkbench}
+        onQueueSnapshot={(snapshot) => {
+          uploadQueueRef.current = snapshot;
+        }}
+        onUploaded={() => void load("silent")}
+      />
 
       <LibraryLightbox
         open={lightboxId !== null}

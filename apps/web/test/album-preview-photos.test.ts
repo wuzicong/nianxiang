@@ -1,20 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ThemeId } from "@memora/shared";
 import cottonCandy from "../../../templates/cotton-candy/theme.json";
 import { buildDemoAlbum } from "../src/lib/album-demo";
 import type { AlbumTheme } from "../src/lib/album-theme";
 import { orderedAlbumPhotos } from "../src/lib/album-preview-photos";
+import { themeSkin } from "../src/lib/themes";
 
 function minimalTheme(file: typeof cottonCandy): AlbumTheme {
+  const themeId = file.id as ThemeId;
   return {
-    skin: { id: file.id, name: file.id },
+    skin: themeSkin(themeId),
     slots: file.slots.map((slot) => ({
       id: slot.id,
       type: slot.type,
       required: slot.required === true,
+      caption: slot.caption === true,
       hint: slot.hint ?? null,
-      min: slot.min,
-      max: slot.max,
+      min: slot.min ?? null,
+      max: slot.max ?? null,
     })),
     shareTitle: file.shareCopyDefaults.title,
     shareSubtitle: file.shareCopyDefaults.subtitle,

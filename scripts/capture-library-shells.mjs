@@ -110,13 +110,22 @@ await page.getByRole("button", { name: "上传第一批照片" }).click();
 await page.locator(".album-upload-file-input").setInputFiles(tinyPng);
 await page.waitForSelector('.album-upload-queue-item[data-upload-state="failed"]', { timeout: 15000 });
 await page.waitForSelector('.album-upload-summary[data-kind="error"]');
-const drawer = page.locator(".lib-drawer-panel");
-await drawer.screenshot({ path: path.join(outDir, "library-upload-fail-375.png") });
+const workbench = page.locator(".lib-upload-workbench");
+await workbench.screenshot({ path: path.join(outDir, "library-upload-fail-375.png") });
+
+await page.getByRole("button", { name: "收起" }).click();
+await page.waitForSelector('.lib-upload-workbench[data-collapsed="true"]');
+await workbench.screenshot({ path: path.join(outDir, "library-upload-collapsed-375.png") });
+
+await mockLibraryApi(page, { failedCell: false });
+await page.goto("http://127.0.0.1:3000/library?libraryMock=24", { waitUntil: "networkidle" });
+await page.waitForSelector(".lib-grid .lib-tile");
+await page.locator("#library-main").screenshot({ path: path.join(outDir, "library-grid-flat-375.png") });
 
 await writeFile(
   path.join("/opt/cursor/artifacts", "library-shells-capture.txt"),
   "viewport=375\n" +
-    "captured=library-empty-375.png,library-load-error-375.png,library-upload-fail-375.png,library-failed-cell-375.png\n",
+    "captured=library-empty-375.png,library-load-error-375.png,library-upload-fail-375.png,library-upload-collapsed-375.png,library-grid-flat-375.png,library-failed-cell-375.png\n",
 );
 
 await browser.close();
