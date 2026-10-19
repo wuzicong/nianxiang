@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { albumFontFaces, albumTheme, resolveAlbumLayout, type AlbumLayoutMode, type AlbumTheme } from "../../lib/album-theme";
-import type { DemoAlbum } from "../../lib/album-demo";
+import type { DemoAlbum, FilledSlot } from "../../lib/album-demo";
 import { buttonInk, shareThemeStyle } from "../s/share-chrome";
 import { FlipBook, type FlipApi } from "./flip-book";
 import { SlotSheet, SvgMark } from "./slot-sheet";
@@ -178,15 +178,7 @@ export function AlbumStage({
         ) : (
           <p className="sample-note">{ownedNote(source)}</p>
         )}
-        {layout === "story" ? (
-          <nav className="slot-nav" aria-label="册页">
-            {album.slots.map((slot) => (
-              <a key={slot.id} href={`#slot-${slot.id}`}>
-                {slot.kicker}
-              </a>
-            ))}
-          </nav>
-        ) : null}
+        {layout === "story" ? <StorySlotNav slots={album.slots} /> : null}
       </header>
 
       {layout === "flip" ? (
@@ -221,6 +213,64 @@ export function AlbumStage({
         </div>
       )}
     </main>
+  );
+}
+
+function StorySlotNav({ slots }: { slots: FilledSlot[] }) {
+  const navRef = useRef<HTMLElement>(null);
+  const [activeId, setActiveId] = useState(() => slots[0]?.id ?? "");
+
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#slot-/, "");
+    if (hash && slots.some((slot) => slot.id === hash)) {
+      setActiveId(hash);
+    }
+  }, [slots]);
+
+  useEffect(() => {
+    const sections = slots
+      .map((slot) => document.getElementById(`slot-${slot.id}`))
+      .filter((node): node is HTMLElement => node instanceof HTMLElement);
+    if (!sections.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (!visible.length) return;
+        const best = visible.reduce((winner, entry) =>
+          entry.intersectionRatio >= winner.intersectionRatio ? entry : winner,
+        );
+        const id = best.target.id.replace(/^slot-/, "");
+        if (id) setActiveId(id);
+      },
+      { rootMargin: "-42% 0px -48% 0px", threshold: [0, 0.2, 0.45, 0.7, 1] },
+    );
+
+    for (const section of sections) observer.observe(section);
+    return () => observer.disconnect();
+  }, [slots]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || !activeId) return;
+    const link = nav.querySelector(`a[href="#slot-${activeId}"]`);
+    if (link instanceof HTMLElement) {
+      link.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    }
+  }, [activeId]);
+
+  return (
+    <nav className="slot-nav" aria-label="册页" ref={navRef}>
+      {slots.map((slot) => (
+        <a
+          key={slot.id}
+          href={`#slot-${slot.id}`}
+          aria-current={activeId === slot.id ? "true" : undefined}
+        >
+          {slot.kicker}
+        </a>
+      ))}
+    </nav>
   );
 }
 
