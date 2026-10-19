@@ -58,6 +58,9 @@ function OwnedPreviewChrome({
       </h1>
       <div className="preview-owned-body">{children}</div>
       <div className="preview-owned-actions">
+        <Link className="preview-owned-back" href={`/albums/${encodeURIComponent(albumId)}`}>
+          返回这本
+        </Link>
         {showShareCta ? (
           <Link className="preview-owned-primary" href={albumShareHref(albumId)}>
             生成分享链接
@@ -67,12 +70,6 @@ function OwnedPreviewChrome({
             登录
           </Link>
         ) : null}
-        <Link
-          className={showShareCta || showLoginCta ? "preview-owned-back" : "preview-owned-primary"}
-          href={`/albums/${encodeURIComponent(albumId)}`}
-        >
-          返回这本
-        </Link>
       </div>
     </main>
   );

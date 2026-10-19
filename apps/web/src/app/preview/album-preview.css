@@ -144,7 +144,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0.42rem 0.95rem;
   font: inherit;
   font-weight: 600;
@@ -157,6 +157,9 @@
 
 .album-shell[data-theme="cotton-candy"] .owned-share-cta {
   border-radius: var(--share-radius-pill);
+  color: var(--share-ink);
+  background: var(--share-brand);
+  border-color: var(--share-brand);
 }
 
 .album-shell[data-theme="magazine-heirloom"] .owned-share-cta {
@@ -173,22 +176,43 @@
   flex: 1 1 100%;
 }
 
+.album-shell[data-album-source="owned"] .toolbar-brand {
+  font-size: 0.875rem;
+  color: var(--share-muted);
+}
+
+.album-shell[data-album-source="owned"] .toolbar-brand a {
+  color: var(--share-muted);
+}
+
+.owned-toolbar-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+  margin-left: auto;
+}
+
 .album-shell[data-album-source="owned"] .owned-sample-link {
   flex: 1 1 auto;
+  font-size: 0.8125rem;
   font-weight: 400;
 }
 
 .album-shell[data-album-source="owned"] .owned-sample-link a {
+  color: var(--share-muted);
   font-weight: inherit;
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
 
 .album-shell[data-album-source="owned"] .owned-toolbar-back {
-  color: var(--share-muted);
+  color: var(--share-text);
   font-weight: 400;
+  font-size: inherit;
   text-decoration: underline;
   text-underline-offset: 0.15em;
+  white-space: nowrap;
 }
 
 .album-shell[data-album-source="owned"] .toolbar-row-layout,
@@ -1159,6 +1183,12 @@ figcaption.slot-empty {
   margin: 0 0 1rem;
   position: relative;
   z-index: 1;
+  font-size: 0.875rem;
+  color: var(--share-muted);
+}
+
+.preview-owned-crumb a {
+  color: var(--share-muted);
 }
 
 .preview-owned-title {
@@ -1219,6 +1249,9 @@ figcaption.slot-empty {
 
 .share-shell.preview-owned-shell[data-theme="cotton-candy"] .preview-owned-primary {
   border-radius: var(--share-radius-pill);
+  color: var(--share-ink);
+  background: var(--share-brand);
+  border-color: var(--share-brand);
 }
 
 .share-shell.preview-owned-shell[data-theme="magazine-heirloom"] .preview-owned-primary {
@@ -1232,10 +1265,10 @@ figcaption.slot-empty {
   min-height: 2.75rem;
   padding: 0.5rem 0.15rem;
   font: inherit;
-  font-weight: 500;
+  font-weight: 400;
   text-decoration: underline;
   text-underline-offset: 0.15em;
-  color: var(--share-muted);
+  color: var(--share-text);
   background: transparent;
   border: 0;
 }

@@ -122,21 +122,20 @@ export function AlbumStage({
             <Link href="/">念册</Link>
             <span aria-hidden="true"> / </span>
             {source.kind === "owned" ? (
-              <>
-                <Link href="/albums">相册</Link>
-                <span aria-hidden="true"> / </span>
-                <Link className="owned-toolbar-back" href={`/albums/${encodeURIComponent(source.albumId)}`}>
-                  返回这本
-                </Link>
-              </>
+              <Link href="/albums">相册</Link>
             ) : (
               <Link href="/preview">样张</Link>
             )}
           </p>
           {source.kind === "owned" ? (
-            <Link className="owned-share-cta" href={albumShareHref(source.albumId)}>
-              生成分享链接
-            </Link>
+            <div className="owned-toolbar-actions">
+              <Link className="owned-toolbar-back" href={`/albums/${encodeURIComponent(source.albumId)}`}>
+                返回这本
+              </Link>
+              <Link className="owned-share-cta" href={albumShareHref(source.albumId)}>
+                生成分享链接
+              </Link>
+            </div>
           ) : null}
         </div>
         {source.kind === "demo" ? (
