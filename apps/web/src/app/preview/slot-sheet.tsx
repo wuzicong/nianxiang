@@ -1,5 +1,6 @@
 import type { AlbumTheme } from "../../lib/album-theme";
 import type { DemoBeat, DemoPhoto, FilledSlot } from "../../lib/album-demo";
+import { useAlbumPhotoZoom } from "./album-photo-zoom";
 
 export function SvgMark({
   markup,
@@ -24,21 +25,60 @@ function pageNumberMarkup(markup: string | undefined, page: number): string | un
   return markup.includes(">01<") ? markup.replace(">01<", `>${label}<`) : markup;
 }
 
-function Photo({ photo, onError }: { photo: DemoPhoto; onError?: (src: string) => void }) {
+function Photo({
+  photo,
+  onError,
+  zoomable,
+}: {
+  photo: DemoPhoto;
+  onError?: (src: string) => void;
+  zoomable?: boolean;
+}) {
+  const zoom = useAlbumPhotoZoom();
+  const canZoom = zoomable && zoom?.enabled;
+
+  if (!canZoom) {
+    return (
+      <img
+        src={photo.src}
+        alt={photo.alt}
+        data-photo-id={photo.id}
+        referrerPolicy="no-referrer"
+        onError={() => onError?.(photo.src)}
+      />
+    );
+  }
+
   return (
-    <img
-      src={photo.src}
-      alt={photo.alt}
-      data-photo-id={photo.id}
-      referrerPolicy="no-referrer"
-      onError={() => onError?.(photo.src)}
-    />
+    <button
+      type="button"
+      className="album-photo-hit"
+      data-album-zoom-id={photo.id}
+      aria-label="放大查看照片"
+      onClick={(event) => zoom.openFromElement(photo, event.currentTarget)}
+    >
+      <img
+        src={photo.src}
+        alt={photo.alt}
+        data-photo-id={photo.id}
+        referrerPolicy="no-referrer"
+        onError={() => onError?.(photo.src)}
+      />
+    </button>
   );
 }
 
-function FramePhoto({ photo, onError }: { photo: DemoPhoto | undefined; onError?: (src: string) => void }) {
+function FramePhoto({
+  photo,
+  onError,
+  zoomable,
+}: {
+  photo: DemoPhoto | undefined;
+  onError?: (src: string) => void;
+  zoomable?: boolean;
+}) {
   if (!photo) return <p className="gap-copy">预览生成后出现在这里</p>;
-  return <Photo photo={photo} onError={onError} />;
+  return <Photo photo={photo} onError={onError} zoomable={zoomable} />;
 }
 
 function Beats({ beats, kind }: { beats: DemoBeat[]; kind: "timeline" | "route" | "contents" }) {
@@ -90,6 +130,7 @@ export function SlotSheet({
         theme={theme}
         slot={slot}
         decorations={decorations}
+        mode={mode}
         pageNumber={pageNumber}
         pageCount={pageCount}
         onPhotoError={onPhotoError}
@@ -103,6 +144,7 @@ function SlotBody({
   theme,
   slot,
   decorations,
+  mode,
   pageNumber,
   pageCount,
   onPhotoError,
@@ -110,14 +152,20 @@ function SlotBody({
   theme: AlbumTheme;
   slot: FilledSlot;
   decorations: Record<string, string>;
+  mode: "story" | "flip";
   pageNumber: number;
   pageCount: number;
   onPhotoError?: (src: string) => void;
 }) {
-  if (slot.id === "full-bleed") return <Bleed slot={slot} onPhotoError={onPhotoError} />;
-  if (slot.type === "hero") return <Hero theme={theme} slot={slot} decorations={decorations} onPhotoError={onPhotoError} />;
-  if (slot.type === "spread-2") return <Spread theme={theme} slot={slot} onPhotoError={onPhotoError} />;
-  if (slot.type === "polaroid-wall") return <Wall theme={theme} slot={slot} decorations={decorations} onPhotoError={onPhotoError} />;
+  const zoomable = mode === "story";
+  if (slot.id === "full-bleed") return <Bleed slot={slot} onPhotoError={onPhotoError} zoomable={zoomable} />;
+  if (slot.type === "hero") {
+    return <Hero theme={theme} slot={slot} decorations={decorations} onPhotoError={onPhotoError} zoomable={zoomable} />;
+  }
+  if (slot.type === "spread-2") return <Spread theme={theme} slot={slot} onPhotoError={onPhotoError} zoomable={zoomable} />;
+  if (slot.type === "polaroid-wall") {
+    return <Wall theme={theme} slot={slot} decorations={decorations} onPhotoError={onPhotoError} zoomable={zoomable} />;
+  }
   if (slot.type === "timeline") return <TimelineBlock slot={slot} />;
   if (slot.type === "map-chapter") return <MapBlock theme={theme} slot={slot} decorations={decorations} />;
   if (slot.type === "closing") {
@@ -131,11 +179,13 @@ function Hero({
   slot,
   decorations,
   onPhotoError,
+  zoomable,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
   decorations: Record<string, string>;
   onPhotoError?: (src: string) => void;
+  zoomable?: boolean;
 }) {
   const photo = slot.photos[0];
   const themeId = theme.skin.id;
@@ -148,7 +198,7 @@ function Hero({
       ) : null}
       <figure className="hero-frame">
         <div className={photo ? "frame" : "frame frame-empty"}>
-          <FramePhoto photo={photo} onError={onPhotoError} />
+          <FramePhoto photo={photo} onError={onPhotoError} zoomable={zoomable} />
         </div>
         {themeId === "cotton-candy" ? (
           <>
@@ -166,11 +216,19 @@ function Hero({
   );
 }
 
-function Bleed({ slot, onPhotoError }: { slot: FilledSlot; onPhotoError?: (src: string) => void }) {
+function Bleed({
+  slot,
+  onPhotoError,
+  zoomable,
+}: {
+  slot: FilledSlot;
+  onPhotoError?: (src: string) => void;
+  zoomable?: boolean;
+}) {
   const photo = slot.photos[0];
   return (
     <div className="bleed">
-      {photo ? <Photo photo={photo} onError={onPhotoError} /> : <p className="gap-copy bleed-gap">预览生成后出现在这里</p>}
+      {photo ? <Photo photo={photo} onError={onPhotoError} zoomable={zoomable} /> : <p className="gap-copy bleed-gap">预览生成后出现在这里</p>}
       <div className="bleed-copy">
         <p className="kicker">{slot.kicker}</p>
         <h2 className="hero-title">{slot.title}</h2>
@@ -184,10 +242,12 @@ function Spread({
   theme,
   slot,
   onPhotoError,
+  zoomable,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
   onPhotoError?: (src: string) => void;
+  zoomable?: boolean;
 }) {
   const cells = [slot.photos[0], slot.photos[1]];
   return (
@@ -199,7 +259,7 @@ function Spread({
         {cells.map((photo, index) => (
           <figure key={photo?.id ?? `gap-${index}`}>
             <div className={photo ? "frame" : "frame frame-empty"}>
-              <FramePhoto photo={photo} onError={onPhotoError} />
+              <FramePhoto photo={photo} onError={onPhotoError} zoomable={zoomable} />
             </div>
             {photo?.caption ? (
               <figcaption>{photo.caption}</figcaption>
@@ -218,11 +278,13 @@ function Wall({
   slot,
   decorations,
   onPhotoError,
+  zoomable,
 }: {
   theme: AlbumTheme;
   slot: FilledSlot;
   decorations: Record<string, string>;
   onPhotoError?: (src: string) => void;
+  zoomable?: boolean;
 }) {
   const tilts = theme.stickerTiltDeg;
   const photos = slot.photos.length > 0 ? slot.photos : [undefined];
@@ -236,7 +298,7 @@ function Wall({
           return (
             <figure key={photo?.id ?? "gap"} className="polaroid" style={{ ["--tilt" as string]: `${tilt}deg` }}>
               <div className={photo ? "frame" : "frame frame-empty"}>
-                <FramePhoto photo={photo} onError={onPhotoError} />
+                <FramePhoto photo={photo} onError={onPhotoError} zoomable={zoomable} />
               </div>
               {photo?.caption ? (
                 <figcaption>{photo.caption}</figcaption>
