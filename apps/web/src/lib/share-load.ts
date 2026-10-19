@@ -6,6 +6,8 @@ export interface PublicDerivative {
 export interface PublicShareAsset {
   assetId: string;
   filename: string;
+  /** 分享 payload 若将来带拍摄日，仅用于短图注；无则前端不渲染脚注。 */
+  takenAt: string | null;
   width: number | null;
   height: number | null;
   derivatives: Partial<Record<"thumb" | "preview" | "hero", PublicDerivative>>;
@@ -63,6 +65,7 @@ export function parsePublicSharePayload(value: unknown): PublicSharePayload | nu
     const row = item as {
       assetId?: unknown;
       filename?: unknown;
+      takenAt?: unknown;
       width?: unknown;
       height?: unknown;
       derivatives?: unknown;
@@ -78,9 +81,12 @@ export function parsePublicSharePayload(value: unknown): PublicSharePayload | nu
         derivatives[size] = { url, expiresAt: entry.expiresAt };
       }
     }
+    const takenAt =
+      typeof row.takenAt === "string" && row.takenAt.length <= 40 ? row.takenAt : null;
     parsed.push({
       assetId: row.assetId,
       filename: row.filename,
+      takenAt,
       width: typeof row.width === "number" ? row.width : null,
       height: typeof row.height === "number" ? row.height : null,
       derivatives,
