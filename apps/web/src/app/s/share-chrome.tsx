@@ -38,7 +38,7 @@ export function ShareChrome({
   children,
 }: {
   theme: ThemeSkin;
-  state: "locked" | "status";
+  state: "locked" | "status" | "limited";
   children: ReactNode;
 }) {
   return (

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { DEFAULT_THEME_ID } from "@memora/shared";
-import { loadPublicShare } from "../../../lib/share";
+import { loadPublicShare, SHARE_RATE_LIMIT_BODY, SHARE_RATE_LIMIT_TITLE } from "../../../lib/share";
+import { forcedPublicShareStatus } from "../../../lib/share-status-hook";
 import { resolveLockedThemeId, themeIdFromHint, themeSkin } from "../../../lib/themes";
 import { ShareGallery } from "../share-gallery";
 import { ShareStatus } from "../share-status";
@@ -13,11 +14,21 @@ export default async function SharePage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ t?: string | string[] }>;
+  searchParams: Promise<{ t?: string | string[]; smokeRateLimit?: string | string[] }>;
 }) {
   const { token } = await params;
   const query = await searchParams;
-  const loaded = await loadPublicShare(token);
+  const loaded = await loadPublicShare(token, forcedPublicShareStatus(query.smokeRateLimit));
+  if (loaded.kind === "limited") {
+    return (
+      <ShareStatus
+        title={SHARE_RATE_LIMIT_TITLE}
+        body={SHARE_RATE_LIMIT_BODY}
+        theme={themeSkin(themeIdFromHint(query.t) ?? DEFAULT_THEME_ID)}
+        state="limited"
+      />
+    );
+  }
   if (loaded.kind === "missing") notFound();
   if (loaded.kind === "locked") {
     return <ShareUnlock token={token} theme={themeSkin(resolveLockedThemeId(loaded.themeId, query.t))} />;

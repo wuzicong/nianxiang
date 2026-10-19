@@ -6,14 +6,16 @@ export function ShareStatus({
   title,
   body,
   theme,
+  state = "status",
 }: {
   title: string;
   body: string;
   theme?: ThemeSkin;
+  state?: "status" | "limited";
 }) {
   const skin = theme ?? themeSkin(DEFAULT_THEME_ID);
   return (
-    <ShareChrome theme={skin} state="status">
+    <ShareChrome theme={skin} state={state}>
       <p className="share-brand">
         <a href="/">念册 · Memora</a>
       </p>

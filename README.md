@@ -230,6 +230,40 @@ SHARE_REQUIRE_PASSWORD=true
 
 公开接口的取舍：令牌是 32 字节随机数，不能靠试 token 来枚举分享。持有链接的人需要知道要不要输密码，所以 **GET** 在「有效且设了密码」时用 **401「需要密码」**，和其他 404 分开。**POST /unlock** 则把密码错误、不存在、撤销、过期合成同一句 **401「无法打开分享」**，这个接口本身不能用来区分原因。密码错误时仍做一次 scrypt；分享不存在时对哑哈希做一次，避免只靠快慢判断链接是否还在。应用内不做按 IP 计数。公网反代要打码 `/s/` 和 `/api/v1/public/shares/`，限制 `POST .../unlock`，并且不要记录这个 POST 的正文。片段在 `deploy/self-host/proxy/`，说明见 `deploy/self-host/README.md`。
 
+## 本地冒烟（可分享 MVP）
+
+先按上面的开发环境把 Postgres、Redis、MinIO、ML 用 `docker compose up -d` 起来，再在宿主机跑 API、worker 和 web。冒烟不负责拉起这套进程。
+
+`WEB_BASE`、`API_BASE`、`ML_BASE` 指向要测的站点，默认是 `http://127.0.0.1:3000`、`http://127.0.0.1:3001`、`http://127.0.0.1:8000`。对着另一套自托管栈复跑时，改这三个地址即可。
+
+日志二选一。本机进程把标准输出转到文件，用 `SMOKE_LOG_FILES`。应用已经在 Compose 里时，用 `SMOKE_LOG_SERVICES` 写服务名，脚本执行 `docker compose logs`。
+
+```bash
+corepack enable && pnpm install
+pnpm exec playwright install --with-deps chromium
+mkdir -p tmp
+pnpm dev:api > tmp/api.log 2>&1
+pnpm dev:web > tmp/web.log 2>&1
+pnpm dev:worker > tmp/worker.log 2>&1
+SMOKE_LOG_FILES=tmp/api.log,tmp/web.log,tmp/worker.log pnpm smoke
+```
+
+另一套栈的例子：
+
+```bash
+WEB_BASE=https://photos.example \
+API_BASE=https://photos.example \
+ML_BASE=http://127.0.0.1:8000 \
+SMOKE_LOG_SERVICES=api,web,worker \
+pnpm smoke
+```
+
+页面若把 `/api/v1` 反代到 API，`WEB_BASE` 和 `API_BASE` 可以是同一个源。脚本会注册一个一次性用户，任选三套主题之一建相册，上传两张 PNG 和一张带 GPS 的 JPEG，等到衍生图 `ready`，打开 `/albums/<id>/preview?layout=story`，创建带密码的分享，再用另一个浏览器上下文打开 `/s/<token>`。错密码和撤销后的解锁都是 401「无法打开分享」。撤销后的页面是 404「分享不存在」。它检查预览页、分享页和这些接口里没有 `/originals/`、EXIF、明文密码；应用日志里有这次注册、建分享和衍生图完成的记录，但没有明文令牌、会话或密码。主人上传原图的预签名地址本身含 `/originals/`，不记入泄漏。终端不打印令牌、密码或带签名的 URL。
+
+分享页加载遇到 429 时显示「请求太频繁」，并说明这不是链接失效。解锁提交遇到 429 时显示大约每分钟 6 次、先等一会儿，按钮不再接受下一次点击；不会显示「无法打开分享」。应用本身仍不做按 IP 计数，这两处只处理反代已经返回的 429。冒烟对分享页加上 `?smokeRateLimit=429` 走同一条分类：`next dev` 会认；`next start` 要在启动前设置 `MEMORA_SHARE_STATUS_HOOK=1`。解锁的 429 由浏览器拦截模拟，不依赖这个开关。错密码文案不变。
+
+`next dev` 默认会把请求路径打出来。`next.config.ts` 忽略了 `/s/` 和 `/api/v1/public/shares/`，所以开发日志可以交给这次检查。生产模式的 `next start` 本来就不记这些访问。
+
 合入前在仓库根目录跑，这三项不依赖 Compose：
 
 ```bash
@@ -279,7 +313,8 @@ memora-{env}/
 | 登录 | 邮箱密码会话；上传和读取绑定已认证用户 |
 | W6 MVP | 相册、链接分享、过期与撤销 |
 | 分享密码 | 可选密码、scrypt、公开页挑战 |
-| 相册上传 | 相册页上传、加入相册、预览就绪后出现在分享 ← **当前** |
+| 相册上传 | 相册页上传、加入相册、预览就绪后出现在分享 |
+| 发布前收口 | 端到端冒烟 | ← **当前** |
 | 后续 | 细粒度权限、邮箱验证分享、一次性密码、人脸 / CLIP、地理编码、成册排版 |
 
 ---
