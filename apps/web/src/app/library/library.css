@@ -627,7 +627,7 @@ a.lib-primary {
 }
 
 .lib-dialog {
-  width: min(52rem, calc(100vw - 1.5rem));
+  width: min(45rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   margin: auto;
   padding: 0;
@@ -637,13 +637,38 @@ a.lib-primary {
 }
 
 .lib-dialog::backdrop {
-  background: color-mix(in srgb, var(--share-text) 48%, transparent);
+  background: color-mix(in srgb, var(--share-text) 40%, transparent);
 }
 
 .lib-dialog-card {
   max-height: calc(100vh - 2rem);
   overflow: auto;
   padding: 1.25rem 1.2rem 1.15rem;
+}
+
+@media (max-width: 767px) {
+  .lib-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .lib-dialog[open] {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .lib-dialog-card {
+    margin-top: auto;
+    max-height: 88vh;
+    border-radius: 1.125rem 1.125rem 0 0;
+    border-bottom: 0;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--share-text) 12%, transparent);
+  }
 }
 
 .lib-dialog h2 {
@@ -725,8 +750,7 @@ a.lib-primary {
 }
 
 .lib-theme[data-checked="true"] {
-  outline: 2px solid var(--share-text);
-  outline-offset: 3px;
+  box-shadow: inset 0 0 0 2px var(--share-brand);
 }
 
 .lib-dialog-actions {
@@ -759,7 +783,7 @@ a.lib-primary {
   border: 0;
 }
 
-@media (min-width: 800px) {
+@media (min-width: 768px) {
   .lib-themes {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -810,6 +834,10 @@ a.lib-primary {
     animation: lib-selection-in var(--lib-duration-3) var(--lib-ease-out);
   }
 
+  .lib-selection-bar-top {
+    animation: lib-selection-in-top var(--lib-duration-3) var(--lib-ease-out);
+  }
+
   .lib-page-drop {
     animation: lib-overlay-in var(--lib-duration-3) var(--lib-ease-out);
   }
@@ -844,18 +872,29 @@ a.lib-primary {
   }
 
   .lib-theme:hover {
-    transform: scale(1.01);
+    filter: brightness(1.03);
   }
 
   .lib-theme:active {
-    transform: scale(0.99);
+    filter: brightness(0.98);
   }
 }
 
 @keyframes lib-selection-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lib-selection-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;
@@ -1105,7 +1144,6 @@ a.lib-primary {
   gap: 0.6rem;
   min-height: 4rem;
   padding: 0.5rem 1rem;
-  background: color-mix(in srgb, var(--share-surface) 92%, transparent);
   border-bottom: 1px solid var(--share-border);
 }
 
@@ -1116,25 +1154,24 @@ a.lib-primary {
   right: 0;
   bottom: 0;
   padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  box-shadow: var(--share-shadow);
+  background: color-mix(in srgb, var(--share-surface) 92%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--share-text) 12%, transparent);
+  border-bottom: 0;
+  border-top: 1px solid var(--share-border);
 }
 
 .lib-selection-bar-top {
-  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--share-bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
-@media (min-width: 1280px) {
-  .lib-selection-bar-bottom {
-    display: none;
-  }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .lib-selection-bar-top {
-    display: flex;
-    position: sticky;
-    top: 0;
-    z-index: 30;
-  }
-  .lib-top {
-    display: none;
+    background: color-mix(in srgb, var(--share-bg) 92%, transparent);
   }
 }
 
@@ -1691,6 +1728,7 @@ a.lib-primary {
   }
 
   .lib-selection-bar-bottom,
+  .lib-selection-bar-top,
   .lib-page-drop {
     animation: lib-overlay-in-reduced 0.01ms ease-out;
   }

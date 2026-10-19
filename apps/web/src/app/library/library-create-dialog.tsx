@@ -55,13 +55,20 @@ export function LibraryCreateDialog({
   }, [open]);
 
   useEffect(() => {
-    if (open && step === "title") {
+    if (!open) return;
+    if (step === "title") {
       const input = titleInputRef.current;
       if (input) {
         input.focus();
         input.select();
       }
+      return;
     }
+    const dialog = dialogRef.current;
+    const firstTheme = dialog?.querySelector<HTMLInputElement>(
+      'input[name="library-theme"]',
+    );
+    firstTheme?.focus();
   }, [open, step]);
 
   const coverSrc = coverPhoto ? previewUrl(coverPhoto.previews) : null;
@@ -96,7 +103,12 @@ export function LibraryCreateDialog({
         </p>
 
         {step === "theme" ? (
-          <fieldset className="lib-themes" aria-labelledby={themesId} disabled={locked || pending}>
+          <fieldset
+            className="lib-themes"
+            role="radiogroup"
+            aria-labelledby={themesId}
+            disabled={locked || pending}
+          >
             <legend id={themesId} className="lib-sr">选择主题</legend>
             {THEME_IDS.map((id) => {
               const theme = albumTheme(id);

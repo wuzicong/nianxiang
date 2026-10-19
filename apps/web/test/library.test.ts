@@ -5,6 +5,7 @@ import { createThemedAlbum } from "../src/lib/library-api";
 import {
   applyPhotoSelection,
   chronologicalAssetIds,
+  composeCoverPhoto,
   flattenGroupIds,
   gridNeighbor,
   groupPhotosByTime,
@@ -230,6 +231,46 @@ test("album title and asset order follow the calendar", () => {
   ];
   assert.equal(suggestedAlbumTitle(photos, "UTC"), "2024年5月1日 – 2024年5月2日");
   assert.deepEqual(chronologicalAssetIds(photos, ["new", "old"], "UTC"), ["old", "new"]);
+  assert.equal(
+    composeCoverPhoto(
+      [
+        photo({
+          assetId: "new",
+          takenAt: "2024-05-02T12:00:00",
+          previews: {
+            thumb: { url: signedThumb, expiresAt: "2026-01-01T00:10:00.000Z" },
+          },
+        }),
+        photo({
+          assetId: "old",
+          takenAt: "2024-05-01T09:00:00",
+          previews: {
+            thumb: { url: `${signedThumb}&v=old`, expiresAt: "2026-01-01T00:10:00.000Z" },
+          },
+        }),
+      ],
+      ["new", "old"],
+      "UTC",
+    )?.assetId,
+    "old",
+  );
+  assert.equal(
+    composeCoverPhoto(
+      [
+        photo({ assetId: "a", takenAt: "2024-05-01T09:00:00", previews: {} }),
+        photo({
+          assetId: "b",
+          takenAt: "2024-05-02T12:00:00",
+          previews: {
+            thumb: { url: signedThumb, expiresAt: "2026-01-01T00:10:00.000Z" },
+          },
+        }),
+      ],
+      ["a", "b"],
+      "UTC",
+    )?.assetId,
+    "b",
+  );
   assert.equal(suggestedAlbumTitle([photos[1]!], "UTC"), "2024年5月1日");
   const groups = groupPhotosByTime(photos, "UTC");
   assert.deepEqual(flattenGroupIds(groups), ["new", "old"]);
