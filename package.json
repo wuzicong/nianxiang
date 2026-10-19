@@ -15,10 +15,14 @@
     "test": "pnpm -r --if-present run test",
     "check:contracts": "node scripts/check-contracts.mjs",
     "verify:upload": "node scripts/verify-upload.mjs",
+    "smoke": "node scripts/smoke-share.mjs",
     "lint": "pnpm -r run lint --if-present"
   },
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
 }

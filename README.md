@@ -101,6 +101,8 @@ pnpm dev:api    # http://127.0.0.1:3001/health
 
 `docker compose ps` 应看到 `postgres`、`redis`、`minio`、`minio-init`（退出码 0）、`ml`。MinIO 控制台：<http://127.0.0.1:9001>。
 
+要连 web / api / worker 一起起来，用下面的「一键起」。改代码时仍用这里的依赖，加上 `pnpm dev:*`。
+
 可选：`pnpm dev:web`（3000）、`pnpm dev:worker`（等 Redis 就绪）。上传链路需要 API 和 Worker 同时在跑，步骤见下方「本地验证上传」。
 
 ### 云托管
@@ -227,6 +229,41 @@ SHARE_REQUIRE_PASSWORD=true
 
 公开接口的取舍：令牌是 32 字节随机数，不能靠试 token 来枚举分享。持有链接的人需要知道要不要输密码，所以 **GET** 在「有效且设了密码」时用 **401「需要密码」**，和其他 404 分开。**POST /unlock** 则把密码错误、不存在、撤销、过期合成同一句 **401「无法打开分享」**，这个接口本身不能用来区分原因。密码错误时仍做一次 scrypt；分享不存在时对哑哈希做一次，避免只靠快慢判断链接是否还在。应用内不做按 IP 计数。公网反代要打码 `/s/` 和 `/api/v1/public/shares/`，限制 `POST .../unlock`，并且不要记录这个 POST 的正文。片段在 `deploy/self-host/proxy/`，说明见 `deploy/self-host/README.md`。
 
+## 一键起整套
+
+干净机器上把 web、api、worker、ML（CPU）、Postgres、Redis、MinIO 一起起来。宿主机端口只绑 `127.0.0.1`。Worker 的健康检查留在容器内，不映射出来。镜像里不写口令；开发占位值来自 `.env` 或 Compose 默认值，和 `.env.example` 相同。
+
+```bash
+cp .env.example .env
+docker compose --profile app up -d --build
+docker compose --profile app ps
+```
+
+本机走 HTTP，Compose 里的 API 设了 `COOKIE_SECURE=false`，浏览器才会记住会话。放到 HTTPS 反代后面，把这项改成 `true`。容器里的 `S3_ENDPOINT` 是 `http://minio:9000`，预签名用 `S3_PUBLIC_ENDPOINT=http://127.0.0.1:9000`，否则页面上传和看图会失败。
+
+## 本地冒烟（可分享 MVP）
+
+需要上面的整套，或者本机的 `pnpm dev:web`、`pnpm dev:api`、`pnpm dev:worker` 再加上 Compose 里的 Postgres、Redis、MinIO、ML。不要用 `next dev` 的访问日志做这次检查：开发服务器会把请求路径打出来。冒烟默认读 `docker compose --profile app logs`。本机进程改把标准输出转到文件，再用 `SMOKE_LOG_FILES` 指过去。
+
+```bash
+corepack enable && pnpm install
+pnpm exec playwright install --with-deps chromium
+pnpm smoke
+```
+
+脚本会注册一个一次性用户，任选三套主题之一建相册，上传两张 PNG 和一张带 GPS 的 JPEG，等到衍生图 `ready`，打开 `/albums/<id>/preview?layout=story`，创建带密码的分享，再用另一个浏览器上下文打开 `/s/<token>`。错密码和撤销后的解锁都是 401「无法打开分享」。撤销后的页面是 404「分享不存在」。它检查预览页、分享页和这些接口里没有 `/originals/`、EXIF、明文密码；应用日志里有这次注册、建分享和衍生图完成的记录，但没有明文令牌、会话或密码。主人上传原图的预签名地址本身含 `/originals/`，不记入泄漏。终端不打印令牌、密码或带签名的 URL。
+
+本机进程示例：
+
+```bash
+pnpm dev:api > tmp/api.log 2>&1
+pnpm dev:web > tmp/web.log 2>&1
+pnpm dev:worker > tmp/worker.log 2>&1
+SMOKE_LOG_FILES=tmp/api.log,tmp/web.log,tmp/worker.log pnpm smoke
+```
+
+`pnpm dev:web` 若仍是 `next dev`，请改跑 `pnpm --filter @memora/web build && pnpm --filter @memora/web start`，避免开发日志带上分享路径。
+
 合入前在仓库根目录跑，这三项不依赖 Compose：
 
 ```bash
@@ -276,7 +313,8 @@ memora-{env}/
 | 登录 | 邮箱密码会话；上传和读取绑定已认证用户 |
 | W6 MVP | 相册、链接分享、过期与撤销 |
 | 分享密码 | 可选密码、scrypt、公开页挑战 |
-| 相册上传 | 相册页上传、加入相册、预览就绪后出现在分享 ← **当前** |
+| 相册上传 | 相册页上传、加入相册、预览就绪后出现在分享 |
+| 发布前收口 | 端到端冒烟，自托管一键起 web / api / worker / ML | ← **当前** |
 | 后续 | 细粒度权限、邮箱验证分享、一次性密码、人脸 / CLIP、地理编码、成册排版 |
 
 ---
