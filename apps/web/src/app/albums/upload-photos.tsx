@@ -174,9 +174,17 @@ export function UploadPhotos({
     } else if (processing > 0) {
       setSummaryMessage(done > 0 ? `${done} 张已上传，预览生成中…` : `照片已加入${place}，预览生成中…`, "success");
     } else if (done > 0) {
-      setSummaryMessage(done === 1 ? `照片已加入${place}。` : `${done} 张照片已加入${place}。`, "success");
+      setSummaryMessage(
+        done === 1 ? `照片已加入${place}。` : `${done} 张照片已加入${place}。`,
+        "success",
+      );
     }
   }
+
+  useEffect(() => {
+    if (running) return;
+    refreshSummary();
+  }, [queue, running, libraryMode]);
 
   const uploadOne = useCallback(
     async (entry: QueueEntry) => {
@@ -399,10 +407,17 @@ export function UploadPhotos({
       {queue.length > 0 ? (
         <ul className="album-upload-queue" aria-label="上传队列">
           {queue.map((entry) => (
-            <li key={entry.id} className="album-upload-queue-item" data-upload-state={entry.status}>
+            <li
+              key={entry.id}
+              className="album-upload-queue-item"
+              data-upload-state={entry.status}
+              aria-label={entry.status === "failed" ? `失败 · ${entry.detail}` : undefined}
+            >
               <div className="album-upload-queue-head">
                 <div>
-                  <p className="album-upload-queue-name">{entry.file.name || "未命名"}</p>
+                  <p className="album-upload-queue-name" aria-hidden={entry.status === "failed" ? true : undefined}>
+                    {entry.file.name || "未命名"}
+                  </p>
                   <p className="album-upload-queue-status" data-state={entry.status}>
                     {statusLabel(entry.status)} · {entry.detail}
                   </p>

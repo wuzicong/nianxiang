@@ -535,6 +535,20 @@ a.lib-primary {
   color: inherit;
 }
 
+.lib-empty-library .lib-empty-art {
+  max-width: 12rem;
+  margin-inline: auto;
+}
+
+.lib-empty-library .lib-decor-bg svg,
+.lib-empty-library .lib-decor-fg svg {
+  opacity: 0.88;
+}
+
+.lib-empty-secondary-wrap {
+  margin-top: 0.65rem;
+}
+
 .lib-empty-library .lib-empty-secondary {
   color: var(--share-muted);
   text-decoration: none;
@@ -1033,16 +1047,16 @@ a.lib-primary {
   opacity: 0.75;
 }
 
-/* TODO: align failed grid cell after moodboard */
 .lib-tile[data-failed="true"] {
-  outline: 1px dashed color-mix(in srgb, var(--share-muted) 55%, var(--share-border));
+  outline: 1px dashed var(--share-muted);
   cursor: not-allowed;
 }
 
 .lib-tile[data-failed="true"] .lib-placeholder {
   color: var(--share-muted);
-  background: color-mix(in srgb, var(--share-muted) 10%, var(--share-surface));
-  border: 1px dashed color-mix(in srgb, var(--share-muted) 40%, var(--share-border));
+  font-size: 0.75rem;
+  line-height: 1.35;
+  background: color-mix(in srgb, var(--share-border) 40%, var(--share-surface));
   box-sizing: border-box;
 }
 

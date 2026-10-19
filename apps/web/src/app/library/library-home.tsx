@@ -73,7 +73,7 @@ export function LibraryHome({
   const uploadTriggerRef = useRef<HTMLButtonElement>(null);
   const uploadDialogRef = useRef<HTMLDialogElement>(null);
   const [phase, setPhase] = useState<Phase>("loading");
-  const [error, setError] = useState("照片暂时没加载出来");
+  const [error, setError] = useState("照片暂时没加载出来。");
   const [email, setEmail] = useState<string | null>(null);
   const [photos, setPhotos] = useState<LibraryPhoto[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -131,7 +131,7 @@ export function LibraryHome({
       }
       if (!listed.ok) {
         if (mode === "initial") {
-          setError(listed.message);
+          setError(libraryLoadErrorMessage(listed.message));
           setPhase("error");
         }
         return;
@@ -141,7 +141,7 @@ export function LibraryHome({
       setPhase("ready");
     } catch {
       if (mode === "initial") {
-        setError("网络好像断了");
+        setError("网络好像断了。");
         setPhase("error");
       }
     }
@@ -470,7 +470,7 @@ export function LibraryHome({
           ) : null}
 
           {phase === "error" ? (
-            <section className="lib-empty">
+            <section className="lib-empty lib-empty-load-error">
               <h2>{error}</h2>
               <button type="button" className="lib-primary" onClick={() => void load("initial")}>重试</button>
             </section>
@@ -498,8 +498,7 @@ export function LibraryHome({
               <button type="button" className="lib-primary" disabled={offline} onClick={() => setUploadOpen(true)}>
                 上传第一批照片
               </button>
-              {/* TODO: align empty-library secondary CTA after moodboard */}
-              <p>
+              <p className="lib-empty-secondary-wrap">
                 <Link className="lib-quiet lib-empty-secondary" href="/preview">看看主题样张</Link>
               </p>
             </section>
@@ -605,6 +604,14 @@ export function LibraryHome({
       <p className="lib-sr" aria-live="polite">{toast}</p>
     </div>
   );
+}
+
+function libraryLoadErrorMessage(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) return "照片暂时没加载出来。";
+  if (/stack|trace|exception|Error:|ECONN|HTTP\s*\d/i.test(trimmed)) return "照片暂时没加载出来。";
+  if (trimmed.endsWith("。") || trimmed.endsWith("！")) return trimmed;
+  return `${trimmed}。`;
 }
 
 function onTabKey(event: React.KeyboardEvent) {

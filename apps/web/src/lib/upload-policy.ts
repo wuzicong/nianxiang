@@ -67,5 +67,14 @@ export function friendlyUploadError(message: string): string {
     return "原图上传失败，可能是网络中断或上传地址已过期，请重试。";
   }
   if (trimmed === "响应不完整") return "服务器响应异常，请稍后重试。";
+  if (/stack|trace|exception|Error:|ECONN|HTTP\s*\d/i.test(trimmed)) {
+    return "上传失败，请稍后重试。";
+  }
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return "上传失败，请稍后重试。";
+  }
+  if (/^[\x00-\x7F]+$/.test(trimmed) && trimmed.length > 64) {
+    return "上传失败，请稍后重试。";
+  }
   return trimmed;
 }
