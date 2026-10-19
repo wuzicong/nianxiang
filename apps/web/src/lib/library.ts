@@ -1,5 +1,6 @@
 import {
   assetNeedsRefresh,
+  lightboxUrl,
   parseAlbumAssets,
   previewUrl,
   PROCESSING_POLL_MS,
@@ -491,6 +492,49 @@ function readExifCaptured(exif: unknown): unknown {
 /** 处理失败的照片不能选入建册。 */
 export function libraryPhotoSelectable(photo: Pick<LibraryPhoto, "status">): boolean {
   return photo.status !== "failed";
+}
+
+/** 就绪且有可用衍生图时可打开灯箱。 */
+export function libraryPhotoLightboxable(photo: LibraryPhoto): boolean {
+  return photo.status === "ready" && lightboxUrl(photo.previews) !== null;
+}
+
+/** 按时间网格顺序排列的可灯箱 assetId（含跨组全量列表索引）。 */
+export function libraryLightboxIds(photos: LibraryPhoto[], timeZone: string): string[] {
+  const byId = new Map(photos.map((photo) => [photo.assetId, photo]));
+  return flattenGroupIds(groupPhotosByTime(photos, timeZone)).filter((id) => {
+    const photo = byId.get(id);
+    return photo ? libraryPhotoLightboxable(photo) : false;
+  });
+}
+
+/** 灯箱底部说明：本地时区的拍摄或上传时间，不含文件名与 EXIF。 */
+export function libraryPhotoCaption(photo: LibraryPhoto, timeZone: string): string {
+  const stamp = photo.takenAt ?? photo.uploadedAt;
+  if (!stamp) return "日期待定";
+  try {
+    const d =
+      photo.takenAt && LITERAL_STAMP.test(photo.takenAt)
+        ? new Date(
+            Number(photo.takenAt.slice(0, 4)),
+            Number(photo.takenAt.slice(5, 7)) - 1,
+            Number(photo.takenAt.slice(8, 10)),
+            Number(photo.takenAt.slice(11, 13)),
+            Number(photo.takenAt.slice(14, 16)),
+          )
+        : new Date(stamp);
+    const when = new Intl.DateTimeFormat("zh-CN", {
+      timeZone,
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d);
+    return photo.takenAt ? when : `${when} · 按上传时间`;
+  } catch {
+    return "日期待定";
+  }
 }
 
 function readCreatedAt(value: unknown): string {

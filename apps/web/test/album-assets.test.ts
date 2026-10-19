@@ -4,6 +4,7 @@ import {
   albumRefreshDelay,
   assetStatusLabel,
   parseAlbumAssets,
+  lightboxUrl,
   previewUrl,
   PROCESSING_POLL_MS,
   PREVIEW_REFRESH_MS,
@@ -51,6 +52,30 @@ test("album assets keep derivative previews and drop original material", () => {
   assert.equal(assets.length, 3);
   assert.equal(assets[0]?.filename, "harbor.jpg");
   assert.equal(previewUrl(assets[0]?.previews ?? {}), signedThumb);
+  assert.equal(
+    lightboxUrl({
+      thumb: { url: signedThumb, expiresAt: "2026-01-01T00:10:00.000Z" },
+      preview: {
+        url: "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/preview.webp?X-Amz-Signature=ok",
+        expiresAt: "2026-01-01T00:10:00.000Z",
+      },
+      hero: {
+        url: "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/hero.webp?X-Amz-Signature=ok",
+        expiresAt: "2026-01-01T00:10:00.000Z",
+      },
+    }),
+    "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/preview.webp?X-Amz-Signature=ok",
+  );
+  assert.equal(
+    lightboxUrl({
+      thumb: { url: signedThumb, expiresAt: "2026-01-01T00:10:00.000Z" },
+      hero: {
+        url: "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/hero.webp?X-Amz-Signature=ok",
+        expiresAt: "2026-01-01T00:10:00.000Z",
+      },
+    }),
+    "http://127.0.0.1:9000/memora-local/users/owner/derivatives/asset1/hero.webp?X-Amz-Signature=ok",
+  );
   assert.equal(assets[0]?.previews.hero, undefined);
   assert.equal(assets[0]?.previews.preview, undefined);
   assert.equal(JSON.stringify(assets).includes("/originals/"), false);

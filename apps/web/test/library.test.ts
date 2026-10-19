@@ -10,6 +10,8 @@ import {
   groupPhotosByTime,
   justifyPhotoRows,
   LIBRARY_SELECTION_LIMIT,
+  libraryLightboxIds,
+  libraryPhotoCaption,
   libraryRefreshDelay,
   normalizeCapturedAt,
   parseLibraryPayload,
@@ -278,4 +280,32 @@ test("create themed album posts assetIds atomically on create", async () => {
   }
   assert.deepEqual(retryCalls, ["/api/v1/albums/album-1/assets"]);
   assert.equal(libraryRefreshDelay([photo({ assetId: "p0", status: "processing" })]), 2000);
+});
+
+test("library lightbox order follows time groups and skips non-ready assets", () => {
+  const preview =
+    "http://127.0.0.1:9000/memora-local/users/owner/derivatives/a/preview.webp?X-Amz-Signature=ok";
+  const ids = libraryLightboxIds(
+    [
+      photo({
+        assetId: "new",
+        takenAt: "2024-02-01T10:00:00",
+        previews: { preview: { url: preview, expiresAt: "2026-01-01T00:00:00.000Z" } },
+      }),
+      photo({ assetId: "old", takenAt: "2024-01-01T10:00:00", status: "processing" }),
+      photo({
+        assetId: "mid",
+        takenAt: "2024-01-15T10:00:00",
+        previews: { thumb: { url: signedThumb, expiresAt: "2026-01-01T00:00:00.000Z" } },
+      }),
+    ],
+    "UTC",
+  );
+  assert.deepEqual(ids, ["new", "mid"]);
+  const caption = libraryPhotoCaption(
+    photo({ assetId: "x", takenAt: "2024-03-02T14:30:00", uploadedAt: "2024-04-01T00:00:00.000Z" }),
+    "UTC",
+  );
+  assert.match(caption, /2024/);
+  assert.equal(caption.includes(".jpg"), false);
 });

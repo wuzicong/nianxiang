@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { previewUrl } from "../../lib/album-assets";
+import { lightboxUrl, previewUrl } from "../../lib/album-assets";
 import {
   flattenGroupIds,
   groupPhotosByTime,
+  libraryPhotoLightboxable,
   libraryPhotoSelectable,
   type LibraryPhoto,
 } from "../../lib/library";
@@ -32,6 +33,7 @@ export function LibraryGrid({
   onToggle,
   onSelectDay,
   onClear,
+  onOpenLightbox,
   onPreviewError,
 }: {
   photos: LibraryPhoto[];
@@ -44,6 +46,7 @@ export function LibraryGrid({
   onToggle: (id: string, shift: boolean, gesture: "toggle" | "add") => void;
   onSelectDay: (ids: string[], select: boolean) => void;
   onClear: () => void;
+  onOpenLightbox: (id: string) => void;
   onPreviewError: (src: string) => void;
 }) {
   const groups = useMemo(() => groupPhotosByTime(photos, timeZone), [photos, timeZone]);
@@ -107,6 +110,14 @@ export function LibraryGrid({
         onClear();
         return;
       }
+      if (event.key === "Enter" && current && !selecting) {
+        const photo = photos.find((p) => p.assetId === current);
+        if (photo && libraryPhotoLightboxable(photo)) {
+          event.preventDefault();
+          onOpenLightbox(current);
+        }
+        return;
+      }
       if (event.key === " " && current) {
         event.preventDefault();
         onToggle(current, false, selecting ? "toggle" : "toggle");
@@ -122,7 +133,7 @@ export function LibraryGrid({
         }
       }
     },
-    [focusId, firstId, locked, onClear, onFocus, onToggle, orderedIds, selecting],
+    [focusId, firstId, locked, onClear, onFocus, onOpenLightbox, onToggle, orderedIds, photos, selecting],
   );
 
   useEffect(() => {
@@ -195,6 +206,7 @@ export function LibraryGrid({
             onFocus={onFocus}
             onToggle={onToggle}
             onSelectDay={onSelectDay}
+            onOpenLightbox={onOpenLightbox}
             onPreviewError={onPreviewError}
           />
         ))}
@@ -230,6 +242,7 @@ function DayBlock({
   onFocus,
   onToggle,
   onSelectDay,
+  onOpenLightbox,
   onPreviewError,
 }: {
   segment: DaySegment;
@@ -243,6 +256,7 @@ function DayBlock({
   onFocus: (id: string) => void;
   onToggle: (id: string, shift: boolean, gesture: "toggle" | "add") => void;
   onSelectDay: (ids: string[], select: boolean) => void;
+  onOpenLightbox: (id: string) => void;
   onPreviewError: (src: string) => void;
 }) {
   const selectableIds = segment.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
@@ -295,6 +309,7 @@ function DayBlock({
             pressTimer={pressTimer}
             onFocus={() => onFocus(photo.assetId)}
             onToggle={(shift, gesture) => onToggle(photo.assetId, shift, gesture)}
+            onOpenLightbox={onOpenLightbox}
             onPreviewError={onPreviewError}
           />
         ))}
@@ -316,6 +331,7 @@ function LibraryTile({
   pressTimer,
   onFocus,
   onToggle,
+  onOpenLightbox,
   onPreviewError,
 }: {
   photo: LibraryPhoto;
@@ -330,6 +346,7 @@ function LibraryTile({
   pressTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
   onFocus: () => void;
   onToggle: (shift: boolean, gesture: "toggle" | "add") => void;
+  onOpenLightbox: (id: string) => void;
   onPreviewError: (src: string) => void;
 }) {
   const src = previewUrl(photo.previews);
@@ -368,6 +385,17 @@ function LibraryTile({
           onToggle(false, "toggle");
           return;
         }
+        if (libraryPhotoLightboxable(photo)) {
+          onOpenLightbox(photo.assetId);
+        }
+      }}
+      onMouseEnter={() => {
+        if (!libraryPhotoLightboxable(photo)) return;
+        const url = lightboxUrl(photo.previews);
+        if (!url) return;
+        const img = new Image();
+        img.referrerPolicy = "no-referrer";
+        img.src = url;
       }}
       onPointerDown={(event) => {
         if (!selectable || locked || event.pointerType === "mouse") return;
