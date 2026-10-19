@@ -26,6 +26,41 @@
   z-index: 0;
 }
 
+/* §3 纹理叠层：卡片实底隔开，不压表单字 */
+.share-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  animation: share-texture-in var(--share-duration-3) var(--share-ease-out) forwards;
+  background-repeat: repeat;
+}
+
+.share-texture-grain {
+  --share-texture-opacity: 0.11;
+  background-size: 160px 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.55'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+.share-texture-paper {
+  --share-texture-opacity: 0.21;
+  background-size: 200px 200px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23p)' opacity='0.42'/%3E%3C/svg%3E");
+  background-color: color-mix(in srgb, var(--share-border) 70%, var(--share-secondary));
+  background-blend-mode: soft-light;
+}
+
+@keyframes share-texture-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--share-texture-opacity, 0.11);
+  }
+}
+
 .share-shell[data-theme="cotton-candy"] .share-backdrop {
   background:
     radial-gradient(circle at 108% -6%, color-mix(in srgb, var(--share-brand) 78%, transparent), transparent 46%),
@@ -39,7 +74,20 @@
 }
 
 .share-shell[data-theme="magazine-heirloom"] .share-backdrop {
-  background: linear-gradient(var(--share-accent), var(--share-accent)) center top / 100% 3px no-repeat;
+  background: none;
+}
+
+.share-shell[data-theme="magazine-heirloom"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  pointer-events: none;
+  z-index: 2;
+  background: color-mix(in srgb, var(--share-accent) 85%, var(--share-text));
+  opacity: 0.8;
 }
 
 .share-blob,
@@ -251,8 +299,17 @@
 }
 
 .share-shell[data-theme="magazine-heirloom"] .share-rule {
-  width: 100%;
-  height: 2px;
+  display: none;
+}
+
+.share-shell[data-theme="magazine-heirloom"] .share-form {
+  padding-top: 1.35rem;
+  border-top: 1px solid
+    color-mix(
+      in srgb,
+      color-mix(in srgb, var(--share-accent) 85%, var(--share-text)) 55%,
+      transparent
+    );
 }
 
 .share-copy,
@@ -477,6 +534,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .share-texture {
+    animation-duration: var(--share-duration-1);
+  }
+
   .share-form button:not(:disabled):active {
     transform: none;
   }

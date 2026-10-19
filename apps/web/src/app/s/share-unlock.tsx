@@ -11,7 +11,7 @@ import {
 import { themeSkin, type ThemeSkin } from "../../lib/themes";
 import { ShareGallery } from "./share-gallery";
 import { ShareChrome, shareThemeStyle } from "./share-chrome";
-import { ShareBackdrop, ShareRevealEnvelope } from "./share-ornaments";
+import { ShareBackdrop, ShareRevealEnvelope, ShareTexture } from "./share-ornaments";
 
 const HINT = "输入密码后才能查看照片。";
 const OPENING = "正在打开…";
@@ -193,6 +193,7 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
           aria-hidden="true"
         >
           <ShareBackdrop themeId={theme.id} />
+          <ShareTexture themeId={theme.id} />
           <div className="share-reveal-mark">
             <ShareRevealEnvelope />
           </div>

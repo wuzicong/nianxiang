@@ -1,5 +1,12 @@
 import type { ThemeId } from "@memora/shared";
 
+/** Shell 纹理层：cotton=grain · kyoto=paper · heirloom=无满屏纹 */
+export function ShareTexture({ themeId }: { themeId: ThemeId }) {
+  if (themeId === "magazine-heirloom") return null;
+  const variant = themeId === "cotton-candy" ? "grain" : "paper";
+  return <div className={`share-texture share-texture-${variant}`} aria-hidden="true" />;
+}
+
 export function ShareBackdrop({ themeId }: { themeId: ThemeId }) {
   return (
     <div className="share-backdrop" aria-hidden="true">
@@ -84,10 +91,10 @@ function WashiTape() {
 function Lantern({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 72" fill="none">
-      <rect x="18" y="4" width="12" height="6" rx="1" fill="#C2A878" />
+      <rect x="18" y="4" width="12" height="6" rx="1" fill="var(--share-accent)" />
       <path d="M10 14h28l-3 36H13L10 14z" fill="#F5C6C6" fillOpacity="0.9" />
-      <ellipse cx="24" cy="32" rx="10" ry="14" fill="#C2A878" fillOpacity="0.38" />
-      <rect x="22" y="50" width="4" height="14" rx="1" fill="#C2A878" />
+      <ellipse cx="24" cy="32" rx="10" ry="14" fill="var(--share-accent)" fillOpacity="0.38" />
+      <rect x="22" y="50" width="4" height="14" rx="1" fill="var(--share-accent)" />
     </svg>
   );
 }
@@ -101,7 +108,7 @@ function PostageStamp({ className }: { className?: string }) {
         width="60"
         height="60"
         fill="#242422"
-        stroke="#C2A878"
+        stroke="var(--share-accent)"
         strokeWidth="2"
         strokeDasharray="4 3"
       />
@@ -116,13 +123,13 @@ function TicketStub({ className }: { className?: string }) {
       <path
         d="M6 8h104c0 5 4 8 4 12s-4 7-4 12 4 7 4 12-4 7-4 12H6a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"
         fill="#242422"
-        stroke="#C2A878"
+        stroke="var(--share-accent)"
       />
-      <path d="M110 8h28a4 4 0 0 1 4 4v40a4 4 0 0 1-4 4h-28" stroke="#C2A878" />
-      <path d="M110 10v44" stroke="#C2A878" strokeDasharray="2 3" />
+      <path d="M110 8h28a4 4 0 0 1 4 4v40a4 4 0 0 1-4 4h-28" stroke="var(--share-accent)" />
+      <path d="M110 10v44" stroke="var(--share-accent)" strokeDasharray="2 3" />
       <path d="M22 32h52" stroke="#F5C6C6" strokeWidth="1.4" />
-      <circle cx="28" cy="24" r="2" fill="#C2A878" />
-      <circle cx="40" cy="24" r="2" fill="#C2A878" />
+      <circle cx="28" cy="24" r="2" fill="var(--share-accent)" />
+      <circle cx="40" cy="24" r="2" fill="var(--share-accent)" />
     </svg>
   );
 }
@@ -130,7 +137,7 @@ function TicketStub({ className }: { className?: string }) {
 function WashiEdge() {
   return (
     <svg viewBox="0 0 320 16" preserveAspectRatio="none" fill="none">
-      <rect width="320" height="16" fill="#C2A878" fillOpacity="0.38" />
+      <rect width="320" height="16" fill="var(--share-accent)" fillOpacity="0.35" />
       <path d="M0 8h320" stroke="#F5C6C6" strokeDasharray="2 7" />
     </svg>
   );
@@ -142,7 +149,14 @@ function PageNumber() {
       <text x="0" y="18" fill="currentColor" fontFamily="serif" fontSize="15">
         01
       </text>
-      <line x1="28" y1="14" x2="64" y2="14" stroke="#C2A878" strokeWidth="1.5" />
+      <line
+        x1="28"
+        y1="14"
+        x2="64"
+        y2="14"
+        stroke="color-mix(in srgb, var(--share-accent) 85%, var(--share-text))"
+        strokeWidth="1"
+      />
     </svg>
   );
 }
