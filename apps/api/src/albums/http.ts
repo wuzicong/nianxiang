@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isSafeStorageId, isShareToken, isThemeId, sharePagePath } from "@memora/shared";
-import type { AlbumRepository, AuthRepository, ObjectStore } from "@memora/storage";
+import { MAX_ASSETS_PER_ALBUM, type AlbumRepository, type AuthRepository, type ObjectStore } from "@memora/storage";
 import { safeErrorMessage } from "@memora/storage";
 import type { Express, Request, Response } from "express";
 import { hashPassword } from "../auth/password.js";
@@ -18,6 +18,7 @@ import {
 import {
   parseAlbumTitle,
   parseAssetIds,
+  parseCreateAlbumAssetIds,
   parseExpiresAt,
   parseSharePassword,
   parseThemeId,
@@ -88,19 +89,29 @@ export function registerAlbumRoutes(app: Express, deps: AlbumRouteDeps): void {
       const body = asRecord(req.body);
       const title = parseAlbumTitle(body.title);
       const themeId = parseThemeId(body.themeId);
+      const assetIds = parseCreateAlbumAssetIds(body.assetIds);
       const created = await deps.albums.createAlbum({
         id: randomUUID(),
         userId: user.id,
         title,
         themeId,
+        assetIds,
       });
       if (!created.ok) {
         if (created.reason === "album_limit") {
           throw new HttpError(409, "album_limit", "相册数量已达上限");
         }
+        if (created.reason === "too_many") {
+          throw new HttpError(400, "invalid_request", `一次最多 ${MAX_ASSETS_PER_ALBUM} 张`);
+        }
+        if (created.reason === "asset_not_found") {
+          throw new HttpError(404, "asset_not_found", "素材不存在");
+        }
         throw new HttpError(401, "unauthenticated", "请先登录");
       }
-      console.log(`[memora-api] album create id=${created.album.id} user=${user.id}`);
+      console.log(
+        `[memora-api] album create id=${created.album.id} user=${user.id} assets=${created.album.assetCount}`,
+      );
       res.status(201).json({ album: presentAlbum(created.album) });
     }),
   );

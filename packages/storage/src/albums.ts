@@ -67,7 +67,7 @@ export interface PublicShareView {
 
 export type CreateAlbumResult =
   | { ok: true; album: AlbumSummary }
-  | { ok: false; reason: "album_limit" | "user_not_found" };
+  | { ok: false; reason: "album_limit" | "user_not_found" | "asset_not_found" | "too_many" };
 
 export type AddAssetsResult =
   | { ok: true; assetIds: string[] }
@@ -82,6 +82,11 @@ export interface NewAlbum {
   userId: string;
   title: string;
   themeId: string;
+  /**
+   * 一起放进这本相册的素材。空数组和省略一样，只建空册。
+   * 重复 id 按第一次出现保留。超过 MAX_ASSETS_PER_ALBUM 直接 too_many，不建册。
+   */
+  assetIds?: readonly string[];
 }
 
 export interface NewShare {
@@ -178,6 +183,23 @@ function mapShare(row: ShareRow): ShareRecord {
   };
 }
 
+function uniqueAssetIds(ids: readonly string[] | undefined): string[] {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const id of ids ?? []) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(id);
+  }
+  return unique;
+}
+
+function postgresCode(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
+}
+
 function sslFor(connectionString: string): pg.ConnectionConfig["ssl"] {
   if (/localhost|127\.0\.0\.1/.test(connectionString)) return undefined;
   if (/sslmode=disable/i.test(connectionString)) return undefined;
@@ -268,28 +290,56 @@ export function createAlbumRepository(options: {
     ready,
 
     async createAlbum(input) {
-      return withTransaction(async (client) => {
-        const user = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [
-          input.userId,
-        ]);
-        if (user.rows.length === 0) return { ok: false, reason: "user_not_found" };
-        const count = await client.query<{ n: number }>(
-          `SELECT count(*)::int AS n FROM albums WHERE user_id = $1`,
-          [input.userId],
-        );
-        if (Number(count.rows[0]?.n ?? 0) >= MAX_ALBUMS_PER_USER) {
-          return { ok: false, reason: "album_limit" };
-        }
-        const inserted = await client.query<AlbumRow>(
-          `INSERT INTO albums (id, user_id, title, theme_id)
-           VALUES ($1, $2, $3, $4)
-           RETURNING id, user_id, title, theme_id, created_at, updated_at`,
-          [input.id, input.userId, input.title, input.themeId],
-        );
-        const row = inserted.rows[0];
-        if (!row) throw new Error("insert_album_failed");
-        return { ok: true, album: mapAlbum(row, 0) };
-      });
+      const assetIds = uniqueAssetIds(input.assetIds);
+      if (assetIds.length > MAX_ASSETS_PER_ALBUM) {
+        return { ok: false, reason: "too_many" };
+      }
+      try {
+        return await withTransaction(async (client) => {
+          const user = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [
+            input.userId,
+          ]);
+          if (user.rows.length === 0) return { ok: false, reason: "user_not_found" };
+          const count = await client.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM albums WHERE user_id = $1`,
+            [input.userId],
+          );
+          if (Number(count.rows[0]?.n ?? 0) >= MAX_ALBUMS_PER_USER) {
+            return { ok: false, reason: "album_limit" };
+          }
+          if (assetIds.length > 0) {
+            const found = await client.query<{ id: string }>(
+              `SELECT id FROM assets
+               WHERE user_id = $1 AND id = ANY($2::text[])
+               FOR UPDATE`,
+              [input.userId, assetIds],
+            );
+            if (found.rows.length !== assetIds.length) {
+              return { ok: false, reason: "asset_not_found" };
+            }
+          }
+          const inserted = await client.query<AlbumRow>(
+            `INSERT INTO albums (id, user_id, title, theme_id)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, user_id, title, theme_id, created_at, updated_at`,
+            [input.id, input.userId, input.title, input.themeId],
+          );
+          const row = inserted.rows[0];
+          if (!row) throw new Error("insert_album_failed");
+          if (assetIds.length > 0) {
+            await client.query(
+              `INSERT INTO album_assets (album_id, asset_id, position)
+               SELECT $1, id, ord::int
+               FROM unnest($2::text[]) WITH ORDINALITY AS t(id, ord)`,
+              [input.id, assetIds],
+            );
+          }
+          return { ok: true, album: mapAlbum(row, assetIds.length) };
+        });
+      } catch (err) {
+        if (postgresCode(err) === "23503") return { ok: false, reason: "asset_not_found" };
+        throw err;
+      }
     },
 
     async listAlbums(userId) {

@@ -1,5 +1,6 @@
 import {
   isAllowedUploadContentType,
+  isSafeStorageId,
   normalizeContentType,
   sanitizeFilename,
   type AllowedUploadContentType,
@@ -53,6 +54,18 @@ export function validateUploadRequest(input: {
     contentType: normalizeContentType(input.mime) as AllowedUploadContentType,
     sizeBytes: input.size,
   };
+}
+
+/**
+ * 上传到图库时不带相册。
+ * 空字符串和 null 同样表示不入册。非法 id 拒绝，避免调用方以为已经指定了相册。
+ */
+export function parseOptionalAlbumId(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !isSafeStorageId(value)) {
+    throw new HttpError(400, "invalid_request", "albumId 不合法");
+  }
+  return value;
 }
 
 export function readTraceId(header: string | undefined): string | undefined {

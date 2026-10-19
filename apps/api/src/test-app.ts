@@ -22,8 +22,10 @@ import {
   type NewAuthUser,
   type NewShare,
   type ObjectStore,
+  type PendingAlbumTarget,
   type PresignPutInput,
   type PublicShareView,
+  type ReservePendingResult,
   type ShareReadAccess,
   type ShareRecord,
   type AssetJobEnqueuer,
@@ -81,29 +83,62 @@ function pendingRecord(asset: NewAsset): AssetRecord {
   });
 }
 
+export interface MemoryAlbumLink {
+  getOwnedAlbum: AlbumRepository["getOwnedAlbum"];
+  addAssets: AlbumRepository["addAssets"];
+  detachAsset: (assetId: string) => void;
+}
+
 export function memoryAssets(
   seed: AssetRecord[] = [],
-): AssetRepository & { rows: Map<string, AssetRecord> } {
+): AssetRepository & {
+  rows: Map<string, AssetRecord>;
+  useAlbums: (albums: MemoryAlbumLink) => void;
+} {
   const rows = new Map(seed.map((row) => [row.id, row]));
+  let albums: MemoryAlbumLink | null = null;
   return {
     rows,
+    useAlbums(next) {
+      albums = next;
+    },
     async ready() {},
     async insertPending(asset: NewAsset) {
       rows.set(asset.id, pendingRecord(asset));
     },
-    async reservePendingUpload(asset: NewAsset, maxPending: number) {
+    async reservePendingUpload(
+      asset: NewAsset,
+      maxPending: number,
+      target?: PendingAlbumTarget | null,
+    ): Promise<ReservePendingResult> {
       if (!Number.isInteger(maxPending) || maxPending < 1) return "limit";
+      if (target) {
+        if (!albums) return "album_not_found";
+        const album = await albums.getOwnedAlbum(target.albumId, asset.userId);
+        if (!album) return "album_not_found";
+        if (album.assetCount >= target.maxAssets) return "album_full";
+      }
       let pending = 0;
       for (const row of rows.values()) {
         if (row.userId === asset.userId && row.status === "pending_upload") pending += 1;
       }
       if (pending >= maxPending) return "limit";
       rows.set(asset.id, pendingRecord(asset));
+      if (target && albums) {
+        const added = await albums.addAssets(target.albumId, asset.userId, [asset.id]);
+        if (!added.ok) {
+          rows.delete(asset.id);
+          return added.reason === "too_many" ? "album_full" : "album_not_found";
+        }
+      }
       return "ok";
     },
     async deletePending(id) {
       const current = rows.get(id);
-      if (current?.status === "pending_upload") rows.delete(id);
+      if (current?.status === "pending_upload") {
+        rows.delete(id);
+        albums?.detachAsset(id);
+      }
     },
     async get(id) {
       return rows.get(id) ?? null;
@@ -193,6 +228,7 @@ export function memoryAlbums(
   tokenHashes: Set<string>;
   passwordHashes: Set<string>;
   expireShare(shareId: string): void;
+  detachAsset(assetId: string): void;
 } {
   interface StoredAlbum {
     id: string;
@@ -246,9 +282,29 @@ export function memoryAlbums(
     tokenHashes,
     passwordHashes,
     async ready() {},
+    detachAsset(assetId: string) {
+      for (const [albumId, rows] of membership) {
+        membership.set(
+          albumId,
+          rows.filter((item) => item.assetId !== assetId),
+        );
+      }
+    },
     async createAlbum(input: NewAlbum): Promise<CreateAlbumResult> {
       const owned = [...albums.values()].filter((album) => album.userId === input.userId);
       if (owned.length >= MAX_ALBUMS_PER_USER) return { ok: false, reason: "album_limit" };
+      const assetIds: string[] = [];
+      const seen = new Set<string>();
+      for (const assetId of input.assetIds ?? []) {
+        if (seen.has(assetId)) continue;
+        seen.add(assetId);
+        assetIds.push(assetId);
+      }
+      if (assetIds.length > MAX_ASSETS_PER_ALBUM) return { ok: false, reason: "too_many" };
+      for (const assetId of assetIds) {
+        const asset = await assets.get(assetId);
+        if (!asset || asset.userId !== input.userId) return { ok: false, reason: "asset_not_found" };
+      }
       const stamp = nowIso();
       const album: StoredAlbum = {
         id: input.id,
@@ -259,7 +315,13 @@ export function memoryAlbums(
         updatedAt: stamp,
       };
       albums.set(album.id, album);
-      membership.set(album.id, []);
+      const rows: Membership[] = [];
+      let position = 0;
+      for (const assetId of assetIds) {
+        position += 1;
+        rows.push({ assetId, position, createdAt: stamp });
+      }
+      membership.set(album.id, rows);
       return { ok: true, album: summary(album) };
     },
     async listAlbums(userId) {
@@ -458,6 +520,7 @@ export function createTestApp(options?: {
   const jobs = options?.jobs ?? fakeJobs();
   const auth = options?.auth ?? memoryAuth();
   const albums = options?.albums ?? memoryAlbums(assets);
+  assets.useAlbums?.(albums);
   const config = createConfig(options?.env ?? ENV);
   const app = createApp({ config, assets, objects, jobs, auth, albums });
   return { app, config, assets, objects, jobs, auth, albums };

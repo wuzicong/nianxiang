@@ -6,13 +6,14 @@ import {
   normalizeContentType,
   originalObjectKey,
 } from "@memora/shared";
-import type {
-  AlbumRepository,
-  AssetJobEnqueuer,
-  AssetRecord,
-  AssetRepository,
-  AuthRepository,
-  ObjectStore,
+import {
+  MAX_ASSETS_PER_ALBUM,
+  type AlbumRepository,
+  type AssetJobEnqueuer,
+  type AssetRecord,
+  type AssetRepository,
+  type AuthRepository,
+  type ObjectStore,
 } from "@memora/storage";
 import { safeErrorMessage } from "@memora/storage";
 import cors from "cors";
@@ -34,7 +35,7 @@ import type { AppConfig } from "./config.js";
 import { HttpError, asyncRoute } from "./http.js";
 import { parseLibraryLimit, presentLibraryAssets } from "./library/present.js";
 import { toPublicAsset } from "./present.js";
-import { asRecord, readTraceId, validateUploadRequest } from "./validate.js";
+import { asRecord, parseOptionalAlbumId, readTraceId, validateUploadRequest } from "./validate.js";
 
 export interface AppDeps {
   config: AppConfig;
@@ -193,6 +194,8 @@ export function createApp(deps: AppDeps): Express {
         size: body.size,
         maxBytes: deps.config.maxUploadBytes,
       });
+      const albumId = parseOptionalAlbumId(body.albumId);
+      if (albumId) await deps.albums.ready();
       await deps.assets.ready();
       const assetId = randomUUID();
       const key = originalObjectKey(user.id, assetId);
@@ -206,6 +209,7 @@ export function createApp(deps: AppDeps): Express {
           sizeBytes: validated.sizeBytes,
         },
         deps.config.maxPendingUploadsPerUser,
+        albumId ? { albumId, maxAssets: MAX_ASSETS_PER_ALBUM } : null,
       );
       if (reserved === "limit") {
         console.log(`[memora-api] upload-url limited user=${user.id}`);
@@ -215,6 +219,12 @@ export function createApp(deps: AppDeps): Express {
           "未完成的上传太多，请稍后再试",
         );
       }
+      if (reserved === "album_not_found") {
+        throw new HttpError(404, "album_not_found", "相册不存在");
+      }
+      if (reserved === "album_full") {
+        throw new HttpError(409, "album_full", "相册里的照片已达上限");
+      }
       try {
         const signed = await deps.objects.presignPut({
           key,
@@ -222,7 +232,7 @@ export function createApp(deps: AppDeps): Express {
           contentLength: validated.sizeBytes,
         });
         console.log(
-          `[memora-api] presign asset=${assetId} user=${user.id} bytes=${validated.sizeBytes} type=${validated.contentType} ttl=${deps.config.presignTtlMinutes}m bucket=${deps.config.s3.bucket}`,
+          `[memora-api] presign asset=${assetId} user=${user.id} bytes=${validated.sizeBytes} type=${validated.contentType} ttl=${deps.config.presignTtlMinutes}m bucket=${deps.config.s3.bucket} album=${albumId ?? "none"}`,
         );
         res.status(201).json({
           assetId,
@@ -232,6 +242,7 @@ export function createApp(deps: AppDeps): Express {
           method: "PUT",
           headers: signed.headers,
           bucket: deps.config.s3.bucket,
+          ...(albumId ? { albumId } : {}),
         });
       } catch (err) {
         console.error("[memora-api] presign failed", safeErrorMessage(err));

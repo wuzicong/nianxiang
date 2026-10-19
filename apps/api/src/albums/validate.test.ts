@@ -4,6 +4,7 @@ import { HttpError } from "../http.js";
 import {
   parseAlbumTitle,
   parseAssetIds,
+  parseCreateAlbumAssetIds,
   parseExpiresAt,
   parseSharePassword,
   parseThemeId,
@@ -36,6 +37,20 @@ test("album validators reject empty titles, unknown themes, and bad expiry", () 
   );
   assert.throws(() => parseExpiresAt("2028-01-01T00:00:00.000Z", NOW), HttpError);
   assert.throws(() => parseExpiresAt(123, NOW), HttpError);
+});
+
+test("createAlbum asset ids are optional, deduped, and capped at 200", () => {
+  assert.deepEqual(parseCreateAlbumAssetIds(undefined), []);
+  assert.deepEqual(parseCreateAlbumAssetIds(null), []);
+  assert.deepEqual(parseCreateAlbumAssetIds([]), []);
+  assert.deepEqual(parseCreateAlbumAssetIds(["asset_1", "asset_1", "asset-2"]), ["asset_1", "asset-2"]);
+  assert.equal(parseCreateAlbumAssetIds(Array.from({ length: 200 }, (_, i) => `a${i}`)).length, 200);
+  assert.throws(
+    () => parseCreateAlbumAssetIds(Array.from({ length: 201 }, () => "same-asset")),
+    (err) => err instanceof HttpError && err.status === 400,
+  );
+  assert.throws(() => parseCreateAlbumAssetIds("asset_1"), HttpError);
+  assert.throws(() => parseCreateAlbumAssetIds(["../x"]), HttpError);
 });
 
 test("share password is optional unless the deployment requires one", () => {

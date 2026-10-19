@@ -14,6 +14,8 @@ export {
   type AssetStatus,
   type ExifSummary,
   type NewAsset,
+  type PendingAlbumTarget,
+  type ReservePendingResult,
 } from "./assets.js";
 export {
   assetJobOptions,
