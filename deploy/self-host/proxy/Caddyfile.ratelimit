@@ -1,0 +1,33 @@
+# 按来源 IP 限制分享公开接口。需要带 github.com/mholt/caddy-ratelimit 的 Caddy。
+# 构建：xcaddy build --with github.com/mholt/caddy-ratelimit
+#
+# 在站点之外先导入本文件，站点里再 import memora_share_limits：
+#   import /path/to/deploy/self-host/proxy/Caddyfile.ratelimit
+# 官方二进制没有 rate_limit，不要导入本文件。
+#
+# 次数可以改。出口 IP 若很多人共用，把 events 调高。
+# 边缘就是这台 Caddy 时用 {remote_host}。只有配了 trusted_proxies 才改成 {client_ip}。
+
+(memora_share_limits) {
+	rate_limit {
+		# POST 解锁：滑动窗口每分钟 6 次。密码输错也计数。
+		zone memora_share_unlock {
+			match {
+				method POST
+				path /api/v1/public/shares/*/unlock /api/v1/public/shares/*/unlock/
+			}
+			key {remote_host}
+			window 1m
+			events 6
+		}
+		# 公开分享前缀，含上面的解锁 POST（更紧的那一档仍生效）。
+		zone memora_public_shares {
+			match {
+				path /api/v1/public/shares/*
+			}
+			key {remote_host}
+			window 1m
+			events 60
+		}
+	}
+}

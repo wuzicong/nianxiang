@@ -40,6 +40,6 @@ REDIS_URL=rediss://...
 
 可计划、但默认不应用的 Terraform 骨架：[`terraform/README.md`](terraform/README.md)。里面没有后端状态，也没有访问密钥。
 
-素材、登录和相册表由应用第一次访问数据库时创建（`packages/storage/migrations/001_assets.sql`、`002_auth.sql`、`003_albums.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。分享令牌只存哈希；可选密码只存 scrypt。撤销后公开读取立即 404。`SHARE_REQUIRE_PASSWORD=true` 时，之后新建的分享必须带密码。反代访问日志要打码 `/s/` 和 `/api/v1/public/shares/`，也不要记录 `POST .../unlock` 的正文。应用自己的日志不会打印明文 token 或密码。本次不附 Nginx 片段。限流放在反代上，对 `POST /api/v1/public/shares/` 按来源地址计数即可。
+素材、登录和相册表由应用第一次访问数据库时创建（`packages/storage/migrations/001_assets.sql`、`002_auth.sql`、`003_albums.sql`），不放进这份云骨架。生产编排（K8s 或单机进程）仍由部署环境负责。分享令牌只存哈希；可选密码只存 scrypt。撤销后公开读取立即 404。`SHARE_REQUIRE_PASSWORD=true` 时，之后新建的分享必须带密码。应用自己的日志不会打印明文 token 或密码。公网反代仍要打码 `/s/` 和 `/api/v1/public/shares/`，限制解锁频率，并且不要记录 `POST .../unlock` 的正文。片段和接法在自托管说明的[公网反代](../self-host/README.md#公网反代)。云负载均衡若自己写访问日志，路径里的令牌也会留下，关掉这份日志，或在入库前打码。
 
 `DATABASE_URL` 里的 `sslmode=require` 会走 TLS，但不校验服务器证书。要校验 CA 时用 `sslmode=verify-full`。
