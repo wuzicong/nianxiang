@@ -20,12 +20,16 @@ function OwnedPreviewChrome({
   themeId,
   albumTitle,
   focusTitleOnMount,
+  showShareCta = true,
+  showLoginCta = false,
   children,
 }: {
   albumId: string;
   themeId: ThemeId;
   albumTitle?: string | null;
   focusTitleOnMount?: boolean;
+  showShareCta?: boolean;
+  showLoginCta?: boolean;
   children: ReactNode;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -54,10 +58,19 @@ function OwnedPreviewChrome({
       </h1>
       <div className="preview-owned-body">{children}</div>
       <div className="preview-owned-actions">
-        <Link className="preview-owned-primary" href={albumShareHref(albumId)}>
-          生成分享链接
-        </Link>
-        <Link className="preview-owned-secondary" href={`/albums/${encodeURIComponent(albumId)}`}>
+        {showShareCta ? (
+          <Link className="preview-owned-primary" href={albumShareHref(albumId)}>
+            生成分享链接
+          </Link>
+        ) : showLoginCta ? (
+          <Link className="preview-owned-primary" href="/login">
+            登录
+          </Link>
+        ) : null}
+        <Link
+          className={showShareCta || showLoginCta ? "preview-owned-secondary" : "preview-owned-primary"}
+          href={`/albums/${encodeURIComponent(albumId)}`}
+        >
           返回这本
         </Link>
       </div>
@@ -152,12 +165,17 @@ export function OwnedAlbumStage({
     void refresh("silent");
   }, [refresh]);
 
-  const chrome = (body: ReactNode, options?: { focusTitle?: boolean }) => (
+  const chrome = (
+    body: ReactNode,
+    options?: { focusTitle?: boolean; showShareCta?: boolean; showLoginCta?: boolean },
+  ) => (
     <OwnedPreviewChrome
       albumId={albumId}
       themeId={shellThemeId}
       albumTitle={albumTitle}
       focusTitleOnMount={options?.focusTitle ?? focusTitleOnMount}
+      showShareCta={options?.showShareCta ?? true}
+      showLoginCta={options?.showLoginCta ?? false}
     >
       {body}
     </OwnedPreviewChrome>
@@ -183,6 +201,7 @@ export function OwnedAlbumStage({
           message
         )}
       </p>,
+      { showShareCta: false, showLoginCta: status === 401 },
     );
   }
 
