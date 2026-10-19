@@ -1,0 +1,251 @@
+{
+  "product": "念册·Memora (nianxiang)",
+  "focus": ["library-empty", "upload-fail", "material-modules"],
+  "themes": ["cotton-candy", "kyoto-lantern", "magazine-heirloom"],
+  "local_path": "/workspace/design-memora/moodboard/",
+  "repo_hang_target": "docs/design/moodboard/",
+  "policy": {
+    "prefer": "outbound-links",
+    "binaries_only_when": "license clearly commercial/redistributable",
+    "required_fields": ["source_url", "license_auth", "intended_use"],
+    "no_license": "moodboard link table only — never copy into assets/ or materials/"
+  },
+  "collected_at": "2026-10-19",
+  "timezone_note": "Asia/Shanghai (UTC+8)",
+  "count": 14,
+  "references": [
+    {
+      "id": "glass-5-0",
+      "name": "Glass 5.0 — Refined and Reflective",
+      "url": "https://glass.photo/highlights/refined-and-reflective-glass-5-0",
+      "category": "photo-app",
+      "license_auth": "inspiration-only",
+      "intended_use": "图库空态与 chrome：照片压过界面；半透明深度节奏",
+      "take": [
+        "控件半透明退让，影像/插画为唯一焦点",
+        "过渡细腻但不炫技",
+        "文案克制，产品退场"
+      ],
+      "dont_copy": ["Liquid Glass 系统控件造型", "Glass 字标", "会员门控话术"],
+      "relevance": "empty-library, future-ui-chrome",
+      "local_file": "link-only"
+    },
+    {
+      "id": "apple-photos-gummble",
+      "name": "Apple Photos iOS UI (Gummble capture index)",
+      "url": "https://gummble.com/apps/apple-photos-ios",
+      "category": "photo-app",
+      "license_auth": "inspiration-only",
+      "intended_use": "空库首动作清晰度；Library/Collections 分栏气质",
+      "take": [
+        "单一主 CTA（导入/备份类）",
+        "大留白 + 短标题一行说明",
+        "空态不伪造缩略图"
+      ],
+      "dont_copy": ["SF Symbol 空态整包", "Photos 品牌黄", "系统「无项目」文案"],
+      "relevance": "empty-library",
+      "local_file": "link-only"
+    },
+    {
+      "id": "ente-empty-redesign",
+      "name": "Ente Photos redesigned empty states",
+      "url": "https://github.com/ente/ente/commit/b7728bb1bff7a745b3083a5fd995385f1d6d6da7",
+      "category": "photo-app",
+      "license_auth": "inspiration-only (repo LICENSE applies; do not copy illustration binaries into product assets)",
+      "intended_use": "分情境空态（库/设备/共享）；小屏可滚动",
+      "take": [
+        "Albums/Feed/On-device 分型插画与文案",
+        "功能要点 bullet-row",
+        "插画重空态可滚动保 CTA"
+      ],
+      "dont_copy": ["Ducky 吉祥物", "Ente 配色", "Outfit 字标"],
+      "relevance": "empty-library, future-material-modules",
+      "local_file": "link-only"
+    },
+    {
+      "id": "fillbyte-empty-loading",
+      "name": "Fillbyte — Empty states & loading patterns",
+      "url": "https://fillbyte.com/blog/the-art-of-empty-states-and-loading-experiences",
+      "category": "product-craft",
+      "license_auth": "inspiration-only",
+      "intended_use": "空态文案语气；上传/衍生失败诚实度与出路",
+      "take": [
+        "空态解释空间用途 + 下一步，禁死胡同文案",
+        "错误具体化 + 至少一条出路，不责备用户",
+        "骨架屏优先于 indeterminate spinner"
+      ],
+      "dont_copy": ["Kiyo 产品插画", "效果浏览器 UI"],
+      "relevance": "empty-library, upload-fail, load-fail",
+      "local_file": "link-only"
+    },
+    {
+      "id": "linear-empty-northbase",
+      "name": "Linear empty states (Northbase breakdown)",
+      "url": "https://www.northbase.design/systems/linear/empty-states",
+      "category": "product-empty",
+      "license_auth": "inspiration-only",
+      "intended_use": "空态分级（插画/图标/纯文字）；过滤无结果瘦身",
+      "take": [
+        "首用 → illustration + 教育文案 + CTA",
+        "搜索/过滤 → text-only",
+        "空态时外围筛选栏仍可见"
+      ],
+      "dont_copy": ["Linear 几何插画", "Issue 语义", "快捷键文化"],
+      "relevance": "empty-library, filter-empty, upload-fail-row",
+      "local_file": "link-only"
+    },
+    {
+      "id": "stripe-empty-northbase",
+      "name": "Stripe empty states (Northbase breakdown)",
+      "url": "https://www.northbase.design/systems/stripe/empty-states",
+      "category": "product-empty",
+      "license_auth": "inspiration-only",
+      "intended_use": "零态保留结构；覆盖层短恢复路径",
+      "take": [
+        "零态保留表头/轴，显示 0 而非空白页",
+        "区块空态紧凑居中",
+        "搜索无结果短标题 + 支持链"
+      ],
+      "dont_copy": ["Stripe 紫品牌", "Connect 流程图插画"],
+      "relevance": "load-fail, derivative-fail-tile",
+      "local_file": "link-only",
+      "related_urls": [
+        "https://docs.stripe.com/stripe-apps/patterns/empty-state"
+      ]
+    },
+    {
+      "id": "sk-photographer-no-sd",
+      "name": "SK Photographer — 404 No SD Card",
+      "url": "https://www.awwwards.com/inspiration/404-no-sd-card-sk-photographer-1",
+      "category": "gallery-portfolio",
+      "license_auth": "inspiration-only",
+      "intended_use": "摄影语境空/错隐喻；错误页仍在品牌世界内",
+      "take": [
+        "器物隐喻替代通用 empty icon",
+        "错误页也有美学",
+        "页面过渡即体验的一部分"
+      ],
+      "dont_copy": ["BEEM 字体与动效曲线原样", "SD 卡矢量资产"],
+      "relevance": "empty-library, load-fail, metaphor",
+      "local_file": "link-only"
+    },
+    {
+      "id": "felix-peault",
+      "name": "Félix Péault • Photographer (Awwwards HM Jan 2026)",
+      "url": "https://www.awwwards.com/sites/felix-peault-photographer",
+      "category": "gallery-portfolio",
+      "license_auth": "inspiration-only",
+      "intended_use": "未来相册/素材模块：系列网格、zoom-to-fill、信息面板 push",
+      "take": [
+        "系列缩略交互 + zoom 填屏不失上下文",
+        "信息面板滑入有 push",
+        "分组网格疏密交替"
+      ],
+      "dont_copy": ["品牌荧光色", "整站 WebGL 当空态"],
+      "relevance": "future-material-modules, album-browse",
+      "local_file": "link-only"
+    },
+    {
+      "id": "brady-perron",
+      "name": "Brady Perron — Idle states & grid/list",
+      "url": "https://www.awwwards.com/sites/brady-perron",
+      "category": "gallery-portfolio",
+      "license_auth": "inspiration-only",
+      "intended_use": "空态微动效上限；grid/list 工具感",
+      "take": [
+        "Idle 有生命力但不打扰",
+        "Grid/List 是工具不是装饰",
+        "灰白底让照片说话"
+      ],
+      "dont_copy": ["过长 intro 挡 CTA", "品牌动效包"],
+      "relevance": "empty-library-motion-cap",
+      "local_file": "link-only"
+    },
+    {
+      "id": "readymag-photography",
+      "name": "Readymag Photography portfolio template",
+      "url": "https://readymag.com/templates/details/6314353",
+      "category": "gallery-portfolio",
+      "license_auth": "inspiration-only (paid template; preview only)",
+      "intended_use": "magazine-heirloom：项目页留白、字号层级、短转场",
+      "take": [
+        "作品→精选→About 结构清晰",
+        "大图 + 细字杂志层级",
+        "转场短、服务翻阅"
+      ],
+      "dont_copy": ["付费模板插图", "默认英文字体搭配原样"],
+      "relevance": "magazine-heirloom-empty, future-layouts",
+      "local_file": "link-only"
+    },
+    {
+      "id": "cargo-orion-photo",
+      "name": "Cargo Orion Design — photography slideshow example",
+      "url": "https://cargocollective.com/orion-design/filter/photography/ReadMe",
+      "category": "gallery-portfolio",
+      "license_auth": "inspiration-only",
+      "intended_use": "编辑画布气质；导航让位于内容",
+      "take": [
+        "全屏媒体 slideshow",
+        "杂志跨页感而非 SaaS 卡片墙",
+        "导航弱化"
+      ],
+      "dont_copy": ["Cargo 编辑器 chrome", "示例摄影原片"],
+      "relevance": "empty-library-atmosphere, editorial",
+      "local_file": "link-only",
+      "related_urls": [
+        "https://www.a1.gallery/technology/cargo"
+      ]
+    },
+    {
+      "id": "paper-shaders-grain-gradient",
+      "name": "Paper Shaders — Grain Gradient",
+      "url": "https://shaders.paper.design/grain-gradient",
+      "category": "motion-effects",
+      "license_auth": "Apache-2.0",
+      "intended_use": "棉花糖 soft-blob / 纸感噪点空态底纹参数；可工程引用",
+      "take": [
+        "shape=blob + noise + 低 speed",
+        "轻量 canvas，优于 GIF 循环",
+        "speed=0 可做静态纸纹"
+      ],
+      "dont_copy": ["演示高饱和默认色不经调色直接上产品"],
+      "relevance": "cotton-candy-empty, effects-module",
+      "local_file": "link-only",
+      "redistributable": true,
+      "source_repo": "https://github.com/paper-design/shaders",
+      "materials_note": "可在 materials/effects 写参数笔记；再分发代码时保留 LICENSE/NOTICE"
+    },
+    {
+      "id": "arc-ui-page-curl",
+      "name": "Arc UI — Animated page curl",
+      "url": "https://uiarc.dev/components/page-curl",
+      "category": "motion-effects",
+      "license_auth": "inspiration-only until component license verified",
+      "intended_use": "magazine-heirloom 翻页阴影与动量手感（核许可前只链不拷）",
+      "take": [
+        "拖拽翻页 + 折痕阴影 + 动量",
+        "键盘可达"
+      ],
+      "dont_copy": ["未核许可前的组件源码"],
+      "relevance": "magazine-heirloom-browse",
+      "local_file": "link-only",
+      "redistributable": false
+    },
+    {
+      "id": "vsco-empty-uiland",
+      "name": "VSCO empty state (Uiland index)",
+      "url": "https://uiland.design/screens/vsco/screens/1d1c50b3-af07-4860-a9db-3d1c922e6e27/screen-type/empty-state",
+      "category": "photo-app",
+      "license_auth": "inspiration-only",
+      "intended_use": "创作者工具空库低对比 + 短导入路径",
+      "take": [
+        "低对比占位不抢滤镜气质",
+        "导入路径短：+ → 选图 → Import",
+        "保持暗房气氛"
+      ],
+      "dont_copy": ["VSCO 字标", "滤镜预览墙", "社区 feed 话术"],
+      "relevance": "empty-library, upload-drawer",
+      "local_file": "link-only"
+    }
+  ]
+}
