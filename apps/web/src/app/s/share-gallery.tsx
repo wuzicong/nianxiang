@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import type { ThemeSkin } from "../../lib/themes";
+import { safeUserMessage } from "../../lib/album-assets";
+import { shareGalleryAlt, shareGalleryCaption } from "../../lib/share-gallery-media";
 import type { PublicShareAsset, PublicSharePayload } from "../../lib/share";
 import { shareThemeStyle } from "./share-chrome";
 
@@ -36,6 +38,9 @@ export function ShareGallery({
     refreshHint === undefined
       ? `只读分享。图片地址大约 15 分钟内有效。${defaultRefresh}`
       : "只读分享。图片地址大约 15 分钟内有效。";
+  const dynamicRefresh = refreshHint
+    ? safeUserMessage(refreshHint, "刷新后需要再输入密码。")
+    : null;
 
   return (
     <main
@@ -58,27 +63,28 @@ export function ShareGallery({
           </h1>
         </div>
         <p className="share-gallery-note">{mergedNote}</p>
-        {refreshHint ? <p className="share-gallery-refresh">{refreshHint}</p> : null}
+        {dynamicRefresh ? <p className="share-gallery-refresh">{dynamicRefresh}</p> : null}
         {share.assets.length === 0 ? (
           <p className="share-gallery-empty">这本相册还没有照片。</p>
         ) : (
           <ul className="share-gallery-grid">
             {share.assets.map((asset) => {
               const src = imageUrl(asset);
-              const caption = asset.filename?.trim() ? asset.filename : "照片";
+              const caption = shareGalleryCaption(asset);
+              const alt = shareGalleryAlt(asset);
               return (
                 <li key={asset.assetId} className="share-gallery-card">
                   {src ? (
                     <img
                       src={src}
-                      alt={caption}
+                      alt={alt}
                       referrerPolicy="no-referrer"
                       className="share-gallery-photo"
                     />
                   ) : (
                     <div className="share-gallery-photo share-gallery-photo--placeholder">暂无预览</div>
                   )}
-                  <p className="share-gallery-caption">{caption}</p>
+                  {caption ? <p className="share-gallery-caption">{caption}</p> : null}
                 </li>
               );
             })}
