@@ -1,3 +1,4 @@
+import { parseAlbumAssets, type AlbumAssetView } from "./album-assets";
 import { apiMessage, parseJsonResponse, type ApiErrorBody } from "./api-client";
 
 export interface AlbumSummary {
@@ -74,10 +75,10 @@ export async function createAlbum(input: {
 export async function getAlbum(
   albumId: string,
 ): Promise<
-  | { ok: true; album: AlbumSummary; assetIds: string[] }
+  | { ok: true; album: AlbumSummary; assets: AlbumAssetView[] }
   | { ok: false; status: number; message: string }
 > {
-  const result = await apiFetch<{ album?: AlbumSummary; assets?: { assetId?: string }[] }>(
+  const result = await apiFetch<{ album?: AlbumSummary; assets?: unknown }>(
     `/api/v1/albums/${encodeURIComponent(albumId)}`,
   );
   if (!result.ok) {
@@ -86,10 +87,7 @@ export async function getAlbum(
   if (!result.data.album) {
     return { ok: false, status: 500, message: "响应不完整" };
   }
-  const assetIds = (result.data.assets ?? [])
-    .map((asset) => asset.assetId)
-    .filter((id): id is string => typeof id === "string");
-  return { ok: true, album: result.data.album, assetIds };
+  return { ok: true, album: result.data.album, assets: parseAlbumAssets(result.data.assets) };
 }
 
 export async function listShares(
