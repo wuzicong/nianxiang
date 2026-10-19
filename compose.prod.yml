@@ -1,0 +1,272 @@
+# 念册 · Memora — 自托管生产
+# 公网只映射 80/443。Postgres、Redis、MinIO、ML、web、api、worker 在内部网络。
+# 开发用的 docker-compose.yml 不要删：本机仍是 docker compose up -d，再用 pnpm dev:*。
+# 口令放 .env（只参与 ${} 替换，不会整份灌进容器）或 Docker secrets。不要写进镜像。
+name: memora-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DEPLOY_MODE: ${DEPLOY_MODE:-selfhost}
+  MEMORA_ENV: ${MEMORA_ENV:-prod}
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
+  POSTGRES_HOST: postgres
+  POSTGRES_USER: ${POSTGRES_USER:-memora}
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}"
+  POSTGRES_DB: ${POSTGRES_DB:-memora}
+  REDIS_URL: redis://redis:6379
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:-memora-prod}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-memora}}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-}}
+  S3_FORCE_PATH_STYLE: "true"
+  PRESIGN_TTL_MINUTES: "${PRESIGN_TTL_MINUTES:-10}"
+  SHARE_REQUIRE_PASSWORD: "${SHARE_REQUIRE_PASSWORD:-false}"
+  ML_SERVICE_URL: http://ml:8000
+  MEMORA_REQUIRE_STORAGE: "1"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-memora}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}"
+      POSTGRES_DB: ${POSTGRES_DB:-memora}
+    volumes:
+      - memora_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-memora} -d ${POSTGRES_DB:-memora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    command: redis-server --appendonly yes
+    volumes:
+      - memora_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    restart: unless-stopped
+    logging: *default-logging
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-}"
+    volumes:
+      - memora_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - internal
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-12-18T13-15-44Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-memora}
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-}"
+      S3_BUCKET: ${S3_BUCKET:-memora-prod}
+    volumes:
+      - ./deploy/self-host/minio-init.sh:/minio-init.sh:ro
+      - ./deploy/self-host/minio-cors.xml:/minio-cors.xml:ro
+    entrypoint: ["/bin/sh", "/minio-init.sh"]
+    restart: "no"
+    networks:
+      - internal
+
+  ml:
+    build: ./services/ml
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - internal
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: memora-api:prod
+    restart: unless-stopped
+    init: true
+    logging: *default-logging
+    stop_grace_period: 20s
+    environment:
+      <<: *app-env
+      API_PORT: "3001"
+      COOKIE_SECURE: "${COOKIE_SECURE:-true}"
+      WEB_ORIGINS: ${WEB_ORIGINS:-http://localhost}
+      AUTH_REGISTRATION: ${AUTH_REGISTRATION:-open}
+      SESSION_TTL_HOURS: "${SESSION_TTL_HOURS:-336}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    networks:
+      - internal
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    image: memora-worker:prod
+    restart: unless-stopped
+    init: true
+    logging: *default-logging
+    stop_grace_period: 30s
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    networks:
+      - internal
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SHARE_REQUIRE_PASSWORD: "${NEXT_PUBLIC_SHARE_REQUIRE_PASSWORD:-false}"
+    image: memora-web:prod
+    restart: unless-stopped
+    init: true
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      API_ORIGIN: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    networks:
+      - internal
+
+  caddy:
+    build:
+      context: deploy/self-host/caddy
+      dockerfile: Dockerfile
+    image: memora-caddy:prod
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      # 留空时 Compose 传 :80，只提供 HTTP，用来在没有域名的机器上看一眼。
+      MEMORA_DOMAIN: "${MEMORA_DOMAIN:-:80}"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/self-host/proxy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - ./deploy/self-host/proxy/Caddyfile:/etc/caddy/snippets/Caddyfile:ro
+      - ./deploy/self-host/proxy/Caddyfile.ratelimit:/etc/caddy/snippets/Caddyfile.ratelimit:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      # 管理接口只绑在容器内的 localhost，不映射出去。
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 5s
+    networks:
+      - edge
+      - internal
+
+networks:
+  edge:
+  internal:
+    internal: true
+
+volumes:
+  memora_pg_data:
+  memora_redis_data:
+  memora_minio_data:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

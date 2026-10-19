@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
+.env
+.env.*
+coverage
+tmp
+.turbo
+*.log
+data
+backups
+**/.terraform
+agent-transcripts

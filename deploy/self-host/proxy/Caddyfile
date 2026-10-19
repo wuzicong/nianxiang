@@ -7,11 +7,16 @@
 # 再打路径上的 43 位令牌。路径那条会吃掉紧跟着的一个字符（通常是 ?）再放回去；
 # 若先打路径，紧跟在令牌后面的 ?password= 会漏掉。
 # 更短或更长的一段不是合法令牌，路径那条不会动它。
-# 访问日志没有请求正文。不要开 debug，也不要另加会记录正文的插件。
+# 访问日志没有请求正文。登录密码和解锁口令都在 JSON 正文里，不要记。
+# 不要开 debug，也不要另加会记录正文的插件，不要打开 credentials 日志。
+# Cookie、Authorization、Set-Cookie 整段删掉，避免会话令牌进日志。
 # 响应正文里有短时预签名，同样不要记。
 {
 	# 进程错误日志（例如上游连不上）里的 request.uri 和 Referer 也走同一条正则。
 	# 级别保持 INFO。日志目录要事先建好，进程用户要能写，不要对所有用户可读。
+	# 只给本容器健康检查用，不要改成对外地址。
+	admin localhost:2019
+
 	log {
 		output file /var/log/caddy/memora-system.log {
 			roll_size 100MiB
@@ -24,6 +29,10 @@
 			request>uri regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
 			request>headers>Referer regexp `([?&](?:password|token)=)[^&]*` `${1}***`
 			request>headers>Referer regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+			resp_headers>Set-Cookie delete
 		}
 	}
 
@@ -48,6 +57,10 @@
 			request>uri regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
 			request>headers>Referer regexp `([?&](?:password|token)=)[^&]*` `${1}***`
 			request>headers>Referer regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+			resp_headers>Set-Cookie delete
 		}
 	}
 }

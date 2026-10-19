@@ -26,7 +26,7 @@ const albums = createAlbumRepository({
 const jobs = createAssetJobEnqueuer(config.redisUrl);
 const app = createApp({ config, objects, assets, jobs, auth, albums });
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, "0.0.0.0", () => {
   logDeployWarnings();
   console.log(
     `[memora-api] listening on :${config.port} (DEPLOY_MODE=${config.deployMode} STORAGE_BACKEND=${config.storageBackend} presign=${config.presignTtlMinutes}m bucket=${config.s3.bucket})`,

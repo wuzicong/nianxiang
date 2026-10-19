@@ -21,6 +21,7 @@ import {
 import { runMediaDerivative } from "./derivative.js";
 import { runMetaExif } from "./exif.js";
 import { onJobFailed } from "./failure.js";
+import { startHealthServer, workerHealthPort } from "./health.js";
 
 const runtime = loadRuntimeConfig();
 const objects = createObjectStore(objectStoreConfigFromRuntime(runtime));
@@ -131,7 +132,22 @@ console.log(
   `[memora-worker] ready; derivative+exif live, stubs: ${ALL_JOB_NAMES.filter((name) => !implemented.has(name)).join(", ")}`,
 );
 
+const healthServer = startHealthServer(workerHealthPort(process.env.WORKER_HEALTH_PORT));
+healthServer.on("error", (err) => {
+  console.error("[memora-worker] health server failed", safeErrorMessage(err));
+  process.exit(1);
+});
+healthServer.on("listening", () => {
+  const address = healthServer.address();
+  const port =
+    address && typeof address === "object"
+      ? address.port
+      : workerHealthPort(process.env.WORKER_HEALTH_PORT);
+  console.log(`[memora-worker] health on :${port}`);
+});
+
 async function shutdown(): Promise<void> {
+  await new Promise<void>((resolve) => healthServer.close(() => resolve()));
   await Promise.all(workers.map((worker) => worker.close()));
   await Promise.all(connections.map((connection) => connection.quit()));
   await assets.close();

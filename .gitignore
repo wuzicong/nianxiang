@@ -38,6 +38,7 @@ credentials.json
 # Local compose overrides may contain secrets
 docker-compose.override.yml
 compose.override.yml
+compose.prod.override.yml
 
 # IDE & OS
 .idea/
