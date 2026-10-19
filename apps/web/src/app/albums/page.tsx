@@ -64,6 +64,9 @@ export default function AlbumsPage() {
       <h1 style={{ fontWeight: 600, letterSpacing: "-0.02em" }}>相册</h1>
       <p style={{ lineHeight: 1.6, color: "#555" }}>
         在这里建相册、上传照片，并生成可撤销的分享链接。设密码的链接在打开时会先要求输入密码。
+        打开某本相册后可以按主题看故事或翻页，用的是预览图。想先看版式，打开{" "}
+        <Link href="/preview">主题样张</Link>
+        ，那里用的是示例照片。
       </p>
       <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{message}</p>
 
@@ -109,7 +112,8 @@ export default function AlbumsPage() {
               <Link href={`/albums/${album.albumId}`}>{album.title}</Link>
               <span style={{ color: "#777", fontSize: 14 }}>
                 {" "}
-                · {themeSkin(album.themeId).name} · {album.assetCount} 张
+                · {themeSkin(album.themeId).name} · {album.assetCount} 张 ·{" "}
+                <Link href={`/albums/${album.albumId}/preview`}>成册预览</Link>
               </span>
             </li>
           ))}

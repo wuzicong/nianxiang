@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { ThemeSkin } from "../../lib/themes";
 import { ShareBackdrop, ShareCardDecor } from "./share-ornaments";
 
-function buttonInk(brand: string, text: string, background: string): string {
+export function buttonInk(brand: string, text: string, background: string): string {
   const hex = brand.trim().replace(/^#/, "");
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return text;
   const r = Number.parseInt(hex.slice(0, 2), 16);
