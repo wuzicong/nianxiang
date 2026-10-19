@@ -49,13 +49,27 @@ export type ShareReadAccess = "public" | "granted";
 
 export interface PublicShareAsset {
   assetId: string;
-  filename: string;
   width: number | null;
   height: number | null;
   derivatives: Partial<Record<DerivativeSize, string>>;
+  /**
+   * 拍摄时间原文，还没做日期校验。
+   * 公开响应不要原样带回这个字段。
+   */
+  capturedAt: string | null;
 }
 
-/** 给公开读取用。不含原图键、EXIF、令牌或令牌哈希。 */
+/**
+ * 公开分享从 EXIF 里只取拍摄时间原文。
+ * 坐标、格式、方向都不离开这一层。这里不做日期校验。
+ */
+export function shareCapturedAt(exif: unknown): string | null {
+  if (!exif || typeof exif !== "object" || Array.isArray(exif)) return null;
+  const raw = (exif as { capturedAt?: unknown }).capturedAt;
+  return typeof raw === "string" ? raw : null;
+}
+
+/** 给公开读取用。不含文件名、原图键、完整 EXIF、令牌或令牌哈希。 */
 export interface PublicShareView {
   shareId: string;
   albumId: string;
@@ -144,10 +158,20 @@ interface ShareRow {
 
 interface PublicAssetRow {
   id: string;
-  filename: string;
   width: number | null;
   height: number | null;
   derivatives: Partial<Record<DerivativeSize, string>> | null;
+  captured_at: string | null;
+}
+
+function mapPublicAsset(row: PublicAssetRow): PublicShareAsset {
+  return {
+    assetId: row.id,
+    width: row.width,
+    height: row.height,
+    derivatives: row.derivatives ?? {},
+    capturedAt: shareCapturedAt({ capturedAt: row.captured_at }),
+  };
 }
 
 function iso(value: Date | string): string {
@@ -532,7 +556,8 @@ export function createAlbumRepository(options: {
         const row = share.rows[0];
         if (!row) return null;
         const assets = await client.query<PublicAssetRow>(
-          `SELECT ast.id, ast.filename, ast.width, ast.height, ast.derivatives
+          `SELECT ast.id, ast.width, ast.height, ast.derivatives,
+                  ast.exif->>'capturedAt' AS captured_at
            FROM album_assets aa
            JOIN assets ast ON ast.id = aa.asset_id AND ast.user_id = $2
            WHERE aa.album_id = $1
@@ -554,13 +579,7 @@ export function createAlbumRepository(options: {
           userId: row.user_id,
           title: row.title,
           themeId: row.theme_id,
-          assets: assets.rows.map((asset) => ({
-            assetId: asset.id,
-            filename: asset.filename,
-            width: asset.width,
-            height: asset.height,
-            derivatives: asset.derivatives ?? {},
-          })),
+          assets: assets.rows.map((asset) => mapPublicAsset(asset)),
         };
       });
     },

@@ -60,6 +60,12 @@ test("postgres albums and shares revoke, expire, and keep only the token hash", 
     });
     const preview = derivativeObjectKey(ownerId, assetId, "preview");
     await assets.markReady(assetId, { preview }, { width: 8, height: 8 });
+    await assets.saveExif(assetId, {
+      capturedAt: "2020:01:02 03:04:05",
+      hasGps: true,
+      lat: 12.3456,
+      lng: 99.9,
+    });
 
     const created = await albums.createAlbum({
       id: randomUUID(),
@@ -113,8 +119,13 @@ test("postgres albums and shares revoke, expire, and keep only the token hash", 
 
     const active = await albums.findActiveShareByTokenHash(tokenHash);
     assert.equal(active?.title, "海港");
-    assert.equal(JSON.stringify(active).includes("/originals/"), false);
+    assert.equal(active?.assets[0]?.capturedAt, "2020:01:02 03:04:05");
     assert.equal(active?.assets[0]?.derivatives.preview, preview);
+    const activeJson = JSON.stringify(active);
+    assert.equal(activeJson.includes("/originals/"), false);
+    assert.equal(activeJson.includes("harbor.jpg"), false);
+    assert.equal(activeJson.includes("12.3456"), false);
+    assert.equal(activeJson.includes("hasGps"), false);
 
     const passwordPlain = "share-secret-1";
     const passwordHash =

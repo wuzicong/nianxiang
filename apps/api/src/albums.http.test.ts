@@ -366,13 +366,15 @@ test("share token is returned once, stored hashed, and dies on revoke or expiry"
         album: { title: string; themeId: string; userId?: string };
         assets: {
           filename: string;
+          takenAt?: string | null;
           derivatives: { thumb?: { url: string }; preview?: { url: string }; hero?: { url: string } };
         }[];
       };
       assert.equal(body.album.title, "海港");
       assert.equal(body.album.themeId, "magazine-heirloom");
       assert.equal(body.album.userId, undefined);
-      assert.equal(body.assets[0]?.filename, "harbor.jpg");
+      assert.equal(body.assets[0]?.filename, "");
+      assert.equal(body.assets[0]?.takenAt, null);
       assert.equal(body.assets[0]?.derivatives.hero, undefined);
       assert.match(body.assets[0]?.derivatives.preview?.url ?? "", /derivatives/);
       assert.deepEqual(objects.presignGets, [thumb, preview]);
@@ -380,6 +382,9 @@ test("share token is returned once, stored hashed, and dies on revoke or expiry"
       assert.equal(pubJson.includes("/originals/"), false);
       assert.equal(pubJson.includes(original), false);
       assert.equal(pubJson.includes("12.3456"), false);
+      assert.equal(pubJson.includes("harbor.jpg"), false);
+      assert.equal(pubJson.includes("hasGps"), false);
+      assert.equal(pubJson.includes("capturedAt"), false);
       assert.equal(pubJson.includes(owner.user.email), false);
       assert.equal(pubJson.includes(share.token), false);
 
@@ -423,6 +428,96 @@ test("share token is returned once, stored hashed, and dies on revoke or expiry"
   } finally {
     logs.restore();
   }
+});
+
+test("public share serializes takenAt and does not leak filenames", async () => {
+  const assets = memoryAssets();
+  const albums = memoryAlbums(assets);
+  const objects = fakeObjects();
+  const { app } = createTestApp({ assets, albums, objects });
+  await withServer(app, async (base) => {
+    const owner = await registerSession(base, "caption@memora.test");
+    const datedId = "dated-photo";
+    const plainId = "plain-photo";
+    const datedPreview = derivativeObjectKey(owner.user.id, datedId, "preview");
+    const plainName = "2024-05-12-trip.jpg";
+    assets.rows.set(
+      datedId,
+      record({
+        id: datedId,
+        userId: owner.user.id,
+        status: "ready",
+        filename: "IMG_20240512.JPG",
+        width: 640,
+        height: 480,
+        derivatives: { preview: datedPreview, hero: originalObjectKey(owner.user.id, datedId) },
+        exif: {
+          capturedAt: "2024:05:12 08:00:00",
+          hasGps: true,
+          lat: 35.0001,
+          lng: 139.0001,
+          format: "jpeg",
+        },
+      }),
+    );
+    assets.rows.set(
+      plainId,
+      record({
+        id: plainId,
+        userId: owner.user.id,
+        status: "ready",
+        filename: plainName,
+        derivatives: { preview: derivativeObjectKey(owner.user.id, plainId, "preview") },
+        exif: { hasGps: true, lat: 48.1234, lng: 2.5678 },
+      }),
+    );
+    const created = await postJson(
+      base,
+      "/api/v1/albums",
+      { title: "短注", themeId: "kyoto-lantern" },
+      owner.cookie,
+    );
+    const albumId = (created.body as { album: { albumId: string } }).album.albumId;
+    await postJson(
+      base,
+      `/api/v1/albums/${albumId}/assets`,
+      { assetIds: [datedId, plainId] },
+      owner.cookie,
+    );
+    const share = await postJson(base, `/api/v1/albums/${albumId}/shares`, {}, owner.cookie);
+    const token = (share.body as { share: { token: string } }).share.token;
+    const pub = await getJson(base, `/api/v1/public/shares/${token}`);
+    assert.equal(pub.status, 200);
+    const body = pub.body as {
+      assets: {
+        assetId: string;
+        filename: string;
+        takenAt: string | null;
+        exif?: unknown;
+        capturedAt?: unknown;
+      }[];
+    };
+    assert.equal(body.assets[0]?.assetId, datedId);
+    assert.equal(body.assets[0]?.takenAt, "2024-05-12T08:00:00");
+    assert.equal(body.assets[0]?.filename, "");
+    assert.equal(body.assets[1]?.assetId, plainId);
+    assert.equal(body.assets[1]?.takenAt, null);
+    assert.equal(body.assets[1]?.filename, "");
+    assert.equal(body.assets[0]?.exif, undefined);
+    assert.equal(body.assets[0]?.capturedAt, undefined);
+    const json = JSON.stringify(body);
+    assert.equal(json.includes("IMG_20240512.JPG"), false);
+    assert.equal(json.includes(plainName), false);
+    assert.equal(json.includes("2024:05:12"), false);
+    assert.equal(json.includes("35.0001"), false);
+    assert.equal(json.includes("139.0001"), false);
+    assert.equal(json.includes("48.1234"), false);
+    assert.equal(json.includes("2.5678"), false);
+    assert.equal(json.includes("hasGps"), false);
+    assert.equal(json.includes("jpeg"), false);
+    assert.equal(json.includes("/originals/"), false);
+    assert.equal(json.includes("capturedAt"), false);
+  });
 });
 
 test("share presign failures do not log the capability token", async () => {
@@ -488,6 +583,7 @@ test("optional share password is hashed, challenged, and not echoed", async () =
           status: "ready",
           filename: "harbor.jpg",
           derivatives: { preview, hero: originalObjectKey(owner.user.id, assetId) },
+          exif: { capturedAt: "2020:01:02 03:04:05", hasGps: true, lat: 12.3456, lng: 99.9 },
         }),
       );
       const album = await postJson(
@@ -590,13 +686,25 @@ test("optional share password is hashed, challenged, and not echoed", async () =
       assert.equal(opened.setCookies.length, 0);
       const openedBody = opened.body as {
         album: { title: string };
-        assets: { derivatives: { preview?: { url: string }; hero?: { url: string } } }[];
+        assets: {
+          filename?: string;
+          takenAt?: string | null;
+          derivatives: { preview?: { url: string }; hero?: { url: string } };
+        }[];
       };
       assert.equal(openedBody.album.title, "上锁的海港");
+      assert.equal(openedBody.assets[0]?.filename, "");
+      assert.equal(openedBody.assets[0]?.takenAt, "2020-01-02T03:04:05");
       assert.match(openedBody.assets[0]?.derivatives.preview?.url ?? "", /derivatives/);
       assert.equal(openedBody.assets[0]?.derivatives.hero, undefined);
-      assert.equal(JSON.stringify(openedBody).includes(secret), false);
-      assert.equal(JSON.stringify(openedBody).includes(share.token), false);
+      const openedJson = JSON.stringify(openedBody);
+      assert.equal(openedJson.includes(secret), false);
+      assert.equal(openedJson.includes(share.token), false);
+      assert.equal(openedJson.includes("harbor.jpg"), false);
+      assert.equal(openedJson.includes("12.3456"), false);
+      assert.equal(openedJson.includes("2020:01:02"), false);
+      assert.equal(openedJson.includes("capturedAt"), false);
+      assert.equal(openedJson.includes("hasGps"), false);
       assert.deepEqual(objects.presignGets, [preview]);
 
       const openShare = await postJson(base, `/api/v1/albums/${albumId}/shares`, {}, owner.cookie);

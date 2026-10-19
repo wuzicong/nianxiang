@@ -89,6 +89,12 @@ export async function presentOwnedAlbumAssets(
   return presented;
 }
 
+/**
+ * 客人看到的分享。
+ * takenAt 与照片库同一套 libraryTakenAt。没有可信拍摄时间就是 null，不从文件名猜日期。
+ * filename 固定为空字符串：已上线的分享解析器要求它是字符串，缺了整本相册会失败关闭。
+ * 真实文件名不查询、不回传。也不回 capturedAt、EXIF、坐标、原图键或库存键。
+ */
 export async function presentPublicShare(
   view: PublicShareView,
   objects: Pick<ObjectStore, "presignGet">,
@@ -97,9 +103,10 @@ export async function presentPublicShare(
   for (const asset of view.assets) {
     assets.push({
       assetId: asset.assetId,
-      filename: asset.filename,
+      filename: "",
       width: asset.width,
       height: asset.height,
+      takenAt: libraryTakenAt({ capturedAt: asset.capturedAt }),
       derivatives: await signStoredDerivatives(
         objects,
         view.userId,
