@@ -10,7 +10,8 @@ import {
 } from "../../lib/share";
 import { themeSkin, type ThemeSkin } from "../../lib/themes";
 import { ShareGallery } from "./share-gallery";
-import { ShareChrome } from "./share-chrome";
+import { ShareChrome, shareThemeStyle } from "./share-chrome";
+import { ShareBackdrop, ShareRevealEnvelope } from "./share-ornaments";
 
 const HINT = "输入密码后才能查看照片。";
 const OPENING = "正在打开…";
@@ -46,15 +47,15 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
   const [message, setMessage] = useState(HINT);
   const [pending, setPending] = useState(false);
   const [invalid, setInvalid] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [nudge, setNudge] = useState(false);
   const [rateLimitSeconds, setRateLimitSeconds] = useState<number | null>(null);
   const [share, setShare] = useState<PublicSharePayload | null>(null);
 
   const limited = message === UNLOCK_RATE_LIMIT || (rateLimitSeconds !== null && rateLimitSeconds > 0);
 
-  const triggerShake = useCallback(() => {
-    setShake(true);
-    window.setTimeout(() => setShake(false), 260);
+  const triggerNudge = useCallback(() => {
+    setNudge(true);
+    window.setTimeout(() => setNudge(false), 200);
   }, []);
 
   useEffect(() => {
@@ -148,14 +149,14 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
       if (response.status === 429) {
         setRateLimitSeconds(parseRetryAfterSeconds(response.headers.get("Retry-After")));
         setMessage(UNLOCK_RATE_LIMIT);
-        triggerShake();
+        triggerNudge();
         return;
       }
       if (!response.ok) {
         setMessage(UNLOCK_FAILED);
         setInvalid(true);
         selectAllPassword();
-        triggerShake();
+        triggerNudge();
         return;
       }
       let parsed: PublicSharePayload | null = null;
@@ -166,7 +167,7 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
       }
       if (!parsed) {
         setMessage(NETWORK_ERROR);
-        triggerShake();
+        triggerNudge();
         return;
       }
       inputRef.current?.blur();
@@ -174,20 +175,37 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
       setShare(parsed);
     } catch {
       setMessage(NETWORK_ERROR);
-      triggerShake();
+      triggerNudge();
     } finally {
       setPending(false);
     }
   }
 
   if (share) {
+    const galleryTheme = themeSkin(share.album.themeId);
     return (
-      <ShareGallery
-        share={share}
-        theme={themeSkin(share.album.themeId)}
-        refreshHint="刷新后需要再输入密码。"
-        focusTitleOnMount
-      />
+      <div className="share-reveal" data-share-reveal="">
+        <div
+          className="share-reveal-overture share-shell"
+          data-share-state="revealing"
+          data-theme={theme.id}
+          style={shareThemeStyle(theme)}
+          aria-hidden="true"
+        >
+          <ShareBackdrop themeId={theme.id} />
+          <div className="share-reveal-mark">
+            <ShareRevealEnvelope />
+          </div>
+        </div>
+        <div className="share-reveal-target">
+          <ShareGallery
+            share={share}
+            theme={galleryTheme}
+            refreshHint="刷新后需要再输入密码。"
+            focusTitleOnMount
+          />
+        </div>
+      </div>
     );
   }
 
@@ -195,7 +213,7 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
   const submitDisabled = pending || password.length === 0 || limited;
 
   return (
-    <ShareChrome theme={theme} state="locked" shake={shake}>
+    <ShareChrome theme={theme} state="locked">
       <p className="share-brand">
         <a href="/">念册 · Memora</a>
       </p>
@@ -262,7 +280,13 @@ export function ShareUnlock({ token, theme }: { token: string; theme: ThemeSkin 
           {submitLabel(theme.id, pending, rateLimitSeconds, message === UNLOCK_RATE_LIMIT)}
         </button>
       </form>
-      <p id="share-feedback" className="share-note" role="status" data-share-feedback={feedback}>
+      <p
+        id="share-feedback"
+        className="share-note"
+        role="status"
+        data-share-feedback={feedback}
+        data-share-nudge={nudge ? "" : undefined}
+      >
         {message}
       </p>
       <noscript className="share-noscript">需要启用 JavaScript 才能提交密码。</noscript>
