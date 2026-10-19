@@ -3,7 +3,9 @@
 > 本地工作区：`docs/design/moodboard/`  
 > 日后挂入仓库目标路径：`docs/design/moodboard/`（由 design lead 挂，**本目录不开 PR**）  
 > 配套材料库：`../materials/`  
-> 首批焦点：图库空态 / 上传失败 / 未来素材模块（棉花糖 · 京都灯笼 · 杂志传家）
+> 首批焦点：图库空态 / 上传失败 / 未来素材模块（棉花糖 · 京都灯笼 · 杂志传家）  
+> 扩展焦点：网格与相册预览 / 产品内 UI（见 `product-ui-v2.md`）；营销壳条目仅作日后参考（W6 不做落地页）  
+> 偷法全书：`../research/canva-awards-stealbook.md` · 动效笔记：`../materials/NOTES-motion-media.md` · 主题命名：`../materials/THEME-ASSET-NAMING.md`
 
 ---
 
@@ -21,12 +23,16 @@
 |---|---|
 | `README.md` | 本说明 + 工作流 |
 | `library-empty-fail.md` | 空库 / 上传失败 / 加载失败 的导演级拆解（偷什么 / 不偷什么） |
-| `refs.json` | 结构化引用清单（程序可读；挂 `docs/design/moodboard/` 时同步） |
+| `product-ui-v2.md` | Canva/Awwwards 扩展 moodboard 索引（grid/preview/marketing；链接优先） |
+| `refs.json` | 结构化引用清单（程序可读；v2 共 26 条） |
 
 ## 与规格文档的关系
 
 - 实现刀：`../library-empty-upload-fail.md` — **定稿须先过本 moodboard**。
 - 材料库：`../materials/catalog.md` — 可再分发条目 + 链接型待采条目。
+- 偷法全书：`../research/canva-awards-stealbook.md` — 模式拆解 + Top 10 刀序。
+- 动效笔记：`../materials/NOTES-motion-media.md` — 动效 / 视频 / GIF 授权候选（链接优先，不落二进制）。
+- 主题命名：`../materials/THEME-ASSET-NAMING.md` — 海风产品名对应路径 id `kyoto-lantern`。
 
 ## 审阅节奏（建议）
 
