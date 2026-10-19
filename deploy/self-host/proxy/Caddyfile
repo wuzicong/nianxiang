@@ -1,0 +1,70 @@
+# 访问日志打码。官方 Caddy 可以直接用这一份。
+# 不要整文件覆盖现有 Caddyfile：把全局 log 合进你的全局块，再 import 下面的片段。
+# 限流在 Caddyfile.ratelimit，需要带 caddy-ratelimit 的构建。
+#
+# 令牌是 32 字节 base64url、无填充，固定 43 位。
+# 每个字段两条正则，顺序不能反。先把查询串里的 password、token 打掉，
+# 再打路径上的 43 位令牌。路径那条会吃掉紧跟着的一个字符（通常是 ?）再放回去；
+# 若先打路径，紧跟在令牌后面的 ?password= 会漏掉。
+# 更短或更长的一段不是合法令牌，路径那条不会动它。
+# 访问日志没有请求正文。不要开 debug，也不要另加会记录正文的插件。
+# 响应正文里有短时预签名，同样不要记。
+{
+	# 进程错误日志（例如上游连不上）里的 request.uri 和 Referer 也走同一条正则。
+	# 级别保持 INFO。日志目录要事先建好，进程用户要能写，不要对所有用户可读。
+	log {
+		output file /var/log/caddy/memora-system.log {
+			roll_size 100MiB
+			roll_keep 7
+		}
+		level INFO
+		format filter {
+			wrap json
+			request>uri regexp `([?&](?:password|token)=)[^&]*` `${1}***`
+			request>uri regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
+			request>headers>Referer regexp `([?&](?:password|token)=)[^&]*` `${1}***`
+			request>headers>Referer regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
+		}
+	}
+
+	# 前面还有你自己的负载均衡时才打开，并只填那一跳的网段。
+	# 打开之后，把 Caddyfile.ratelimit 里的 key 从 {remote_host} 改成 {client_ip}。
+	# 不要信任浏览器自己带的 X-Forwarded-For。
+	# servers {
+	# 	trusted_proxies static 10.0.0.0/8
+	# 	client_ip_headers X-Forwarded-For
+	# }
+}
+
+(memora_access_log) {
+	log {
+		output file /var/log/caddy/memora-access.log {
+			roll_size 100MiB
+			roll_keep 7
+		}
+		format filter {
+			wrap json
+			request>uri regexp `([?&](?:password|token)=)[^&]*` `${1}***`
+			request>uri regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
+			request>headers>Referer regexp `([?&](?:password|token)=)[^&]*` `${1}***`
+			request>headers>Referer regexp `(/(?:api/v1/public/shares|s)/)[A-Za-z0-9_-]{43}([^A-Za-z0-9_-]|$)` `${1}***${2}`
+		}
+	}
+}
+
+# 限流插件返回 429 时换成和页面一致的一句提示。官方 Caddy 没有限流时，这段不会被触发。
+(memora_rate_limited) {
+	handle_errors 429 {
+		header Content-Type "application/json; charset=utf-8"
+		header Cache-Control "no-store"
+		respond `{"error":"rate_limited","message":"请稍后再试"}` 429
+	}
+}
+
+# 站点示例。反代到本机 Web。API 若另有入口，那一跳也要 import memora_access_log。
+# memora.example.com {
+# 	import memora_access_log
+# 	import memora_share_limits
+# 	import memora_rate_limited
+# 	reverse_proxy 127.0.0.1:3000
+# }

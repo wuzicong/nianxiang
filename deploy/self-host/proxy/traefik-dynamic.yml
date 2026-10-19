@@ -1,0 +1,41 @@
+# 并进现有动态配置，不要当成完整站点。
+# 这两条路由的 priority 需要高于兜底路由，否则公开分享会落到没有限流的那条上。
+# 已有同名 memora-web 服务时，删掉文末 services，避免重名。
+# 默认转到本机 Web :3000。API 若单独暴露，改 url，不要让那一跳绕过这里。
+#
+# 按来源地址限流。不要设置 ipStrategy.depth，除非上一跳一定是你的负载均衡。
+# depth 配错时，客户端可以伪造 X-Forwarded-For 绕过限流。
+# 次数可以改。出口 IP 若很多人共用，把 average 和 burst 调高。
+# burst 是短时能通过的次数：解锁第 7 次 429，公开前缀第 21 次 429。
+# average/period 是之后的补充速度。
+# 超过限额是 Traefik 自己的 429，不是应用 JSON。
+http:
+  routers:
+    memora-share-unlock:
+      rule: Method(`POST`) && PathRegexp(`^/api/v1/public/shares/[A-Za-z0-9_-]{43}/unlock$`)
+      priority: 200
+      middlewares:
+        - memora-share-unlock-limit
+      service: memora-web
+    memora-public-shares:
+      rule: PathPrefix(`/api/v1/public/shares/`)
+      priority: 100
+      middlewares:
+        - memora-public-shares-limit
+      service: memora-web
+  middlewares:
+    memora-share-unlock-limit:
+      rateLimit:
+        average: 6
+        period: 1m
+        burst: 6
+    memora-public-shares-limit:
+      rateLimit:
+        average: 60
+        period: 1m
+        burst: 20
+  services:
+    memora-web:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:3000

@@ -1,0 +1,17 @@
+# 合进静态配置的根。若已有 log 段，不要再复制一份 log，只把 level 保持在 INFO 或更高。
+# Traefik 不能按正则只替换令牌。这里改用 JSON，并丢掉请求路径、请求行和全部请求头
+# （含 Referer）。查询串在 RequestPath 里，会一起丢掉。方法、状态码和耗时还在。
+# 需要看其它路径时改用 Caddy 或 Nginx，不要把 RequestPath / RequestLine 改回 keep，
+# 也不要改用 common 格式（common 每一行都带路径和 Referer）。
+# 访问日志只有正文大小（RequestContentSize），没有正文。不要打开会导出正文的调试或 tracing。
+log:
+  level: INFO
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    names:
+      RequestPath: drop
+      RequestLine: drop
+    headers:
+      defaultMode: drop
