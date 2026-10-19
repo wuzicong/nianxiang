@@ -138,8 +138,20 @@ export default function AlbumDetailPage() {
 
       {album && skin ? (
         <>
-          <AlbumAssetGrid assets={assets} onPreviewError={onPreviewError} />
-          <UploadPhotos albumId={album.albumId} onUploaded={() => void refresh("silent")} />
+          <AlbumAssetGrid
+            assets={assets}
+            onPreviewError={onPreviewError}
+            uploadAnchorId="album-upload"
+          />
+          <div id="album-upload">
+            <UploadPhotos
+              albumId={album.albumId}
+              theme={skin}
+              assets={assets}
+              albumEmpty={assets.length === 0}
+              onUploaded={() => void refresh("silent")}
+            />
+          </div>
           <CreateShareForm albumId={album.albumId} theme={skin} onCreated={() => void refreshShares()} />
           <AlbumShareList shares={shares} revokingId={revokingId} onRevoke={(shareId) => void revoke(shareId)} />
         </>

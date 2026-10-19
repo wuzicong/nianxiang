@@ -101,6 +101,99 @@ async function readApi(response: Response): Promise<{ ok: true; body: unknown } 
 
 type FetchImpl = (input: string, init?: RequestInit) => Promise<Response>;
 
+const MAX_PRESIGN_RETRIES = 2;
+
+function isPresignExpiredStatus(status: number): boolean {
+  return status === 401 || status === 403 || status === 410;
+}
+
+type PutResult =
+  | { ok: true }
+  | { ok: false; message: string; presignExpired: boolean };
+
+async function putObject(
+  grant: UploadGrant,
+  body: Blob,
+  fetchImpl: FetchImpl,
+  onProgress?: (ratio: number) => void,
+): Promise<PutResult> {
+  const headers = presignPutHeaders(grant.headers);
+  if (onProgress && typeof XMLHttpRequest !== "undefined") {
+    return await new Promise<PutResult>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", grant.url, true);
+      for (const [name, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(name, value);
+      }
+      xhr.withCredentials = false;
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || event.total <= 0) return;
+        onProgress(Math.min(1, event.loaded / event.total));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ ok: true });
+          return;
+        }
+        resolve({
+          ok: false,
+          message: "原图上传失败",
+          presignExpired: isPresignExpiredStatus(xhr.status),
+        });
+      };
+      xhr.onerror = () => resolve({ ok: false, message: "存储暂时不可达", presignExpired: false });
+      xhr.onabort = () => resolve({ ok: false, message: "上传已取消", presignExpired: false });
+      xhr.send(body);
+    });
+  }
+
+  let putResponse: Response;
+  try {
+    putResponse = await fetchImpl(grant.url, {
+      method: "PUT",
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "manual",
+      headers,
+      body,
+    });
+  } catch {
+    return { ok: false, message: "存储暂时不可达", presignExpired: false };
+  }
+  await putResponse.arrayBuffer().catch(() => undefined);
+  if (putResponse.ok) return { ok: true };
+  return {
+    ok: false,
+    message: "原图上传失败",
+    presignExpired: isPresignExpiredStatus(putResponse.status),
+  };
+}
+
+async function requestUploadGrant(
+  fetchImpl: FetchImpl,
+  filename: string,
+  mime: string,
+  size: number,
+): Promise<{ ok: true; grant: UploadGrant } | { ok: false; message: string }> {
+  let grantResponse: Response;
+  try {
+    grantResponse = await fetchImpl("/api/v1/assets/upload-url", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ filename, mime, size }),
+    });
+  } catch {
+    return { ok: false, message: "API 暂时不可达" };
+  }
+  const granted = await readApi(grantResponse);
+  if (!granted.ok) return granted;
+  const grant = readUploadGrant(granted.body);
+  if (!grant) return { ok: false, message: "响应不完整" };
+  return { ok: true, grant };
+}
+
 export async function uploadPhotoToAlbum(
   input: {
     albumId: string;
@@ -108,6 +201,7 @@ export async function uploadPhotoToAlbum(
     mime: string;
     body: Blob;
     onPhase?: (phase: UploadPhase) => void;
+    onPutProgress?: (ratio: number) => void;
   },
   deps: { fetchImpl?: FetchImpl } = {},
 ): Promise<{ ok: true; assetId: string } | { ok: false; message: string }> {
@@ -120,40 +214,25 @@ export async function uploadPhotoToAlbum(
   const filename = input.filename.trim();
   if (!filename) return { ok: false, message: "文件名不能为空" };
 
-  input.onPhase?.("request");
-  let grantResponse: Response;
-  try {
-    grantResponse = await fetchImpl("/api/v1/assets/upload-url", {
-      method: "POST",
-      credentials: "include",
-      cache: "no-store",
-      headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ filename, mime, size: input.body.size }),
-    });
-  } catch {
-    return { ok: false, message: "API 暂时不可达" };
-  }
-  const granted = await readApi(grantResponse);
-  if (!granted.ok) return granted;
-  const grant = readUploadGrant(granted.body);
-  if (!grant) return { ok: false, message: "响应不完整" };
+  let grant: UploadGrant | null = null;
+  let presignAttempt = 0;
+  while (presignAttempt <= MAX_PRESIGN_RETRIES) {
+    input.onPhase?.("request");
+    const granted = await requestUploadGrant(fetchImpl, filename, mime, input.body.size);
+    if (!granted.ok) return granted;
+    grant = granted.grant;
 
-  input.onPhase?.("put");
-  let putResponse: Response;
-  try {
-    putResponse = await fetchImpl(grant.url, {
-      method: "PUT",
-      credentials: "omit",
-      cache: "no-store",
-      redirect: "manual",
-      headers: presignPutHeaders(grant.headers),
-      body: input.body,
-    });
-  } catch {
-    return { ok: false, message: "存储暂时不可达" };
+    input.onPhase?.("put");
+    const put = await putObject(grant, input.body, fetchImpl, input.onPutProgress);
+    if (put.ok) break;
+    if (put.presignExpired && presignAttempt < MAX_PRESIGN_RETRIES) {
+      presignAttempt += 1;
+      input.onPutProgress?.(0);
+      continue;
+    }
+    return { ok: false, message: put.message };
   }
-  await putResponse.arrayBuffer().catch(() => undefined);
-  if (!putResponse.ok) return { ok: false, message: "原图上传失败" };
+  if (!grant) return { ok: false, message: "响应不完整" };
 
   input.onPhase?.("complete");
   let completeResponse: Response;

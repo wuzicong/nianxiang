@@ -5,12 +5,40 @@ import { assetStatusLabel, previewUrl, type AlbumAssetView } from "../../lib/alb
 export function AlbumAssetGrid({
   assets,
   onPreviewError,
+  uploadAnchorId,
 }: {
   assets: AlbumAssetView[];
   onPreviewError: (src: string) => void;
+  uploadAnchorId?: string;
 }) {
   if (assets.length === 0) {
-    return <p style={{ color: "#555" }}>还没有照片。</p>;
+    return (
+      <div
+        style={{
+          marginTop: "1rem",
+          padding: "1.25rem 1rem",
+          borderRadius: 12,
+          border: "1px dashed #e7e0d8",
+          background: "#faf8f5",
+          color: "#555",
+          lineHeight: 1.65,
+          fontSize: 15,
+        }}
+      >
+        <p style={{ margin: 0, fontWeight: 600, color: "#44403c" }}>这本相册还是空的</p>
+        <p style={{ margin: "0.45rem 0 0" }}>
+          在下方上传区域拖入或选择照片，预览生成后会出现在这里。
+          {uploadAnchorId ? (
+            <>
+              {" "}
+              <a href={`#${uploadAnchorId}`} style={{ color: "#8a5a44", fontWeight: 600 }}>
+                前往上传
+              </a>
+            </>
+          ) : null}
+        </p>
+      </div>
+    );
   }
 
   return (

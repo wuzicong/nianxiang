@@ -185,3 +185,45 @@ test("failed upload messages omit the presigned url", async () => {
   );
   assert.deepEqual(rejected, { ok: false, message: "只接受 jpeg、png、webp、gif" });
 });
+
+test("upload retries presign when the signed PUT expires", async () => {
+  const png = new Blob([Uint8Array.from([1, 2, 3, 4])], { type: "image/png" });
+  const signedA = "http://127.0.0.1:9000/memora-local/users/owner/originals/asset-a?X-Amz-Signature=a";
+  const signedB = "http://127.0.0.1:9000/memora-local/users/owner/originals/asset-b?X-Amz-Signature=b";
+  let grantCalls = 0;
+  const fetchImpl = async (url: string, init?: RequestInit) => {
+    if (url === "/api/v1/assets/upload-url") {
+      grantCalls += 1;
+      const assetId = grantCalls === 1 ? "asset-a" : "asset-b";
+      const signed = grantCalls === 1 ? signedA : signedB;
+      return Response.json({
+        assetId,
+        url: signed,
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+      }, { status: 201 });
+    }
+    if (url === signedA) return new Response("expired", { status: 403 });
+    if (url === signedB) return new Response(null, { status: 200 });
+    if (url === "/api/v1/assets/asset-b/complete") {
+      return Response.json({ assetId: "asset-b", status: "uploaded" });
+    }
+    if (url === "/api/v1/albums/album-1/assets") {
+      return Response.json({ albumId: "album-1", assetIds: ["asset-b"] });
+    }
+    throw new Error(`unexpected ${url}`);
+  };
+
+  const result = await uploadPhotoToAlbum(
+    {
+      albumId: "album-1",
+      filename: "pixel.png",
+      mime: "image/png",
+      body: png,
+    },
+    { fetchImpl },
+  );
+
+  assert.deepEqual(result, { ok: true, assetId: "asset-b" });
+  assert.equal(grantCalls, 2);
+});
