@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { albumFontFaces, albumTheme, resolveAlbumLayout, type AlbumLayoutMode, type AlbumTheme } from "../../lib/album-theme";
 import type { DemoAlbum, FilledSlot } from "../../lib/album-demo";
 import { buttonInk, shareThemeStyle } from "../s/share-chrome";
+import { AlbumPhotoZoomProvider } from "./album-photo-zoom";
 import { FlipBook, type FlipApi } from "./flip-book";
 import { SlotSheet, SvgMark } from "./slot-sheet";
 
@@ -90,16 +91,19 @@ export function AlbumStage({
     "--album-hover-lift": `${theme.hoverLift}px`,
   } as CSSProperties;
 
+  const storyZoom = layout === "story";
+
   return (
-    <main
-      className="album-shell"
-      data-theme={theme.skin.id}
-      data-motion={theme.motionEnter}
-      data-respect-motion={theme.respectReducedMotion ? "true" : "false"}
-      data-layout={layout}
-      data-album-source={source.kind}
-      style={style}
-    >
+    <div className="album-preview-root" style={style}>
+      <AlbumPhotoZoomProvider album={album} enabled={storyZoom} onPhotoError={onPhotoError}>
+        <main
+          className="album-shell"
+          data-theme={theme.skin.id}
+          data-motion={theme.motionEnter}
+          data-respect-motion={theme.respectReducedMotion ? "true" : "false"}
+          data-layout={layout}
+          data-album-source={source.kind}
+        >
       <div className="album-backdrop" aria-hidden="true">
         {theme.skin.id === "cotton-candy" ? (
           <>
@@ -212,7 +216,9 @@ export function AlbumStage({
           ))}
         </div>
       )}
-    </main>
+        </main>
+      </AlbumPhotoZoomProvider>
+    </div>
   );
 }
 
