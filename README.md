@@ -79,7 +79,8 @@
 
 **自托管**
 
-- Postgres / Redis / MinIO / ML 只绑定 `127.0.0.1`（见 `docker-compose.yml`）
+- 开发 Compose 里 Postgres / Redis / MinIO / ML 只绑定 `127.0.0.1`（见 `docker-compose.yml`）
+- 生产 Compose（`compose.prod.yml`）公网只映射 80/443，其余在内部网络。见 [deploy/self-host/README.md](deploy/self-host/README.md) 的「生产部署」
 - 公网只暴露反代后的 Web/API，并强制 HTTPS
 - 加固：防火墙只开 443、系统更新、磁盘告警、备份落到本机以外
 - 开发口令写在 `.env.example` 里，只为对齐 Compose；换到非本机前必须改掉
@@ -100,6 +101,8 @@ pnpm dev:api    # http://127.0.0.1:3001/health
 ```
 
 `docker compose ps` 应看到 `postgres`、`redis`、`minio`、`minio-init`（退出码 0）、`ml`。MinIO 控制台：<http://127.0.0.1:9001>。
+
+自托管生产（web / api / worker / Caddy 一条命令拉起）见 [deploy/self-host/README.md](deploy/self-host/README.md) 的「生产部署」。开发这条不要直接暴露到公网。
 
 可选：`pnpm dev:web`（3000）、`pnpm dev:worker`（等 Redis 就绪）。上传链路需要 API 和 Worker 同时在跑，步骤见下方「本地验证上传」。
 

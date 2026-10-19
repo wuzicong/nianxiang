@@ -7,6 +7,7 @@
 #
 # 次数可以改。出口 IP 若很多人共用，把 events 调高。
 # 边缘就是这台 Caddy 时用 {remote_host}。只有配了 trusted_proxies 才改成 {client_ip}。
+# 登录和注册的密码在 JSON 正文里。访问日志不要包含请求正文。
 
 (memora_share_limits) {
 	rate_limit {
@@ -28,6 +29,17 @@
 			key {remote_host}
 			window 1m
 			events 60
+		}
+		# 登录和注册共用额度。滑动窗口每分钟 5 次，第 6 次 429。
+		# 登出和 GET /api/v1/auth/me 不在这里。
+		zone memora_auth {
+			match {
+				method POST
+				path /api/v1/auth/login /api/v1/auth/register /api/v1/auth/login/ /api/v1/auth/register/
+			}
+			key {remote_host}
+			window 1m
+			events 5
 		}
 	}
 }

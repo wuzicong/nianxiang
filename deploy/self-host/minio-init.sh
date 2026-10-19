@@ -3,6 +3,26 @@
 # 口令只传给 mc，不写进这条脚本的输出。
 set -eu
 
+# 口令可以来自环境变量，也可以来自 *_FILE 或 /run/secrets（Docker secret）。读文件时不回显。
+if [ -z "${MINIO_ROOT_USER:-}" ]; then
+  for secret_file in ${MINIO_ROOT_USER_FILE:-} /run/secrets/MINIO_ROOT_USER; do
+    if [ -n "$secret_file" ] && [ -f "$secret_file" ]; then
+      MINIO_ROOT_USER="$(tr -d '\r\n' < "$secret_file")"
+      export MINIO_ROOT_USER
+      break
+    fi
+  done
+fi
+if [ -z "${MINIO_ROOT_PASSWORD:-}" ]; then
+  for secret_file in ${MINIO_ROOT_PASSWORD_FILE:-} /run/secrets/MINIO_ROOT_PASSWORD; do
+    if [ -n "$secret_file" ] && [ -f "$secret_file" ]; then
+      MINIO_ROOT_PASSWORD="$(tr -d '\r\n' < "$secret_file")"
+      export MINIO_ROOT_PASSWORD
+      break
+    fi
+  done
+fi
+
 : "${MINIO_ROOT_USER:?MINIO_ROOT_USER required}"
 : "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD required}"
 : "${S3_BUCKET:?S3_BUCKET required}"
