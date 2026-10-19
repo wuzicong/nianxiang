@@ -720,7 +720,15 @@ a.lib-primary {
 }
 
 /* —— 规范 v1：share-shell 变量 + 方格网格 + 吸顶 + 选择栏 —— */
+/* 图库根节点复用 share-shell 主题变量，但需覆盖 share-theme 里解锁页用的 grid/overflow */
 .lib.share-shell {
+  display: block;
+  place-items: unset;
+  place-content: unset;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
   --library-sticky-top: 7.25rem;
   --library-year-h: 2.75rem;
   --library-month-h: 2rem;
