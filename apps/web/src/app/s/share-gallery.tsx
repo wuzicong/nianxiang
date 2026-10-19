@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ThemeSkin } from "../../lib/themes";
 import type { PublicShareAsset, PublicSharePayload } from "../../lib/share";
+import { shareThemeStyle } from "./share-chrome";
 
 function imageUrl(asset: PublicShareAsset): string | null {
   return (
@@ -30,73 +31,54 @@ export function ShareGallery({
     if (focusTitleOnMount) titleRef.current?.focus();
   }, [focusTitleOnMount]);
 
+  const defaultRefresh = "刷新页面即可继续查看。";
+  const mergedNote =
+    refreshHint === undefined
+      ? `只读分享。图片地址大约 15 分钟内有效。${defaultRefresh}`
+      : "只读分享。图片地址大约 15 分钟内有效。";
+
   return (
     <main
+      className="share-gallery"
       data-share-state="open"
       data-theme={theme.id}
-      style={{
-        minHeight: "100vh",
-        background: theme.colors.background,
-        color: theme.colors.text,
-        padding: "3rem 1.25rem 4rem",
-      }}
+      style={shareThemeStyle(theme)}
     >
-      <article style={{ maxWidth: 960, margin: "0 auto" }}>
-        <p style={{ margin: 0 }}>
-          <a href="/" style={{ color: theme.colors.accent }}>
-            念册
-          </a>
+      <article className="share-gallery-inner">
+        <p className="share-gallery-brand">
+          <a href="/">念册</a>
         </p>
-        <p style={{ margin: "1.5rem 0 0", letterSpacing: "0.08em", color: theme.colors.accent }}>
-          {theme.name}
-        </p>
-        <h1
-          ref={titleRef}
-          tabIndex={-1}
-          style={{ margin: "0.35rem 0 0", fontWeight: 600, letterSpacing: "-0.03em", fontSize: "2.25rem" }}
-        >
-          {share.album.title}
-        </h1>
-        <p style={{ lineHeight: 1.6, maxWidth: 460 }}>
-          只读分享。图片地址大约 15 分钟内有效。
-          {refreshHint ?? "刷新页面即可继续查看。"}
-        </p>
+        <p className="share-gallery-kicker">{theme.name}</p>
+        <div className="share-gallery-title-block">
+          {theme.id === "cotton-candy" ? (
+            <span className="share-gallery-sparkle" aria-hidden="true" />
+          ) : null}
+          <h1 ref={titleRef} tabIndex={-1} className="share-gallery-title">
+            {share.album.title}
+          </h1>
+        </div>
+        <p className="share-gallery-note">{mergedNote}</p>
+        {refreshHint ? <p className="share-gallery-refresh">{refreshHint}</p> : null}
         {share.assets.length === 0 ? (
-          <p>这本相册还没有照片。</p>
+          <p className="share-gallery-empty">这本相册还没有照片。</p>
         ) : (
-          <ul
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: "1rem",
-              padding: 0,
-              margin: "2rem 0 0",
-              listStyle: "none",
-            }}
-          >
+          <ul className="share-gallery-grid">
             {share.assets.map((asset) => {
               const src = imageUrl(asset);
+              const caption = asset.filename?.trim() ? asset.filename : "照片";
               return (
-                <li
-                  key={asset.assetId}
-                  style={{
-                    background: theme.colors.primary,
-                    color: theme.colors.text,
-                    borderRadius: theme.radius.card,
-                    overflow: "hidden",
-                  }}
-                >
+                <li key={asset.assetId} className="share-gallery-card">
                   {src ? (
                     <img
                       src={src}
-                      alt={asset.filename || "照片"}
+                      alt={caption}
                       referrerPolicy="no-referrer"
-                      style={{ width: "100%", height: 220, objectFit: "cover", display: "block" }}
+                      className="share-gallery-photo"
                     />
                   ) : (
-                    <div style={{ height: 220, display: "grid", placeItems: "center" }}>暂无预览</div>
+                    <div className="share-gallery-photo share-gallery-photo--placeholder">暂无预览</div>
                   )}
-                  <p style={{ margin: 0, padding: "0.75rem 0.9rem" }}>{asset.filename || "照片"}</p>
+                  <p className="share-gallery-caption">{caption}</p>
                 </li>
               );
             })}

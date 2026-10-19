@@ -458,9 +458,226 @@
 
 /* 解锁成功：序章信封 → 交叉淡入相册 */
 .share-reveal {
+  --share-duration-1: 80ms;
+  --share-duration-2: 120ms;
+  --share-duration-3: 180ms;
+  --share-duration-4: 280ms;
+  --share-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
+}
+
+/* —— 解锁成功 · ShareGallery 轻序章（字阶 / 间距）—— */
+.share-gallery {
+  --share-duration-4: 280ms;
+  --share-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--share-bg);
+  color: var(--share-text);
+  font-family: var(--share-font-body);
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 1.5rem)
+    1.25rem
+    max(3rem, env(safe-area-inset-bottom, 0px));
+}
+
+.share-gallery-inner {
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+.share-gallery-brand {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.share-gallery-brand a {
+  color: color-mix(in srgb, var(--share-accent) 55%, var(--share-muted));
+  text-decoration-color: color-mix(in srgb, var(--share-accent) 40%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.share-gallery-brand a:focus-visible {
+  outline: 2px solid var(--share-accent);
+  outline-offset: 3px;
+}
+
+.share-gallery-kicker {
+  margin: 1.25rem 0 0;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  color: var(--share-muted);
+  text-transform: uppercase;
+}
+
+.share-gallery[data-theme="cotton-candy"] .share-gallery-kicker {
+  font-family: var(--share-font-title);
+  text-transform: none;
+  letter-spacing: 0.08em;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--share-brand) 38%, var(--share-muted));
+}
+
+.share-gallery[data-theme="kyoto-lantern"] .share-gallery-kicker {
+  font-family: var(--share-font-title);
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--share-brand) 72%, var(--share-muted));
+}
+
+.share-gallery-title-block {
+  position: relative;
+  margin: 0.4375rem 0 0;
+}
+
+.share-gallery-title {
+  margin: 0;
+  font-family: var(--share-font-title);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  line-height: 1.15;
+  color: var(--share-text);
+}
+
+.share-gallery[data-theme="cotton-candy"] .share-gallery-title {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.share-gallery[data-theme="kyoto-lantern"] .share-gallery-title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.share-gallery[data-theme="magazine-heirloom"] .share-gallery-title {
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.share-gallery-sparkle {
+  position: absolute;
+  top: 0.15rem;
+  left: -0.35rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--share-brand) 85%, white) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  animation: share-gallery-sparkle-once 380ms var(--share-ease-out) both;
+  animation-delay: var(--share-duration-4);
+}
+
+@keyframes share-gallery-sparkle-once {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  35% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+.share-gallery-note {
+  margin: 0.875rem 0 0;
+  max-width: 32rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--share-text);
+}
+
+.share-gallery-refresh {
+  margin: 0.375rem 0 0;
+  max-width: 32rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--share-muted);
+}
+
+.share-gallery-empty {
+  margin: 2rem 0 0;
+  color: var(--share-muted);
+}
+
+.share-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 1.75rem 0 0;
+  list-style: none;
+}
+
+.share-gallery-card {
+  background: var(--share-surface);
+  color: var(--share-text);
+  border-radius: var(--share-radius-card);
+  overflow: hidden;
+}
+
+.share-gallery-photo {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.share-gallery-photo--placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--share-muted);
+  font-size: 0.875rem;
+}
+
+.share-gallery-caption {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--share-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-gallery[data-theme="magazine-heirloom"]::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  pointer-events: none;
+  z-index: 2;
+  background: color-mix(in srgb, var(--share-accent) 85%, var(--share-text));
+  opacity: 0.8;
+}
+
+@media (min-width: 768px) {
+  .share-gallery {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+  }
+
+  .share-gallery-kicker {
+    margin-top: 1.5rem;
+  }
+
+  .share-gallery-grid {
+    gap: 0.875rem;
+    margin-top: 2.375rem;
+  }
 }
 
 .share-reveal-overture.share-shell {
@@ -554,6 +771,11 @@
     animation: none;
     opacity: 1;
     transform: none;
+  }
+
+  .share-gallery-sparkle {
+    animation: none;
+    display: none;
   }
 }
 
