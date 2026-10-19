@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { applyProxyResponseHeaders } from "@/lib/api-proxy";
 import { apiOrigin } from "@/lib/api-origin";
 
 export const dynamic = "force-dynamic";
@@ -44,12 +45,7 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
   }
 
   const responseHeaders = new Headers();
-  const contentType = upstream.headers.get("content-type");
-  if (contentType) responseHeaders.set("content-type", contentType);
-  for (const name of ["cache-control", "referrer-policy", "x-robots-tag"]) {
-    const value = upstream.headers.get(name);
-    if (value) responseHeaders.set(name, value);
-  }
+  applyProxyResponseHeaders(responseHeaders, upstream.headers);
   for (const cookie of upstream.headers.getSetCookie()) {
     responseHeaders.append("set-cookie", cookie);
   }

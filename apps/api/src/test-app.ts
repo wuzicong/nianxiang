@@ -507,6 +507,14 @@ export function fakeJobs(): AssetJobEnqueuer & { calls: unknown[] } {
   };
 }
 
+function withTestRateLimits(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    SHARE_READ_LIMIT: env.SHARE_READ_LIMIT ?? "1000",
+    SHARE_UNLOCK_LIMIT: env.SHARE_UNLOCK_LIMIT ?? "1000",
+  };
+}
+
 export function createTestApp(options?: {
   env?: NodeJS.ProcessEnv;
   assets?: ReturnType<typeof memoryAssets>;
@@ -521,7 +529,7 @@ export function createTestApp(options?: {
   const auth = options?.auth ?? memoryAuth();
   const albums = options?.albums ?? memoryAlbums(assets);
   assets.useAlbums?.(albums);
-  const config = createConfig(options?.env ?? ENV);
+  const config = createConfig(withTestRateLimits(options?.env ?? ENV));
   const app = createApp({ config, assets, objects, jobs, auth, albums });
   return { app, config, assets, objects, jobs, auth, albums };
 }
@@ -544,8 +552,9 @@ export async function postJson(
   path: string,
   body: unknown,
   cookie?: string,
+  extraHeaders?: Record<string, string>,
 ) {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = { "content-type": "application/json", ...extraHeaders };
   if (cookie) headers.cookie = cookie;
   const response = await fetch(`${base}${path}`, {
     method: "POST",
@@ -560,11 +569,17 @@ export async function postJson(
     cacheControl: response.headers.get("cache-control"),
     robots: response.headers.get("x-robots-tag"),
     referrerPolicy: response.headers.get("referrer-policy"),
+    retryAfter: response.headers.get("retry-after"),
   };
 }
 
-export async function getJson(base: string, path: string, cookie?: string) {
-  const headers: Record<string, string> = {};
+export async function getJson(
+  base: string,
+  path: string,
+  cookie?: string,
+  extraHeaders?: Record<string, string>,
+) {
+  const headers: Record<string, string> = { ...extraHeaders };
   if (cookie) headers.cookie = cookie;
   const response = await fetch(`${base}${path}`, { headers });
   const text = await response.text();
@@ -575,6 +590,7 @@ export async function getJson(base: string, path: string, cookie?: string) {
     cacheControl: response.headers.get("cache-control"),
     robots: response.headers.get("x-robots-tag"),
     referrerPolicy: response.headers.get("referrer-policy"),
+    retryAfter: response.headers.get("retry-after"),
   };
 }
 

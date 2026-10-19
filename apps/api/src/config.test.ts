@@ -54,6 +54,21 @@ test("cloud, staging, and production force Secure unless explicitly disabled", (
   );
 });
 
+test("share rate limits default to the edge budgets and ignore junk", () => {
+  const config = createConfig(ENV);
+  assert.equal(config.shareReadLimit, 60);
+  assert.equal(config.shareUnlockLimit, 6);
+  assert.equal(config.shareRateWindowMs, 60_000);
+  assert.equal(createConfig({ ...ENV, SHARE_READ_LIMIT: "12" }).shareReadLimit, 12);
+  assert.equal(createConfig({ ...ENV, SHARE_UNLOCK_LIMIT: "4" }).shareUnlockLimit, 4);
+  assert.equal(
+    createConfig({ ...ENV, SHARE_RATE_WINDOW_SECONDS: "30" }).shareRateWindowMs,
+    30_000,
+  );
+  assert.equal(createConfig({ ...ENV, SHARE_READ_LIMIT: "nope" }).shareReadLimit, 60);
+  assert.equal(createConfig({ ...ENV, SHARE_UNLOCK_LIMIT: "0" }).shareUnlockLimit, 6);
+});
+
 test("session, registration, and oidc flags do not retain the client secret", () => {
   assert.equal(createConfig({ ...ENV, SESSION_TTL_HOURS: "2" }).sessionTtlSeconds, 7200);
   assert.equal(

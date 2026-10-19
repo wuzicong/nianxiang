@@ -4,10 +4,12 @@ import {
   createAssetRepository,
   createAuthRepository,
   createObjectStore,
+  createRedisIncrCounter,
   objectStoreConfigFromRuntime,
   safeErrorMessage,
 } from "@memora/storage";
 import { config, logDeployWarnings } from "./config.js";
+import { createMemoryIncrCounter, createShareRateLimiter } from "./shares/rate-limit.js";
 import { createApp } from "./server.js";
 
 const objects = createObjectStore(objectStoreConfigFromRuntime(config));
@@ -24,7 +26,18 @@ const albums = createAlbumRepository({
   applicationName: "memora-api",
 });
 const jobs = createAssetJobEnqueuer(config.redisUrl);
-const app = createApp({ config, objects, assets, jobs, auth, albums });
+const shareCounter = createRedisIncrCounter(config.redisUrl);
+let shareRedisWarnedAt = 0;
+const shareRateLimit = createShareRateLimiter(shareCounter, config.shareRateWindowMs, {
+  fallback: createMemoryIncrCounter(),
+  onError(err) {
+    const now = Date.now();
+    if (now - shareRedisWarnedAt < 30_000) return;
+    shareRedisWarnedAt = now;
+    console.error("[memora-api] share rate-limit redis failed", safeErrorMessage(err));
+  },
+});
+const app = createApp({ config, objects, assets, jobs, auth, albums, shareRateLimit });
 
 const server = app.listen(config.port, "0.0.0.0", () => {
   logDeployWarnings();
@@ -37,6 +50,9 @@ async function shutdown(): Promise<void> {
   server.close();
   await jobs.close().catch((err) => {
     console.error("[memora-api] queue close failed", safeErrorMessage(err));
+  });
+  await shareCounter.close().catch((err) => {
+    console.error("[memora-api] share rate-limit close failed", safeErrorMessage(err));
   });
   await assets.close().catch((err) => {
     console.error("[memora-api] db close failed", safeErrorMessage(err));

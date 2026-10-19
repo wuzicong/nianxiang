@@ -32,6 +32,7 @@ import {
 } from "./auth/service.js";
 import { registerAlbumRoutes } from "./albums/http.js";
 import type { AppConfig } from "./config.js";
+import { createMemoryIncrCounter, createShareRateLimiter, type ShareRateLimiter } from "./shares/rate-limit.js";
 import { HttpError, asyncRoute } from "./http.js";
 import { parseLibraryLimit, presentLibraryAssets } from "./library/present.js";
 import { toPublicAsset } from "./present.js";
@@ -44,6 +45,8 @@ export interface AppDeps {
   jobs: AssetJobEnqueuer;
   auth: AuthRepository;
   albums: AlbumRepository;
+  /** 不传时用进程内计数。生产入口改走 Redis，多副本共用同一窗口。 */
+  shareRateLimit?: ShareRateLimiter;
 }
 
 function param(value: string | string[] | undefined): string {
@@ -350,11 +353,17 @@ export function createApp(deps: AppDeps): Express {
     }),
   );
 
+  const shareRateLimit =
+    deps.shareRateLimit ??
+    createShareRateLimiter(createMemoryIncrCounter(), deps.config.shareRateWindowMs);
   registerAlbumRoutes(app, {
     auth: deps.auth,
     albums: deps.albums,
     objects: deps.objects,
     sharePasswordRequired: deps.config.sharePasswordRequired,
+    shareRateLimit,
+    shareReadLimit: deps.config.shareReadLimit,
+    shareUnlockLimit: deps.config.shareUnlockLimit,
   });
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
