@@ -259,6 +259,7 @@ export function LibraryHome({
         width: p.width,
         height: p.height,
         error: p.error,
+        takenAt: p.takenAt,
         previews: p.previews,
       })),
     [photos],
@@ -336,7 +337,7 @@ export function LibraryHome({
       setComposerOpen(false);
       clearSelection();
       setToast(`已建好「${title.trim()}」，共 ${ids.length} 张`);
-      router.push(`/albums/${result.albumId}/preview`);
+      router.push(`/albums/${result.albumId}/preview?focus=title`);
     } catch {
       setCreateError("网络好像断了，选择还在，连上后再点一次");
     } finally {

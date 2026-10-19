@@ -52,11 +52,19 @@ function photoBudget(slot: AlbumSlot): number {
   return 0;
 }
 
-function captionFromFilename(filename: string): string {
-  const trimmed = filename.trim();
-  const base = trimmed.replace(/\.[a-z0-9]{1,8}$/i, "");
-  const text = base || "照片";
-  return text.length > 42 ? `${text.slice(0, 42)}…` : text;
+export const OWNED_PHOTO_ALT = "相册里的一张照片";
+
+const LITERAL_TAKEN = /^(\d{4})-(\d{2})-(\d{2})T/;
+
+/** 成册图注：有拍摄日则短日期（如 2024.5），否则留空。 */
+export function shortShootCaption(takenAt: string | null | undefined): string {
+  if (!takenAt) return "";
+  const match = LITERAL_TAKEN.exec(takenAt.trim());
+  if (!match) return "";
+  const year = match[1];
+  const month = Number(match[2]);
+  if (!month || month > 12) return "";
+  return `${year}.${month}`;
 }
 
 export interface OwnedAlbumFill {
@@ -100,10 +108,11 @@ export function buildOwnedAlbum(
       if (!asset) break;
       const src = derivativeSheetUrl(asset.previews, slot.type);
       if (!src) continue;
+      const caption = shortShootCaption(asset.takenAt);
       photos.push({
         id: asset.assetId,
-        alt: captionFromFilename(asset.filename),
-        caption: captionFromFilename(asset.filename),
+        alt: OWNED_PHOTO_ALT,
+        caption,
         src,
       });
       placed += 1;

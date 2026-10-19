@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AlbumFontScope } from "../../../album-fonts";
 import "../../../preview/album-preview.css";
+import "../../../s/share-theme.css";
 
 export const metadata: Metadata = {
   title: "成册预览 · 念册",

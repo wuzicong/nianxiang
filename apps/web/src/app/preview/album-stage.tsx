@@ -10,6 +10,10 @@ import { buttonInk, shareThemeStyle } from "../s/share-chrome";
 import { FlipBook, type FlipApi } from "./flip-book";
 import { SlotSheet, SvgMark } from "./slot-sheet";
 
+function albumShareHref(albumId: string): string {
+  return `/albums/${encodeURIComponent(albumId)}#album-create-share`;
+}
+
 export type AlbumStageSource =
   | { kind: "demo" }
   | {
@@ -35,6 +39,7 @@ export function AlbumStage({
   initialLayout,
   source,
   onPhotoError,
+  focusTitleOnMount = false,
 }: {
   theme: AlbumTheme;
   album: DemoAlbum;
@@ -42,14 +47,21 @@ export function AlbumStage({
   initialLayout: AlbumLayoutMode;
   source: AlbumStageSource;
   onPhotoError?: (src: string) => void;
+  focusTitleOnMount?: boolean;
 }) {
   const router = useRouter();
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [layout, setLayout] = useState<AlbumLayoutMode>(initialLayout);
   const [prefersReduced, setPrefersReduced] = useState(false);
 
   useEffect(() => {
     setLayout(initialLayout);
   }, [initialLayout, theme.skin.id]);
+
+  useEffect(() => {
+    if (!focusTitleOnMount) return;
+    titleRef.current?.focus({ preventScroll: true });
+  }, [focusTitleOnMount, album.title]);
 
   useEffect(() => {
     if (!theme.respectReducedMotion) return;
@@ -101,19 +113,26 @@ export function AlbumStage({
       </div>
 
       <div className="album-toolbar">
-        <p className="toolbar-brand">
-          <Link href="/">念册</Link>
-          <span aria-hidden="true"> / </span>
+        <div className="toolbar-row toolbar-row-head">
+          <p className="toolbar-brand">
+            <Link href="/">念册</Link>
+            <span aria-hidden="true"> / </span>
+            {source.kind === "owned" ? (
+              <>
+                <Link href="/albums">相册</Link>
+                <span aria-hidden="true"> / </span>
+                <Link href={`/albums/${encodeURIComponent(source.albumId)}`}>返回这本</Link>
+              </>
+            ) : (
+              <Link href="/preview">样张</Link>
+            )}
+          </p>
           {source.kind === "owned" ? (
-            <>
-              <Link href="/albums">相册</Link>
-              <span aria-hidden="true"> / </span>
-              <Link href={`/albums/${encodeURIComponent(source.albumId)}`}>返回这本</Link>
-            </>
-          ) : (
-            <Link href="/preview">样张</Link>
-          )}
-        </p>
+            <Link className="owned-share-cta" href={albumShareHref(source.albumId)}>
+              生成分享链接
+            </Link>
+          ) : null}
+        </div>
         {source.kind === "demo" ? (
           <nav className="theme-switch" aria-label="模板">
             {THEME_IDS.map((id) => {
@@ -132,12 +151,12 @@ export function AlbumStage({
             })}
           </nav>
         ) : (
-          <p className="layout-note">
+          <p className="layout-note owned-sample-link">
             <Link href={`/preview/${theme.skin.id}`}>同主题样张</Link>
           </p>
         )}
         {theme.layouts.length > 1 ? (
-          <div className="layout-switch" role="group" aria-label="版式">
+          <div className="layout-switch toolbar-row-layout" role="group" aria-label="版式">
             <button type="button" aria-pressed={layout === "story"} onClick={() => selectLayout("story")}>
               故事
             </button>
@@ -152,7 +171,7 @@ export function AlbumStage({
 
       <header className="album-intro">
         <p className="kicker">{theme.englishName}</p>
-        <h1>{album.title}</h1>
+        <h1 tabIndex={-1} ref={titleRef}>{album.title}</h1>
         <p className="lede">{album.subtitle}</p>
         {source.kind === "demo" ? (
           <p className="sample-note">样张预览，使用示例图片，不读取上传的照片。</p>

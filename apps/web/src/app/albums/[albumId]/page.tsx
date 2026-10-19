@@ -152,7 +152,9 @@ export default function AlbumDetailPage() {
               onUploaded={() => void refresh("silent")}
             />
           </div>
-          <CreateShareForm albumId={album.albumId} theme={skin} onCreated={() => void refreshShares()} />
+          <div id="album-create-share">
+            <CreateShareForm albumId={album.albumId} theme={skin} onCreated={() => void refreshShares()} />
+          </div>
           <AlbumShareList shares={shares} revokingId={revokingId} onRevoke={(shareId) => void revoke(shareId)} />
         </>
       ) : null}
