@@ -144,27 +144,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0.42rem 0.95rem;
   font: inherit;
   font-weight: 600;
   text-decoration: none;
-  color: var(--share-ink);
-  background: var(--share-brand);
-  border: 1px solid transparent;
+  color: var(--share-bg);
+  background: var(--share-text);
+  border: 1px solid var(--share-text);
   border-radius: var(--share-radius-button);
 }
 
 .album-shell[data-theme="cotton-candy"] .owned-share-cta {
   border-radius: var(--share-radius-pill);
+  color: var(--share-ink);
+  background: var(--share-brand);
+  border-color: var(--share-brand);
 }
 
 .album-shell[data-theme="magazine-heirloom"] .owned-share-cta {
   border-radius: 2px;
   letter-spacing: 0.08em;
-  color: var(--share-bg);
-  background: var(--share-text);
-  border-color: var(--share-text);
 }
 
 .owned-share-cta:focus-visible {
@@ -176,8 +176,43 @@
   flex: 1 1 100%;
 }
 
+.album-shell[data-album-source="owned"] .toolbar-brand {
+  font-size: 0.875rem;
+  color: var(--share-muted);
+}
+
+.album-shell[data-album-source="owned"] .toolbar-brand a {
+  color: var(--share-muted);
+}
+
+.owned-toolbar-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+  margin-left: auto;
+}
+
 .album-shell[data-album-source="owned"] .owned-sample-link {
   flex: 1 1 auto;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.album-shell[data-album-source="owned"] .owned-sample-link a {
+  color: var(--share-muted);
+  font-weight: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.album-shell[data-album-source="owned"] .owned-toolbar-back {
+  color: var(--share-text);
+  font-weight: 400;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  white-space: nowrap;
 }
 
 .album-shell[data-album-source="owned"] .toolbar-row-layout,
@@ -1148,6 +1183,12 @@ figcaption.slot-empty {
   margin: 0 0 1rem;
   position: relative;
   z-index: 1;
+  font-size: 0.875rem;
+  color: var(--share-muted);
+}
+
+.preview-owned-crumb a {
+  color: var(--share-muted);
 }
 
 .preview-owned-title {
@@ -1200,9 +1241,36 @@ figcaption.slot-empty {
   font: inherit;
   font-weight: 600;
   text-decoration: none;
+  color: var(--share-bg);
+  background: var(--share-text);
+  border: 1px solid var(--share-text);
+  border-radius: var(--share-radius-button);
+}
+
+.share-shell.preview-owned-shell[data-theme="cotton-candy"] .preview-owned-primary {
+  border-radius: var(--share-radius-pill);
   color: var(--share-ink);
   background: var(--share-brand);
-  border-radius: var(--share-radius-button);
+  border-color: var(--share-brand);
+}
+
+.share-shell.preview-owned-shell[data-theme="magazine-heirloom"] .preview-owned-primary {
+  border-radius: 2px;
+  letter-spacing: 0.08em;
+}
+
+.preview-owned-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.15rem;
+  font: inherit;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  color: var(--share-text);
+  background: transparent;
+  border: 0;
 }
 
 .preview-owned-secondary,
@@ -1227,7 +1295,8 @@ button.preview-owned-secondary {
 }
 
 .preview-owned-primary:focus-visible,
-.preview-owned-secondary:focus-visible {
+.preview-owned-secondary:focus-visible,
+.preview-owned-back:focus-visible {
   outline: 2px solid var(--share-accent);
   outline-offset: 3px;
 }
@@ -1436,7 +1505,7 @@ button.preview-owned-secondary {
 
   .album-shell[data-album-source="owned"] .owned-sample-link {
     margin: 0;
-    width: 100%;
+    width: auto;
   }
 
   .album-shell[data-album-source="owned"] .toolbar-row-layout {
