@@ -80,7 +80,7 @@
 **自托管**
 
 - 开发 Compose 里 Postgres / Redis / MinIO / ML 只绑定 `127.0.0.1`（见 `docker-compose.yml`）
-- 生产 Compose（`compose.prod.yml`）公网只映射 80/443，其余在内部网络。见 [deploy/self-host/README.md](deploy/self-host/README.md) 的「生产部署」
+- 生产 Compose（`compose.prod.yml`）公网只映射 80/443，其余在内部网络。证书续期、健康检查和活体抽查见 [deploy/self-host/README.md](deploy/self-host/README.md) 的「生产部署」
 - 公网只暴露反代后的 Web/API，并强制 HTTPS
 - 加固：防火墙只开 443、系统更新、磁盘告警、备份落到本机以外。演练和验收清单在 [deploy/self-host/README.md](deploy/self-host/README.md)
 - 开发口令写在 `.env.example` 里，只为对齐 Compose；换到非本机前必须改掉
