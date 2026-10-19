@@ -853,6 +853,10 @@ a.lib-primary {
 }
 
 @media (max-width: 767px) {
+  .lib-sticky-pseudo-mount .lib-sticky-month.lib-sticky-pseudo {
+    top: 0;
+  }
+
   .lib.share-shell {
     --library-sticky-top: 6.5rem;
     --library-year-h: 0px;
@@ -1028,6 +1032,32 @@ a.lib-primary {
   position: relative;
 }
 
+.lib-sticky-pseudo-mount {
+  position: sticky;
+  top: var(--library-sticky-top);
+  z-index: 9;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lib-sticky-pseudo-mount .lib-sticky-pseudo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0;
+}
+
+.lib-sticky-pseudo-mount .lib-sticky-year.lib-sticky-pseudo {
+  top: 0;
+}
+
+.lib-sticky-pseudo-mount .lib-sticky-month.lib-sticky-pseudo {
+  top: var(--library-year-h);
+}
+
 .lib-virtual-spacer {
   display: block;
   width: 100%;
@@ -1036,11 +1066,11 @@ a.lib-primary {
 
 .lib-timeline {
   position: fixed;
-  right: 0.35rem;
+  right: 0.15rem;
   top: calc(var(--library-sticky-top) + 1rem);
   bottom: 5rem;
   z-index: 5;
-  width: 1.25rem;
+  width: 24px;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -1049,12 +1079,24 @@ a.lib-primary {
 
 .lib-timeline-rail {
   position: relative;
-  width: 4px;
+  width: 24px;
+  min-width: 24px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--share-muted) 35%, transparent);
   pointer-events: auto;
   cursor: pointer;
   touch-action: none;
+}
+
+.lib-timeline-rail::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--share-muted) 35%, transparent);
 }
 
 .lib-timeline-thumb {

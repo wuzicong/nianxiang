@@ -12,8 +12,7 @@ import {
   buildDaySegments,
   buildMonthAnchors,
   libraryGridLayout,
-  segmentBlockHeight,
-  segmentHeaders,
+  stickyContextAtScroll,
   virtualWindowForScroll,
   type DaySegment,
 } from "../../lib/library-virtual";
@@ -67,6 +66,7 @@ export function LibraryGrid({
     () => virtualWindowForScroll(segments, scrollTop, viewportHeight, layout),
     [segments, scrollTop, viewportHeight, layout],
   );
+  const stickyCtx = useMemo(() => stickyContextAtScroll(segments, scrollTop), [segments, scrollTop]);
 
   const measure = useCallback(() => {
     const frame = frameRef.current;
@@ -167,13 +167,24 @@ export function LibraryGrid({
         onKeyDown={onKeyDown}
         style={{ minHeight: virtual.totalHeight > 0 ? virtual.totalHeight : undefined }}
       >
+        {stickyCtx && !stickyCtx.undated ? (
+          <div className="lib-sticky-pseudo-mount" aria-hidden="true">
+            {!layout.mobile ? (
+              <div className="lib-sticky-year lib-sticky-pseudo">
+                <span className="lib-sticky-year-num">{stickyCtx.year}</span>
+              </div>
+            ) : null}
+            <p className="lib-sticky-month lib-sticky-pseudo">
+              <span className="lib-sticky-month-inline">{stickyCtx.year} · </span>
+              {stickyCtx.month} 月
+            </p>
+          </div>
+        ) : null}
         {virtual.totalHeight > 0 ? <div className="lib-virtual-spacer" style={{ height: virtual.topSpacer }} aria-hidden="true" /> : null}
-        {visibleSegments.map(({ segment, index }) => (
+        {visibleSegments.map(({ segment }) => (
           <DayBlock
             key={segment.key}
             segment={segment}
-            previous={index > 0 ? segments[index - 1]! : null}
-            layout={layout}
             timeZone={timeZone}
             selected={selected}
             selecting={selecting}
@@ -209,8 +220,6 @@ function countTiles(items: { segment: DaySegment }[]): number {
 
 function DayBlock({
   segment,
-  previous,
-  layout,
   timeZone,
   selected,
   selecting,
@@ -224,8 +233,6 @@ function DayBlock({
   onPreviewError,
 }: {
   segment: DaySegment;
-  previous: DaySegment | null;
-  layout: ReturnType<typeof libraryGridLayout>;
   timeZone: string;
   selected: string[];
   selecting: boolean;
@@ -238,8 +245,6 @@ function DayBlock({
   onSelectDay: (ids: string[], select: boolean) => void;
   onPreviewError: (src: string) => void;
 }) {
-  const headers = segmentHeaders(segment, layout, previous);
-
   const selectableIds = segment.photos.filter(libraryPhotoSelectable).map((p) => p.assetId);
   const selectedInDay = selectableIds.filter((id) => selected.includes(id)).length;
   const dayChecked =
@@ -253,19 +258,8 @@ function DayBlock({
     <section
       className="lib-day-block"
       aria-labelledby={segment.undated ? undefined : `day-${segment.key}`}
-      style={{ minHeight: segmentBlockHeight(segment, layout, previous) }}
+      style={{ minHeight: segment.height }}
     >
-      {headers.year ? (
-        <div className="lib-sticky-year">
-          <span className="lib-sticky-year-num">{segment.year}</span>
-        </div>
-      ) : null}
-      {headers.month ? (
-        <p className="lib-sticky-month">
-          <span className="lib-sticky-month-inline">{segment.year} · </span>
-          {segment.month} 月
-        </p>
-      ) : null}
       <div className="lib-sticky-day">
         <h3 id={segment.undated ? undefined : `day-${segment.key}`}>
           {segment.undated

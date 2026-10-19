@@ -72,6 +72,12 @@ export interface VirtualWindow {
   totalHeight: number;
 }
 
+export interface StickyContext {
+  year: number;
+  month: number;
+  undated: boolean;
+}
+
 const DEFAULT_OVERSCAN_PX = 900;
 
 export function buildDaySegments(groups: TimeGroups, layout: LibraryGridLayout): DaySegment[] {
@@ -79,7 +85,6 @@ export function buildDaySegments(groups: TimeGroups, layout: LibraryGridLayout):
   let offset = 0;
   let lastYear: number | null = null;
   let lastMonthKey: string | null = null;
-  let previous: DaySegment | null = null;
 
   for (const year of groups.years) {
     for (const month of year.months) {
@@ -89,7 +94,14 @@ export function buildDaySegments(groups: TimeGroups, layout: LibraryGridLayout):
         const isFirstOfMonth = lastMonthKey !== monthKey;
         lastYear = year.year;
         lastMonthKey = monthKey;
-        const draft: DaySegment = {
+        const height = segmentBlockHeight(
+          {
+            photos: day.photos,
+            undated: false,
+          },
+          layout,
+        );
+        segments.push({
           key: day.key,
           year: year.year,
           month: month.month,
@@ -100,20 +112,17 @@ export function buildDaySegments(groups: TimeGroups, layout: LibraryGridLayout):
           isFirstOfYear,
           isFirstOfMonth,
           undated: false,
-          height: 0,
+          height,
           offset,
-        };
-        const height = segmentBlockHeight(draft, layout, previous);
-        draft.height = height;
-        segments.push(draft);
+        });
         offset += height;
-        previous = draft;
       }
     }
   }
 
   if (groups.undated.length > 0) {
-    const draft: DaySegment = {
+    const height = segmentBlockHeight({ photos: groups.undated, undated: true }, layout);
+    segments.push({
       key: "undated",
       year: 0,
       month: 0,
@@ -124,11 +133,9 @@ export function buildDaySegments(groups: TimeGroups, layout: LibraryGridLayout):
       isFirstOfYear: true,
       isFirstOfMonth: true,
       undated: true,
-      height: 0,
+      height,
       offset,
-    };
-    draft.height = segmentBlockHeight(draft, layout, previous);
-    segments.push(draft);
+    });
   }
 
   return segments;
@@ -151,6 +158,19 @@ export function buildMonthAnchors(segments: readonly DaySegment[]): MonthAnchor[
     });
   }
   return anchors;
+}
+
+/** 视口顶缘对应的年/月（伪吸顶文案）；日组高度不含年/月头。 */
+export function stickyContextAtScroll(
+  segments: readonly DaySegment[],
+  scrollTop: number,
+): StickyContext | null {
+  if (segments.length === 0) return null;
+  const index = findSegmentAt(segments, scrollTop);
+  const segment = segments[index];
+  if (!segment) return null;
+  if (segment.undated) return { year: 0, month: 0, undated: true };
+  return { year: segment.year, month: segment.month, undated: false };
 }
 
 export function virtualWindowForScroll(
@@ -182,7 +202,7 @@ export function virtualWindowForScroll(
 export function maxRenderedTiles(
   segments: readonly DaySegment[],
   window: VirtualWindow,
-  layout: LibraryGridLayout,
+  _layout: LibraryGridLayout,
 ): number {
   if (window.end < window.start) return 0;
   let tiles = 0;
@@ -194,27 +214,12 @@ export function maxRenderedTiles(
   return tiles;
 }
 
-export function segmentHeaders(
-  segment: DaySegment,
-  layout: LibraryGridLayout,
-  previous: DaySegment | null | undefined,
-): { year: boolean; month: boolean } {
-  if (segment.undated) return { year: false, month: false };
-  const year = !layout.mobile && (!previous || previous.year !== segment.year);
-  const month = !previous || previous.year !== segment.year || previous.month !== segment.month;
-  return { year, month };
-}
-
+/** 日组块高度：仅日头 + 方格网格（年/月由伪吸顶层承担）。 */
 export function segmentBlockHeight(
-  segment: DaySegment,
+  segment: Pick<DaySegment, "photos" | "undated">,
   layout: LibraryGridLayout,
-  previous: DaySegment | null | undefined,
 ): number {
-  const headers = segmentHeaders(segment, layout, previous);
-  let headerPx = layout.dayHeader;
-  if (headers.month) headerPx += layout.monthHeader;
-  if (headers.year) headerPx += layout.yearHeader;
-  if (segment.undated) headerPx = layout.dayHeader;
+  const headerPx = layout.dayHeader;
   const rows = Math.max(1, Math.ceil(segment.photos.length / layout.columns));
   const grid = rows * layout.tileSize + Math.max(0, rows - 1) * layout.gap;
   return headerPx + grid;

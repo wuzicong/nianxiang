@@ -6,6 +6,8 @@ import {
   buildDaySegments,
   libraryGridLayout,
   maxRenderedTiles,
+  segmentBlockHeight,
+  stickyContextAtScroll,
   virtualWindowForScroll,
 } from "../src/lib/library-virtual";
 
@@ -32,4 +34,23 @@ test("segment offsets are monotonic and cover total height", () => {
     const current = segments[index]!;
     assert.equal(current.offset, prev.offset + prev.height);
   }
+});
+
+test("day segment height ignores year/month headers", () => {
+  const layout = libraryGridLayout(1280, false);
+  const three = segmentBlockHeight({ photos: generateMockLibraryPhotos(3), undated: false }, layout);
+  const sameMonthLater = segmentBlockHeight({ photos: generateMockLibraryPhotos(3), undated: false }, layout);
+  assert.equal(three, sameMonthLater);
+  assert.ok(three < layout.dayHeader + layout.yearHeader + layout.monthHeader + 400);
+});
+
+test("sticky context follows scroll position within the same month", () => {
+  const photos = generateMockLibraryPhotos(90);
+  const segments = buildDaySegments(groupPhotosByTime(photos, "UTC"), libraryGridLayout(1280, false));
+  const monthBucket = segments.filter((s) => !s.undated && s.month === segments[0]!.month && s.year === segments[0]!.year);
+  assert.ok(monthBucket.length >= 2, "need multiple days in a month");
+  const second = monthBucket[1]!;
+  const ctx = stickyContextAtScroll(segments, second.offset + 2);
+  assert.equal(ctx?.year, second.year);
+  assert.equal(ctx?.month, second.month);
 });
