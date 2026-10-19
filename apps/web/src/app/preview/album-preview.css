@@ -149,6 +149,9 @@
 .album-shell[data-theme="magazine-heirloom"] .owned-share-cta {
   border-radius: 2px;
   letter-spacing: 0.08em;
+  color: var(--share-bg);
+  background: var(--share-text);
+  border-color: var(--share-text);
 }
 
 .owned-share-cta:focus-visible {
@@ -183,7 +186,6 @@
 
 .theme-switch,
 .layout-switch,
-.slot-nav,
 .flip-controls {
   display: flex;
   flex-wrap: wrap;
@@ -208,9 +210,16 @@
   border-radius: var(--share-radius-pill);
 }
 
-.theme-switch a[aria-current="page"] {
+.theme-switch a[aria-current="page"],
+.slot-nav a[aria-current="true"] {
   background: var(--share-surface);
   border-color: var(--share-brand);
+}
+
+.album-shell[data-theme="magazine-heirloom"] .slot-nav a[aria-current="true"] {
+  background: var(--share-text);
+  color: var(--share-bg);
+  border-color: var(--share-text);
 }
 
 .layout-switch button,
@@ -346,7 +355,22 @@ figcaption {
 }
 
 .slot-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
   margin-top: 0.9rem;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 0.1rem;
+}
+
+.slot-nav a {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .album-story {
@@ -901,6 +925,7 @@ figcaption.slot-empty {
 .flip-controls {
   justify-content: center;
   margin-top: 0.75rem;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .flip-controls p {
