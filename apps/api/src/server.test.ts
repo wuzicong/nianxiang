@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { JOB_NAMES, originalObjectKey } from "@memora/shared";
-import type { AssetStatus, ExifSummary } from "@memora/storage";
+import { JOB_NAMES, derivativeObjectKey, originalObjectKey } from "@memora/shared";
+import type { AssetStatus } from "@memora/storage";
 import {
   ENV,
   TEST_PASSWORD,
@@ -183,33 +183,164 @@ test("complete enqueues derivative and exif after the object lands", async () =>
   });
 });
 
-test("asset read model omits GPS coordinates", async () => {
-  const exif: ExifSummary = {
-    hasGps: true,
-    lat: 30.1,
-    lng: 120.2,
-    width: 10,
-    capturedAt: "2020-01-02T00:00:00.000Z",
-  };
+test("asset read returns signed previews only and hides the original key and exif", async () => {
   const assets = memoryAssets();
-  const { app } = createTestApp({ assets, objects: fakeObjects(), jobs: fakeJobs() });
-  await withServer(app, async (base) => {
-    const session = await registerSession(base);
-    assets.rows.set(
-      "asset1",
-      record({ id: "asset1", userId: session.user.id, status: "ready", exif, width: 10 }),
-    );
-    const response = await getJson(base, "/api/v1/assets/asset1", session.cookie);
-    const body = response.body as { exif: Record<string, unknown>; status: string; userId: string };
-    assert.equal(response.status, 200);
-    assert.equal(body.status, "ready");
-    assert.equal(body.userId, session.user.id);
-    assert.equal(body.exif.hasGps, true);
-    assert.equal(body.exif.capturedAt, "2020-01-02T00:00:00.000Z");
-    assert.equal("lat" in body.exif, false);
-    assert.equal("lng" in body.exif, false);
-    assert.equal(JSON.stringify(body).includes("30.1"), false);
+  const objects = fakeObjects();
+  const logs: string[] = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  console.log = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const { app } = createTestApp({ assets, objects, jobs: fakeJobs() });
+    await withServer(app, async (base) => {
+      const session = await registerSession(base);
+      const assetId = "asset1";
+      const thumb = derivativeObjectKey(session.user.id, assetId, "thumb");
+      const preview = derivativeObjectKey(session.user.id, assetId, "preview");
+      const original = originalObjectKey(session.user.id, assetId);
+      assets.rows.set(
+        assetId,
+        record({
+          id: assetId,
+          userId: session.user.id,
+          status: "ready",
+          filename: "harbor.jpg",
+          width: 640,
+          height: 480,
+          storageKey: original,
+          derivatives: { thumb, preview, hero: original },
+          exif: {
+            hasGps: true,
+            lat: 30.1,
+            lng: 120.2,
+            width: 640,
+            format: "jpeg",
+            orientation: 6,
+            capturedAt: "2020:01:02 03:04:05",
+            error: "gps 30.1,120.2",
+          },
+          error:
+            "http://127.0.0.1:9000/memora-local/users/u/originals/asset1?X-Amz-Signature=supersecret",
+        }),
+      );
+      const response = await getJson(base, `/api/v1/assets/${assetId}`, session.cookie);
+      assert.equal(response.status, 200);
+      assert.equal(response.cacheControl, "private, no-store");
+      assert.equal(response.referrerPolicy, "no-referrer");
+      const body = response.body as {
+        assetId: string;
+        filename: string;
+        status: string;
+        width: number;
+        height: number;
+        takenAt: string | null;
+        uploadedAt: string;
+        error: string | null;
+        key?: string;
+        userId?: string;
+        exif?: unknown;
+        derivatives?: unknown;
+        storageKey?: string;
+        previews: { thumb?: { url: string; expiresAt: string }; preview?: { url: string }; hero?: { url: string } };
+      };
+      assert.deepEqual(Object.keys(body).sort(), [
+        "assetId",
+        "error",
+        "filename",
+        "height",
+        "previews",
+        "status",
+        "takenAt",
+        "uploadedAt",
+        "width",
+      ]);
+      assert.equal(body.assetId, assetId);
+      assert.equal(body.filename, "harbor.jpg");
+      assert.equal(body.status, "ready");
+      assert.equal(body.width, 640);
+      assert.equal(body.height, 480);
+      assert.equal(body.takenAt, "2020-01-02T03:04:05");
+      assert.equal(body.uploadedAt, "2026-01-01T00:00:00.000Z");
+      assert.equal(body.error, null);
+      assert.equal(body.key, undefined);
+      assert.equal(body.userId, undefined);
+      assert.equal(body.exif, undefined);
+      assert.equal(body.derivatives, undefined);
+      assert.equal(body.storageKey, undefined);
+      assert.match(body.previews.thumb?.url ?? "", /\/derivatives\//);
+      assert.match(body.previews.thumb?.url ?? "", /X-Amz-Signature=/);
+      assert.match(body.previews.preview?.url ?? "", /\/derivatives\//);
+      assert.equal(body.previews.thumb?.expiresAt, "2026-01-01T00:10:00.000Z");
+      assert.equal(body.previews.hero, undefined);
+      const json = JSON.stringify(body);
+      assert.equal(json.includes("/originals/"), false);
+      assert.equal(json.includes(original), false);
+      assert.equal(json.includes("30.1"), false);
+      assert.equal(json.includes("120.2"), false);
+      assert.equal(json.includes("hasGps"), false);
+      assert.equal(json.includes("exif"), false);
+      assert.equal(json.includes("jpeg"), false);
+      assert.deepEqual(objects.presignGets, [thumb, preview]);
+      assert.equal(logs.join("\n").includes("supersecret"), false);
+    });
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test("asset read presign failures do not echo the signed url", async () => {
+  const assets = memoryAssets();
+  const objects = fakeObjects({
+    presignGetError: new Error(
+      "http://127.0.0.1:9000/memora-local/users/u/derivatives/asset1/thumb.webp?X-Amz-Signature=supersecret",
+    ),
   });
+  const logs: string[] = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  console.log = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  try {
+    const { app } = createTestApp({ assets, objects, jobs: fakeJobs() });
+    await withServer(app, async (base) => {
+      const session = await registerSession(base);
+      const assetId = "asset1";
+      assets.rows.set(
+        assetId,
+        record({
+          id: assetId,
+          userId: session.user.id,
+          status: "ready",
+          derivatives: { thumb: derivativeObjectKey(session.user.id, assetId, "thumb") },
+          exif: { hasGps: true, lat: 30.1, lng: 120.2, capturedAt: "2020:01:02 03:04:05" },
+        }),
+      );
+      const response = await getJson(base, `/api/v1/assets/${assetId}`, session.cookie);
+      assert.equal(response.status, 502);
+      assert.equal((response.body as { error: string }).error, "presign_failed");
+      const json = JSON.stringify(response.body);
+      assert.equal(json.includes("supersecret"), false);
+      assert.equal(json.includes("30.1"), false);
+      assert.equal(json.includes("/originals/"), false);
+      assert.equal(json.includes("exif"), false);
+      const text = logs.join("\n");
+      assert.equal(text.includes("supersecret"), false);
+      assert.equal(text.includes("X-Amz-Signature"), false);
+    });
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
 });
 
 test("misconfigured bucket refuses to presign", async () => {

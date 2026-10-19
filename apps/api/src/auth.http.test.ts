@@ -88,7 +88,24 @@ test("login session can upload, and another user gets 404", async () => {
 
     const ownRead = await getJson(base, `/api/v1/assets/${body.assetId}`, owner.cookie);
     assert.equal(ownRead.status, 200);
-    assert.equal((ownRead.body as { userId: string }).userId, owner.user.id);
+    assert.equal(ownRead.cacheControl, "private, no-store");
+    assert.equal(ownRead.referrerPolicy, "no-referrer");
+    const ownBody = ownRead.body as {
+      assetId: string;
+      status: string;
+      userId?: string;
+      key?: string;
+      exif?: unknown;
+      previews?: Record<string, unknown>;
+    };
+    assert.equal(ownBody.assetId, body.assetId);
+    assert.equal(ownBody.status, "pending_upload");
+    assert.equal(ownBody.userId, undefined);
+    assert.equal(ownBody.key, undefined);
+    assert.equal(ownBody.exif, undefined);
+    assert.deepEqual(ownBody.previews, {});
+    assert.equal(JSON.stringify(ownRead.body).includes(body.key), false);
+    assert.equal(JSON.stringify(ownRead.body).includes("/originals/"), false);
 
     const missing = await getJson(base, "/api/v1/assets/missing-asset", owner.cookie);
     assert.equal(missing.status, 404);
